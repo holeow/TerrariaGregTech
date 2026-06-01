@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System.IO;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 

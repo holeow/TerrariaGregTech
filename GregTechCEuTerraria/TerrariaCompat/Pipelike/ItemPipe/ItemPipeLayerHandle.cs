@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.Api.Pipenet;
 using GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 using GregTechCEuTerraria.TerrariaCompat.Net;
@@ -49,7 +50,7 @@ public sealed class ItemPipeLayerHandle : IGridLayerHandle
 	// static so the MP packet handlers can call it after their mutations.
 	internal static void NotifyAdjacentCoversNeighborChanged(int x, int y)
 	{
-		foreach (var (_, dx, dy) in Machine.MachineSides.Cardinal4)
+		foreach (var (_, dx, dy) in IODirectionExtensions.Cardinal4)
 		{
 			int nx = x + dx, ny = y + dy;
 			var pcv = ItemPipeLayerSystem.GetSides(nx, ny);

@@ -12,6 +12,7 @@ using GregTechCEuTerraria.Api.Fluids;
 using GregTechCEuTerraria.Api.Machine;
 using GregTechCEuTerraria.Api.Machine.Trait;
 using GregTechCEuTerraria.Common.Machine.Trait;
+using GregTechCEuTerraria.TerrariaCompat.Capabilities;
 using GregTechCEuTerraria.TerrariaCompat.Capabilities.Handlers;
 using GregTechCEuTerraria.TerrariaCompat.Cover;
 using GregTechCEuTerraria.TerrariaCompat.Net;
@@ -27,7 +28,7 @@ namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 // flattened (we don't need MC's trait/capability layering). Lifecycle:
 // MetaMachineTile.PlaceInWorld -> Place(i,j); KillMultiTile -> entity removal +
 // OnKill().
-public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable, IFancyTooltip
+public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable, IFancyTooltip, ISidedCapabilityProvider
 {
 	// tML Activator-builds entities via the parameterless ctor (losing the
 	// prototype tier). _persistedTier is the per-instance source of truth -
@@ -407,6 +408,14 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 			result = cover.GetFluidHandlerCap(result);
 		return result;
 	}
+
+	// ISidedCapabilityProvider seam - forwards to the cover-aware resolvers above;
+	// explicit impl so the public surface stays GetXHandlerCap.
+	IItemHandler? ISidedCapabilityProvider.GetItemHandler(IODirection side) =>
+		GetItemHandlerCap(side, useCoverCapability: true);
+
+	IFluidHandler? ISidedCapabilityProvider.GetFluidHandler(IODirection side) =>
+		GetFluidHandlerCap(side, useCoverCapability: true);
 
 	// None / non-cardinal = sideless query (never cover-gated).
 	private static CoverSide? CoverSideOf(IODirection side) => side switch

@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System;
 using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.Api.Cover.Filter;

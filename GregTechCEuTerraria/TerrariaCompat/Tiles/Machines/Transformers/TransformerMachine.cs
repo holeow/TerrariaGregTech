@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System;
 using System.Collections.Generic;
 using GregTechCEuTerraria.Api.Machine.Trait;

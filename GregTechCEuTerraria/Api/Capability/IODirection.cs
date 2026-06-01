@@ -1,7 +1,14 @@
 #nullable enable
-namespace GregTechCEuTerraria.TerrariaCompat.Machine;
+using System.Collections.Generic;
 
-// I/O side picker. None = off. Tile-Y grows downward: Up = -Y, Down = +Y.
+namespace GregTechCEuTerraria.Api.Capability;
+
+// DEVIATION: 2D adaptation of net.minecraft.core.Direction (6-way → 4-way + None).
+// The capability-access `side` primitive for GetItemHandlerCap / IFluidHandler
+// resolution and pipe + energy-net walks. Lives in Api.Capability (not
+// TerrariaCompat) so the locked Api zone stays self-contained.
+//
+// Tile-Y grows downward: Up = -Y, Down = +Y.
 public enum IODirection : byte
 {
 	None = 0,
@@ -11,12 +18,9 @@ public enum IODirection : byte
 	Right,
 }
 
-// Per-machine auto-output config lives on AutoOutputTrait (verbatim upstream
-// port). This file keeps only the 4-direction primitives used by the energy
-// net and adjacency-push helpers.
-
 public static class IODirectionExtensions
 {
+	// Forge Direction.getNormal() analogue - the (dx, dy) tile-delta for a side.
 	public static (int dx, int dy) Offset(this IODirection d) => d switch
 	{
 		IODirection.Up    => (0, -1),
@@ -27,7 +31,7 @@ public static class IODirectionExtensions
 	};
 
 	// Forge Direction.getOpposite() analogue. Critical at the cable<->endpoint
-	// boundary so side-filtering doesn't match the wrong cable. None stays None.
+	// boundary so side-filtering doesn't match the wrong cable.
 	public static IODirection Opposite(this IODirection d) => d switch
 	{
 		IODirection.Up    => IODirection.Down,
@@ -36,14 +40,11 @@ public static class IODirectionExtensions
 		IODirection.Right => IODirection.Left,
 		_                  => IODirection.None,
 	};
-}
 
-// Canonical cardinal-side iteration order. Up/Down/Left/Right matches
-// upstream's NSWE order projected to 2D.
-public static class MachineSides
-{
-	public static readonly System.Collections.Generic.IReadOnlyList<(IODirection side, int dx, int dy)>
-		Cardinal4 = new (IODirection, int, int)[]
+	// Canonical cardinal-side iteration order + each side's normal (Forge
+	// Direction.Plane.HORIZONTAL + getNormal(), projected to 2D).
+	public static readonly IReadOnlyList<(IODirection side, int dx, int dy)> Cardinal4 =
+		new (IODirection, int, int)[]
 		{
 			(IODirection.Up,    0, -1),
 			(IODirection.Down,  0,  1),

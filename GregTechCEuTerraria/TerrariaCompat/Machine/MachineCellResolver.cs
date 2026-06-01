@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System.Collections.Generic;
 using Terraria;
 using Terraria.DataStructures;
@@ -40,7 +41,7 @@ public static class MachineCellResolver
 		var seen = new HashSet<MetaMachine>();
 		foreach (var (cx, cy) in machine.Cells())
 		{
-			foreach (var (side, dx, dy) in MachineSides.Cardinal4)
+			foreach (var (side, dx, dy) in IODirectionExtensions.Cardinal4)
 			{
 				int nx = cx + dx, ny = cy + dy;
 				if (own.Contains((nx, ny))) continue;

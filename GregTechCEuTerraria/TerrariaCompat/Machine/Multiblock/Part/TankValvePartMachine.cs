@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.Api.Machine;
 using GregTechCEuTerraria.Api.Machine.Feature.Multiblock;

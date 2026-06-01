@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 

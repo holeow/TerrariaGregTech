@@ -1,6 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
-using GregTechCEuTerraria.TerrariaCompat.Machine;
+using GregTechCEuTerraria.Api.Capability;
 
 namespace GregTechCEuTerraria.Api.Pipenet;
 
@@ -138,7 +138,7 @@ public abstract class PipeNetWalker<TCell, TNodeData, TNet>
 	// The directions that this net can traverse from this pipe. Upstream's
 	// `getSurroundingPipeSides()`. Default 4 cardinal sides.
 	protected virtual IReadOnlyList<(IODirection side, int dx, int dy)> GetSurroundingPipeSides() =>
-		MachineSides.Cardinal4;
+		IODirectionExtensions.Cardinal4;
 
 	// Called when a sub walker is done walking. Subclasses use this to merge
 	// sub-walker results back into the parent. Upstream's `onRemoveSubWalker`.

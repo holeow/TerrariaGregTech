@@ -326,13 +326,13 @@ public class FluidPipeState : IFluidPipeHost
 		_               => s,
 	};
 
-	private static Machine.IODirection ArrivalFor(CoverSide outward) => outward switch
+	private static IODirection ArrivalFor(CoverSide outward) => outward switch
 	{
-		CoverSide.Up    => Machine.IODirection.Down,
-		CoverSide.Down  => Machine.IODirection.Up,
-		CoverSide.Left  => Machine.IODirection.Right,
-		CoverSide.Right => Machine.IODirection.Left,
-		_               => Machine.IODirection.None,
+		CoverSide.Up    => IODirection.Down,
+		CoverSide.Down  => IODirection.Up,
+		CoverSide.Left  => IODirection.Right,
+		CoverSide.Right => IODirection.Left,
+		_               => IODirection.None,
 	};
 
 	public void CheckAndDestroy(FluidStack stack)

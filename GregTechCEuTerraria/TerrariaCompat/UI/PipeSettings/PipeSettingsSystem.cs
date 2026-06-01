@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System.Collections.Generic;
 using GregTechCEuTerraria.TerrariaCompat.Pipelike;
 using GregTechCEuTerraria.TerrariaCompat.Pipelike.Fluid;
@@ -263,8 +264,8 @@ public sealed class PipeSettingsSystem : ModSystem
 		if (net is not null)
 		{
 			foreach (var side in new[]
-				{ Machine.IODirection.Up, Machine.IODirection.Down,
-				  Machine.IODirection.Left, Machine.IODirection.Right })
+				{ IODirection.Up, IODirection.Down,
+				  IODirection.Left, IODirection.Right })
 			{
 				if (net.GetNetData((x, y), side) is not null) { hasEndpoint = true; break; }
 			}
@@ -283,8 +284,8 @@ public sealed class PipeSettingsSystem : ModSystem
 		if (net is not null)
 		{
 			foreach (var side in new[]
-				{ Machine.IODirection.Up, Machine.IODirection.Down,
-				  Machine.IODirection.Left, Machine.IODirection.Right })
+				{ IODirection.Up, IODirection.Down,
+				  IODirection.Left, IODirection.Right })
 			{
 				if (net.GetNetData((x, y), side) is not null) { hasEndpoint = true; break; }
 			}

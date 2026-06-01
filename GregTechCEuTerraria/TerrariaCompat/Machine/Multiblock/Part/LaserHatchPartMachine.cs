@@ -202,7 +202,7 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		var own  = new System.Collections.Generic.HashSet<(int, int)>(machine.Cells());
 		var seen = new System.Collections.Generic.HashSet<(int, int)>();
 		foreach (var (cx, cy) in machine.Cells())
-		foreach (var (side, dx, dy) in MachineSides.Cardinal4)
+		foreach (var (side, dx, dy) in IODirectionExtensions.Cardinal4)
 		{
 			int nx = cx + dx, ny = cy + dy;
 			if (own.Contains((nx, ny))) continue;

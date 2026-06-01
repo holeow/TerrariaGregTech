@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using System;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 using Microsoft.Xna.Framework;

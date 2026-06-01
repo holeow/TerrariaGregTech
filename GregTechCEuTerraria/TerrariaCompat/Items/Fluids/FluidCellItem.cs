@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using System.Collections.Generic;
+using System.IO;
 using Terraria;
 using Terraria.GameContent;
 using Terraria.ID;
@@ -90,6 +91,33 @@ public abstract class FluidCellItem : ModItem, IFluidHandlerItem, ITextureWarmUp
 	{
 		_fluidTag = tag.GetCompound("fluid");
 		if (_fluidTag is { Count: 0 }) _fluidTag = null;
+	}
+
+	// Per-stack contents must ride the item-sync wire (ItemIO -> NetSend, default
+	// empty), else a filled cell shows empty on remote clients. Same { id, amount }
+	// shape as SaveData. Covers player-held / dropped / chested cells; cells in
+	// machine slots sync via the machine's SaveData blob instead.
+	public override void NetSend(BinaryWriter writer)
+	{
+		bool has = _fluidTag is not null;
+		writer.Write(has);
+		if (has)
+		{
+			writer.Write(_fluidTag!.GetString("id"));
+			writer.Write(_fluidTag!.GetInt("amount"));
+		}
+	}
+
+	public override void NetReceive(BinaryReader reader)
+	{
+		if (reader.ReadBoolean())
+			_fluidTag = new TagCompound
+			{
+				["id"]     = reader.ReadString(),
+				["amount"] = reader.ReadInt32(),
+			};
+		else
+			_fluidTag = null;
 	}
 
 	public override ModItem Clone(Item newEntity)
@@ -215,8 +243,11 @@ public abstract class FluidCellItem : ModItem, IFluidHandlerItem, ITextureWarmUp
 		ref float rotation, ref float scale, int whoAmI)
 	{
 		scale *= ItemRenderScale;
-		var tex = TextureAssets.Item[Item.type].Value;
-		var frame = Main.itemAnimations[Item.type]?.GetFrame(tex) ?? tex.Frame();
+		// Frame against the raw 16x16 source (DrawLayers draws _baseTex, not the
+		// baked 32x32 TextureAssets entry) - else the oversized source rect smears
+		// edge pixels into a long rectangle under PointClamp. See PreDrawInInventory.
+		_baseTex ??= ModContent.Request<Texture2D>(Texture);
+		var frame = _baseTex?.Value is { } bt ? bt.Frame() : TextureAssets.Item[Item.type].Value.Frame();
 		var origin = frame.Size() * 0.5f;
 		var pos = Item.Center - Main.screenPosition;
 		float drawScale = scale;

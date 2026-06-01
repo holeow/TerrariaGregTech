@@ -1,4 +1,5 @@
 #nullable enable
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Laser;
