@@ -14,14 +14,14 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of ItemBusPartMachine. Tier-sized item inventory ((1+min(9,tier))^2
-// slots), optional circuit slot (input-side only), output-side item filter,
-// per-bus distinctness. Auto-IO every 5 ticks while WorkingEnabled.
+// Port of ItemBusPartMachine. Tier-sized item inventory ((1+min(9,tier))^2 slots)
 //
-// Adaptations: ctor -> Configure(tier, io); paint dropped; frontFacing ->
-// TieredIOPartMachine.IoDirection (player-configurable, default Up);
-// onLoad TickTask deferred init -> kicked from Configure; swapIO deferred
-// (needs sister-def + tile-replace plumbing); circuit always-real (no ghost).
+// Adaptations:
+//   ctor -> Configure(tier, io)
+//   paint dropped
+//   frontFacing -> TieredIOPartMachine.IoDirection
+//   onLoad TickTask deferred init -> kicked from Configure
+//   swapIO deferred
 public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircuitSlot
 {
 	protected override string Label => "Item Bus";
@@ -30,7 +30,6 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 	public NotifiableItemStackHandler? CircuitInventory { get; protected set; }
 	public ItemFilterHandler? FilterHandler { get; protected set; }
 
-	// CircuitInventory deliberately NOT exposed (internal slot).
 	public override Api.Capability.IItemHandler? ExposedItemHandler => Inventory;
 
 	protected bool HasCircuitSlot { get; private set; } = true;
@@ -78,12 +77,14 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 	{
 		if (io == IO.IN)
 		{
-			return new NotifiableItemStackHandler(1, IO.IN, IO.NONE)
-				.SetFilter(IsProgrammedCircuit);
+			var circuit = new NotifiableItemStackHandler(1, IO.IN, IO.NONE).SetFilter(IsProgrammedCircuit);
+			circuit.ShouldDropInventoryInWorld = false;
+			circuit.ShouldSearchContent = false;
+			return circuit;
 		}
 		HasCircuitSlot     = false;
 		CircuitSlotEnabled = false;
-		return new NotifiableItemStackHandler(0, IO.NONE);
+		return new NotifiableItemStackHandler(0, IO.NONE) { ShouldSearchContent = false };
 	}
 
 	private void EnsureTraits()
@@ -135,8 +136,7 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 	{
 		if (HasCircuitSlot && !controller.AllowCircuitSlots())
 		{
-			// No ghost system - always drop the circuit to world.
-			DropCircuitToWorld();
+			ClearCircuit();
 			SetCircuitSlotEnabled(false);
 		}
 		base.AddedToController(controller);
@@ -153,23 +153,16 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 		SetCircuitSlotEnabled(true);
 	}
 
-	private void DropCircuitToWorld()
+	private void ClearCircuit()
 	{
 		if (CircuitInventory == null) return;
 		for (int i = 0; i < CircuitInventory.SlotCount; i++)
-		{
-			var stack = CircuitInventory.GetSlot(i);
-			if (stack == null || stack.IsAir) continue;
-			Item.NewItem(new Terraria.DataStructures.EntitySource_TileBreak(Position.X, Position.Y),
-				Position.X * 16, Position.Y * 16, 16, 16, stack.type, stack.stack);
-			CircuitInventory.Extract(i, stack.stack, simulate: false);
-		}
+			CircuitInventory.SetSlot(i, new Item());
 	}
 
+	// TODO check if its optimal
 	private void EnsureAutoIOSubscription()
 	{
-		// Per-5-tick + IsEmpty fast-path keeps the no-op cost low without
-		// upstream's hasAdjacentItemHandler caching (would race with covers).
 		_autoIOSubs ??= SubscribeServerTick(AutoIOTick);
 	}
 
@@ -177,9 +170,7 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 	{
 		if (GetOffsetTimer() % global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(5) != 0) return;
 		if (!WorkingEnabled || Inventory == null) return;
-		// Push/Pull treat None as "every perimeter side"; explicitly skip here.
 		if (IoDirection == IODirection.None) return;
-		// BOTH = front-pushes-output / back-pulls-input (upstream pattern).
 		if (Io == IO.OUT && !Inventory.IsEmpty())
 		{
 			AdjacentItemPush.Push(this, 0, Inventory.SlotCount, maxPerSlot: int.MaxValue, side: IoDirection);
@@ -203,7 +194,6 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 		lines.Add($"Capacity: {slots} slots");
 		lines.Add($"Side: {IoDirection}");
 
-		// Cap contents at 8 stacks + "+N more" to bound hover panel size.
 		if (Inventory is null) return;
 		var stacks = Inventory.Storage.Stacks;
 		int shown = 0;
@@ -234,10 +224,8 @@ public class ItemBusPartMachine : TieredIOPartMachine, IDistinctPart, IHasCircui
 		_isDistinct        = tag.GetBool("isDistinct");
 		CircuitSlotEnabled = !tag.ContainsKey("circuitSlotEnabled") || tag.GetBool("circuitSlotEnabled");
 		EnsureTraits();
-		// Re-run trait load - base.LoadData fired before EnsureTraits.
 		Traits.Load(tag);
 		EnsureAutoIOSubscription();
-		// Lazy GetHandlerList builds UNGROUPED; push saved distinctness now.
 		GetHandlerList().SetDistinctAndNotify(_isDistinct);
 	}
 }

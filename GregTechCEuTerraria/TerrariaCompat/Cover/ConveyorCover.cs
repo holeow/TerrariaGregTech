@@ -16,16 +16,11 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Cover;
 
-// Port of common.cover.ConveyorCover. Moves items host<->adjacent, filter-gated.
-// Base class of ItemVoidingCover (reuses filter + subscription, overrides Update).
-//
-// Adaptations: LDLib createUIWidget / buildAdditionalUI / getUITitle dropped
-// (settings UI is a later layer); world-tool hooks (screwdriver / mallet /
-// sideTips / copy/paste) dropped - see CoverBehavior; GetAdjacentItemHandler
-// resolves via WorldCapability instead of Forge-cap lookup.
+// Port of common.cover.ConveyorCover
+// Adaptations:
+//  world-tool hooks (screwdriver / mallet / sideTips / copy/paste) dropped
 public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 {
-	// Verbatim CONVEYOR_SCALING: 8 32 128 512 1024 ... = 2 x 4^min(tier, LuV).
 	public static int ConveyorScaling(int tier) =>
 		2 * (int)Math.Pow(4, Math.Min(tier, (int)VoltageTier.LuV));
 
@@ -43,8 +38,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 	protected readonly ItemFilterHandler FilterHandler;
 	protected readonly ConditionalSubscriptionHandler SubscriptionHandler;
 
-	// Exposes the filter handler to the settings popup's install slot +
-	// 3x3 phantom matcher. Inherited by ItemVoidingCover / Advanced*.
 	public override ItemFilterHandler? UiItemFilterHandler => FilterHandler;
 
 	public ConveyorCover(CoverDefinition definition, ICoverable coverHolder, CoverSide attachedSide,
@@ -71,21 +64,8 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 	protected virtual bool IsSubscriptionActive() =>
 		IsWorkingEnabled() && GetAdjacentItemHandler() != null;
 
-	// Verbatim upstream coverHolder.getCapability(ITEM_HANDLER, attachedSide).
-	// Machines: io-gated, NOT cover-wrapped (a cover mustn't re-apply itself to
-	// its own host read). Pipes: the ItemNetHandler.
-	protected IItemHandler? GetOwnItemHandler()
-	{
-		var side = WorldCapability.ToIODirection(AttachedSide);
-		if (CoverHolder is MetaMachine m)
-			return m.GetItemHandlerCap(side, useCoverCapability: false);
-		if (CoverHolder is TerrariaCompat.Pipelike.PipeCoverable pcv)
-			return WorldCapability.ItemHandlerAt(pcv.X, pcv.Y, side);
-		return null;
-	}
+	protected IItemHandler? GetOwnItemHandler() => CoverHolder.GetItemHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false);
 
-	// Equivalent of upstream's Forge ITEM_HANDLER capability lookup
-	// at pos.relative(side), via WorldCapability.
 	protected IItemHandler? GetAdjacentItemHandler()
 	{
 		var dir = WorldCapability.ToIODirection(AttachedSide);
@@ -96,8 +76,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 			foreach (var (side, x, y) in WorldCapability.Perimeter(machine))
 			{
 				if (side != dir) continue;
-				// Cover-aware neighbour resolution - its per-side covers +
-				// output-side gating apply. Arrival side = neighbour's opposite.
 				var handler = WorldCapability.ItemHandlerAt(x, y, side.Opposite());
 				if (handler != null && !ReferenceEquals(handler, own))
 					return handler;
@@ -122,7 +100,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 
 	public void SetDistributionMode(DistributionMode mode) => DistributionMode = mode;
 
-	// Upstream-faithful: gate on `coverHolder.getCapability(ITEM_HANDLER, side)`.
 	public override bool CanAttach() => base.CanAttach() && GetOwnItemHandler() != null;
 
 	public void SetTransferRate(int transferRate)
@@ -172,8 +149,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		}
 	}
 
-	// field 1=IO, 2=manual-IO mode, 3=transfer rate. Field 0 (working-enabled)
-	// falls through to base. DistributionMode hidden upstream w/o pipe routing.
 	public override void ApplySetting(int field, long value)
 	{
 		switch (field)
@@ -193,8 +168,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		if (!ReferenceEquals(((ICoverable)CoverHolder).GetCoverAtSide(AttachedSide), this))
 			return;
 
-		// Verbatim cadence: 5 MC ticks/cycle, 20 MC ticks rate reset.
-		// FromMcTicks applies Terraria scale + SimulationSpeed.
 		long timer = CoverHolder.GetOffsetTimer();
 		int cyclePeriod = Api.TickScale.FromMcTicks(5);
 		int resetPeriod = Api.TickScale.FromMcTicks(20);
@@ -221,7 +194,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		}
 	}
 
-	// RobotArmCover overrides to dispatch on TransferMode.
 	protected virtual int DoTransferItems(IItemHandler sourceInventory, IItemHandler targetInventory, int maxTransferAmount) =>
 		MoveInventoryItems(sourceInventory, targetInventory, maxTransferAmount);
 
@@ -253,7 +225,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return maxTransferAmount - itemsLeftToTransfer;
 	}
 
-	// Verbatim ItemHandlerHelper.insertItem.
 	protected static Item InsertItem(IItemHandler dest, Item stack, bool simulate)
 	{
 		if (stack.IsAir) return new Item();
@@ -266,8 +237,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return remaining;
 	}
 
-	// Keyed by type - upstream uses ItemStack comparingAllButCount; Terraria
-	// item matching is type-only (see SimpleItemFilter).
 	protected Dictionary<int, TypeItemInfo> CountInventoryItemsByType(IItemHandler inventory)
 	{
 		var filter = FilterHandler.GetFilter();
@@ -303,12 +272,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		}
 	}
 
-	// Count-exact transfer primitives - verbatim port of upstream
-	// moveInventoryItemsExact / countInventoryItemsByMatchSlot / the
-	// GroupItemInfo overload of moveInventoryItems. Per-type maps key by
-	// item type (vs upstream's ItemStack hash).
-
-	// All-or-nothing exact move of itemInfo.TotalCount across itemInfo.Slots.
 	protected static bool MoveInventoryItemsExact(IItemHandler sourceInventory, IItemHandler targetInventory,
 		TypeItemInfo itemInfo)
 	{
@@ -326,11 +289,11 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 			}
 			if (itemsLeftToExtract == 0) break;
 		}
-		if (totalExtractedCount != itemInfo.TotalCount) return false;     // can't fully extract
+		if (totalExtractedCount != itemInfo.TotalCount) return false; // can't fully extract
 		resultStack.stack = totalExtractedCount;
 		if (!InsertItem(targetInventory, resultStack, simulate: true).IsAir) return false; // can't fully insert
 
-		// Commit.
+		// Commit
 		InsertItem(targetInventory, resultStack, simulate: false);
 		itemsLeftToExtract = itemInfo.TotalCount;
 		foreach (int slotIndex in itemInfo.Slots)
@@ -343,8 +306,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return true;
 	}
 
-	// Grouped move: each source slot drains down to its group's TotalCount,
-	// capped by maxTransfer.
 	protected int MoveInventoryItems(IItemHandler sourceInventory, IItemHandler targetInventory,
 		Dictionary<int, GroupItemInfo> itemInfos, int maxTransferAmount)
 	{
@@ -382,7 +343,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return maxTransferAmount - itemsLeftToTransfer;
 	}
 
-	// Like CountInventoryItemsByType but no per-slot list.
 	protected Dictionary<int, GroupItemInfo> CountInventoryItemsByMatchSlot(IItemHandler inventory)
 	{
 		var filter = FilterHandler.GetFilter();
@@ -400,7 +360,6 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return result;
 	}
 
-	// Shared with ItemNetHandler.
 	protected static Item InsertItemStacked(IItemHandler dest, Item stack, bool simulate) =>
 		Api.Capability.ItemHandlerHelper.InsertItemStacked(dest, stack, simulate);
 
@@ -416,10 +375,7 @@ public class ConveyorCover : CoverBehavior, IIOCover, IUICover, IControllable
 		}
 	}
 
-	// AdvancedItemVoidingCover overrides to clamp the filter's max stack.
 	protected virtual void ConfigureFilter() { }
-
-	// Capability override - pipe-consulted.
 
 	private CoverableItemHandlerWrapper? _itemHandlerWrapper;
 

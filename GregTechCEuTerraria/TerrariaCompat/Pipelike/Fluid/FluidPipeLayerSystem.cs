@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.Api.Cover;
 using GregTechCEuTerraria.TerrariaCompat.Net;
 using Terraria;
@@ -16,11 +17,8 @@ public sealed class FluidPipeLayerSystem : ModSystem
 
 	private static readonly Dictionary<(int x, int y), PipeCoverable> _sides = new();
 
-	// Per-cell FluidPipeState; lifetime mirrors the pipe cell. Separate from
-	// PipeCoverable to mirror upstream's cover/pipe-state split.
 	private static readonly Dictionary<(int x, int y), FluidPipeState> _states = new();
 
-	// Populated by FluidPipeStatsPacket; read by the pipe panel on MP clients.
 	public static readonly Dictionary<(int x, int y), global::GregTechCEuTerraria.Api.Fluids.FluidStack[]>
 		ClientTankSnapshots = new();
 
@@ -44,6 +42,13 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		if (_sides.TryGetValue((x, y), out var c)) ((ICoverable)c).OnCoversUnload();
 		_sides.Remove((x, y));
 		_states.Remove((x, y));
+	}
+
+	internal static IFluidHandler? ResolveRawTanks(PipeCoverable coverable, CoverSide side)
+	{
+		if (!Pipes.Has(coverable.X, coverable.Y)) return null;
+		if (coverable.GetMode(side) == PipeSideMode.Off) return null;
+		return EnsureState(coverable.X, coverable.Y).GetTankList(side);
 	}
 
 	public static FluidPipeState? GetState(int x, int y) =>
@@ -96,7 +101,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		_states.Clear();
 	}
 
-	// Re-render layer above tiles while holding any fluid-pipe item.
 	public override void PostDrawTiles()
 	{
 		var held = Main.LocalPlayer?.HeldItem;
@@ -132,7 +136,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 			tputs.Add(c.Throughput);
 			chans.Add((byte)c.Channels);
 			mtemps.Add(c.MaxFluidTemperature);
-			// Bits 0-3 = proof flags, bit 4 = IsSimple (back-compat: 0 = false).
 			byte proof = 0;
 			if (c.GasProof)    proof |= 1;
 			if (c.CryoProof)   proof |= 2;
@@ -150,7 +153,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		tag["fluid_pipes.maxtemp"] = mtemps;
 		tag["fluid_pipes.proof"]   = proofs;
 
-		// Per-cell covers (sparse).
 		var cxs   = new List<int>();
 		var cys   = new List<int>();
 		var cdata = new List<TagCompound>();
@@ -171,7 +173,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 			tag["fluid_pipes.covers.data"] = cdata;
 		}
 
-		// Sparse: only non-empty states saved; empty re-derive on reload.
 		var sxs   = new List<int>();
 		var sys   = new List<int>();
 		var sdata = new List<TagCompound>();
@@ -220,7 +221,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 				IsSimple:    (proof & 16) != 0));
 		}
 
-		// Per-cell covers (sparse - only cells with HasAnyCover were saved).
 		if (tag.ContainsKey("fluid_pipes.covers.xs"))
 		{
 			var cxs   = tag.GetList<int>         ("fluid_pipes.covers.xs");
@@ -235,7 +235,6 @@ public sealed class FluidPipeLayerSystem : ModSystem
 			}
 		}
 
-		// Every cell needs a PipeCoverable so per-cell tick state is available.
 		foreach (var kv in Pipes.All)
 		{
 			var pos = kv.Key;
@@ -251,7 +250,7 @@ public sealed class FluidPipeLayerSystem : ModSystem
 			int k = System.Math.Min(sxs.Count, System.Math.Min(sys.Count, sdata.Count));
 			for (int i = 0; i < k; i++)
 			{
-				if (!Pipes.Has(sxs[i], sys[i])) continue;   // orphan blob - skip
+				if (!Pipes.Has(sxs[i], sys[i])) continue;
 				var state = EnsureState(sxs[i], sys[i]);
 				state.LoadFrom(sdata[i]);
 			}

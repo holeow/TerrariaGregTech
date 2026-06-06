@@ -68,11 +68,6 @@ def walk_recipes(input_dir: Path):
         yield recipe_id, obj
 
 
-# Non-oak wood species. Minecraft has one recipe per wood species (birch
-# planks, acacia stairs, jungle boat, ...); in our port every wood collapses to
-# Terraria's generic Wood, so the per-species variants are pure duplicates.
-# We keep ONLY the oak variant - it stands in for the whole "any wood" family
-# (resolved through the wood RecipeGroup, like Terraria's any-wood campfire).
 NON_OAK_WOOD = (
     "spruce", "birch", "jungle", "acacia", "dark_oak",
     "mangrove", "cherry", "bamboo", "crimson", "warped",
@@ -80,15 +75,6 @@ NON_OAK_WOOD = (
 
 
 def is_non_oak_wood_recipe(recipe_id: str) -> bool:
-    """True if the recipe is named for a non-oak wood species.
-
-    Checks the recipe id ONLY. GTCEu/MC name a recipe after its primary
-    output, so every per-species variant carries the species token in its id
-    (`cutter/birch_planks`, `macerator/macerate_dark_oak_boat`, ...) while the
-    oak variant does not. Deliberately NOT a deep scan of the recipe body - a
-    recursive scan would also catch recipes that merely have a `jungle` biome
-    condition or a crimson/warped byproduct and drop genuinely useful
-    non-wood recipes."""
     rid = recipe_id.lower()
     return any(sp in rid for sp in NON_OAK_WOOD)
 
@@ -99,7 +85,6 @@ def clean_legacy(legacy_dir: Path) -> int:
         return 0
     removed = 0
     for f in legacy_dir.glob("*.json"):
-        # Skip the new bundle if it lives in the same directory.
         if f.name == "all.json":
             continue
         f.unlink()
@@ -107,27 +92,8 @@ def clean_legacy(legacy_dir: Path) -> int:
     return removed
 
 
-# Materials / items deliberately not ported (no Terraria analogue / gameplay
-# role). Any recipe mentioning one - in its id OR anywhere in its body - is
-# dropped wholesale (see mentions_removed). The token strings below are
-# self-describing; only the non-obvious bits are worth a comment:
-#
-#  - Tokens are SUBSTRING-matched, so one token catches a whole family:
-#    "mud" -> mud/packed_mud/mud_brick*; "moss" -> moss_block/mossy_*; likewise
-#    wheat, candle, azalea, terracotta, *_coral, *_minecart, *_wool, etc. A
-#    trailing "_" (e.g. "smooth_") scopes the match.
-#  - Keep each token specific enough not to hit an id that must SURVIVE:
-#      * white_wool is kept (-> Cloud) - the 15 dyed wools are listed one by one.
-#      * plain anvil / tnt / minecart are kept - the tokens target only the
-#        variants (chipped_/damaged_anvil, industrial_tnt, *_minecart).
-#      * polished_<stone> lists each MC stone individually so it cannot catch
-#        gtceu's polished_marble / polished_red_granite (kept as casings).
-#      * treated_wood_* drops only the shaped furniture - treated_wood_planks
-#        and its dust/plate/rod/frame/pipe forms are kept.
-#      * the `smoking` recipe TYPE is a different string - the "smoker" token
-#        does not touch it.
-#  - Whole-id cases a substring token would WRONGLY catch live in
-#    REMOVED_EXACT_IDS instead, not here.
+# Materials / items deliberately not ported.
+# Any recipe mentioning one - in its id OR anywhere in its body - is dropped
 REMOVED_TOKENS = (
     "sculk", "end_rod", "grass_block", "mycelium", "terracotta", "mud",
     "bubble_coral", "brain_coral", "fire_coral", "horn_coral", "tube_coral",
@@ -158,33 +124,17 @@ REMOVED_TOKENS = (
     "activator_rail", "nether_brick",
     "hazmat", "flint_and_steel", "horse_armor", "sticky_piston", "iron_door",
     "slime_block", "ender_chest", "rubber_slab", "glass_vial",
-    # GregTech rubber decorative blocks/items - no Terraria role (the
-    # functional rubber forms - log/wood/planks/ingot/dust/plate/rod - are kept).
-    # "rubber_fence" also catches rubber_fence_gate; "hanging_sign" (above)
-    # already catches rubber_hanging_sign, so only the plain rubber_sign needs listing.
     "rubber_boat", "rubber_door", "rubber_gloves", "rubber_fence", "rubber_trapdoor",
     "rubber_sign",
-    # Ore indicator blocks - GregTech generates one `<material>_indicator` per
-    # ore material (a surface marker hinting at a buried vein). No Terraria role;
-    # "_indicator" catches every one and matches nothing else.
     "_indicator",
-    # Every pressure plate / button - vanilla MC (wood + stone + weighted) and
-    # gtceu wood-material variants. All decorative redstone parts, none ported.
     "_pressure_plate", "_button",
     "chainmail", "face_mask",
-    # GregTech bronze / steel / titanium armor sets - not ported. Per-piece
-    # tokens: a bare `bronze`/`steel`/`titanium` would hit every material item.
     "bronze_helmet", "bronze_chestplate", "bronze_leggings", "bronze_boots",
     "steel_helmet", "steel_chestplate", "steel_leggings", "steel_boots",
     "titanium_helmet", "titanium_chestplate", "titanium_leggings", "titanium_boots",
-    # Misc unported MC blocks/redstone. `stone_bricks` also catches the
-    # cracked_/chiseled_/mossy_ stone-brick variants.
     "rubber_stairs", "coarse_dirt", "lodestone", "stone_bricks", "cut_sandstone",
     "chiseled_sandstone", "dispenser", "observer", "respawn_anchor", "stonecutter",
     "dripstone_block", "pointed_dripstone",
-    # Minecraft flowers / plants / crops / seeds - no Terraria recipe use.
-    # `beetroot`/`carrot`/`torchflower` also catch their _seeds/_soup/etc.;
-    # `_tulip` catches all four tulip colours.
     "azure_bluet", "blue_orchid", "cornflower", "dandelion", "lilac",
     "lily_of_the_valley", "oxeye_daisy", "peony", "poppy", "rose_bush",
     "wither_rose", "_tulip", "sunflower", "torchflower", "pink_petals",
@@ -192,35 +142,21 @@ REMOVED_TOKENS = (
     "beetroot", "carrot", "melon_seeds",
     "brown_mushroom", "kelp", "pitcher_pod", "potato", "sweet_berries",
     "ink_sac", "music_disc", "deepslate_bricks",
-    # GregTech RF/FE <-> EU energy converters - RF energy is not ported yet.
     "energy_converter",
     # Monitors (central_monitor / advanced_monitor / monitor) and their
     # casing + computer_monitor_cover - not ported. Bare `monitor` token
     # catches every variant (monitor / advanced_monitor / central_monitor /
     # monitor_casing / computer_monitor_cover).
     "monitor",
-    # Charcoal pile igniter multiblock - not ported.
-    "charcoal_pile_igniter",
-    # Raw meats - no Terraria equivalent.
+    "charcoal_pile_igniter", # not ported
     "chicken", "rabbit", "porkchop", "mutton",
-    # Melon (catches melon / melon_slice / glistering_melon_slice) and
-    # compressed-ice variants - no Terraria equivalent.
     "melon", "packed_ice", "blue_ice",
-    # Every GregTech coloured lamp - the normal `<colour>_lamp` plus the
-    # separate `<colour>_borderless_lamp` variant ("borderless_lamp" catches
-    # all 16 of those). `minecraft:redstone_lamp` is dropped too.
+    # Every GregTech coloured lamp - not ported
     "borderless_lamp", "redstone_lamp",
     "white_lamp", "orange_lamp", "magenta_lamp", "light_blue_lamp",
     "yellow_lamp", "lime_lamp", "pink_lamp", "gray_lamp", "light_gray_lamp",
     "cyan_lamp", "purple_lamp", "blue_lamp", "brown_lamp", "green_lamp",
     "red_lamp", "black_lamp",
-    # Minecraft decorative stone-family wall / stairs / slab - the port keeps
-    # only the base blocks (andesite -> StoneSlab, ...), not the cut variants.
-    # `brick_*` also catches stone_brick_* / deepslate_brick_* / prismarine_
-    # brick_*; `stone_stairs` also catches cobblestone_/sandstone_/blackstone_
-    # stairs; `prismarine_*` also catches dark_prismarine_*. `stone_slab` and
-    # `cobblestone_slab` are deliberately NOT listed - they resolve to
-    # Terraria's Stone Slab and stay craftable.
     "andesite_wall", "andesite_stairs", "andesite_slab",
     "diorite_wall", "diorite_stairs", "diorite_slab",
     "granite_wall", "granite_stairs", "granite_slab",
@@ -229,39 +165,15 @@ REMOVED_TOKENS = (
     "cobblestone_wall", "stone_stairs",
     "brick_wall", "brick_stairs", "brick_slab",
     "quartz_stairs",
-    # Stones / decorative blocks with no Terraria analogue. Substring tokens
-    # consolidate families: `cobbled_deepslate` catches _wall/_stairs/_slab;
-    # `purpur` catches _block/_pillar/_stairs/_slab; `prismarine` catches base
-    # block + _bricks + dark_ + _shard + _wall/_stairs/_slab.
     "calcite", "cobbled_deepslate", "chiseled_deepslate",
     "purpur", "prismarine",
     "quartz_bricks", "quartz_pillar", "chiseled_quartz_block",
-    # Nether / End / Aquatic oddities with no Terraria analogue. `nether_wart`
-    # also catches nether_wart_block; `spider_eye` also catches fermented_;
-    # `shulker` catches box + shell; `chorus` catches popped_chorus_fruit
-    # (and any other chorus_* MC ids); `hanging_sign` catches every species.
     "nether_wart", "spider_eye", "cocoa_beans", "shulker", "chorus",
     "beehive", "hanging_sign",
-    # Grindstone - no Terraria analogue (the MeatGrinder stand-in substitution
-    # was removed). No gtceu id contains "grindstone", so the token is safe.
     "grindstone",
-    # Duct pipes (small/normal/large/huge) - the hazard-particle transport
-    # pipenet. Their sole consumer (EnvironmentalHazardEmitter/CleanerTrait +
-    # the environmental hazard subsystem) is not ported.
-    # `duct_pipe` catches all 4 size ids and nothing else (does not touch
-    # duct_tape / nonconducting / inductor / superconducting / byproducts).
-    "duct_pipe",
+    "duct_pipe", # not ported
 )
 
-# Exact item ids to drop - matched whole, never as a substring. For each, a
-# substring token would also catch a kept id:
-#   minecraft:snow         within snow_block / snowball (kept)
-#   minecraft:golden_apple within enchanted_golden_apple (kept -> Candy Apple)
-#   minecraft:barrel       within gtceu:powderbarrel (kept casing)
-#   minecraft:lead         within gtceu lead-metal items (lead_ingot, lead_dust, ...)
-#   minecraft:target       within gtceu:*_laser_target_hatch (multiblock parts)
-#   minecraft:allium       within gtceu gallium-metal items (gallium_ingot, ...)
-#   minecraft:{wooden,stone}_<tool> - share a suffix with gtceu material tools
 REMOVED_EXACT_IDS = (
     "minecraft:snow",
     "minecraft:golden_apple",
@@ -274,10 +186,6 @@ REMOVED_EXACT_IDS = (
     "minecraft:wooden_shovel", "minecraft:wooden_hoe",
     "minecraft:stone_axe", "minecraft:stone_pickaxe", "minecraft:stone_sword",
     "minecraft:stone_shovel", "minecraft:stone_hoe",
-    # Power-armor BOOTS - dropped to keep parity with Terraria's 3 armor slots
-    # (head/body/legs only). Removes the boots craft + recycle recipes. The
-    # Advanced chestplates are NOT dropped - they're combinational chest variants
-    # of the same suit (alternate body piece, like Hallowed Mask vs Helmet).
     "gtceu:nanomuscle_boots", "gtceu:quarktech_boots",
 )
 
@@ -303,11 +211,6 @@ def mentions_removed(recipe_id, obj):
     return walk(obj)
 
 
-# GregTech generates an ore block per (host stone x material) - the same ore
-# hosted in granite, deepslate, endstone, sand, ... The port keeps only the
-# plain stone host; the ~2.6k alt-host ore recipes (host_<material>_ore ->
-# crushed_<material>_ore) are dropped. (Was RecipeExtractor.AltStoneOreHosts
-# in the retired .NET extractor - not carried over to this script until now.)
 ORE_HOSTS = (
     "granite", "red_granite", "diorite", "andesite", "deepslate", "tuff",
     "marble", "basalt", "blackstone", "netherrack", "endstone",
@@ -321,7 +224,6 @@ def _is_alt_host_ore_id(item_id):
         return False
     bare = item_id[len("gtceu:"):]
     for h in ORE_HOSTS:
-        # host prefix, with a material segment still ending in _ore after it
         if bare.startswith(h + "_") and bare[len(h) + 1:].endswith("_ore"):
             return True
     return False
@@ -340,14 +242,7 @@ def is_alt_host_ore_recipe(obj):
 
 
 # Applied Energistics 2 (ME network) parts are not ported until the AE2
-# integration lands. Upstream ships ME bus/hatch/pattern-buffer parts whose
-# ids are all namespace-qualified `gtceu:me_*` (me_input_bus, me_output_hatch,
-# me_pattern_buffer[_proxy], me_stocking_input_*, ...). We key off the
-# `gtceu:me_` PREFIX, NOT a bare `me_` substring - the latter is a minefield
-# (`nichrome_ingot`, `name_casting_mold`, `slime_`, `lime_` all contain
-# "me_"). Any recipe that produces or consumes one of these items is dropped
-# (the producing recipe references the item in its body, so the body walk
-# alone catches both crafting and the research_station/assembly_line chain).
+# integration lands
 def is_ae2_recipe(obj):
     """True if a recipe references any AE2 ME part (gtceu:me_* item id)."""
     def walk(x):
@@ -360,13 +255,7 @@ def is_ae2_recipe(obj):
     return walk(obj)
 
 
-# Concrete blocks are deliberately not ported: Minecraft's 16 coloured
-# concrete / concrete_powder are decorative blocks with no Terraria analogue,
-# and GregTech's own light/dark concrete (+ its brick/tile/cobblestone/windmill
-# decorative variants) are unported building blocks. The concrete *material*
-# stays - `concrete_dust` (+ small/tiny dust, the concrete fluid bucket) is a
-# real ported MaterialItem - so a string is "kept concrete" only if it is a
-# dust / bucket reference; anything else mentioning "concrete" is a block.
+# Concrete blocks are explicitly not ported except crafting ingredients
 KEEP_CONCRETE = ("concrete_dust", "dusts/concrete", "concrete_bucket")
 
 
@@ -391,16 +280,23 @@ def is_concrete_block_recipe(recipe_id, obj):
     return walk(obj)
 
 
-# Whole recipe TYPES dropped - every recipe of this `type` is removed.
-# minecraft:smithing_transform - the smithing-table netherite-upgrade recipes
-# (diamond tool + netherite ingot -> netherite tool). No smithing table is
-# ported; the upgrade path isn't reproduced.
+def is_stripped_wood_recipe(recipe_id, obj):
+    if "stripped" in recipe_id.lower():
+        return True
+
+    def walk(x):
+        if isinstance(x, dict):
+            return any(walk(v) for v in x.values())
+        if isinstance(x, list):
+            return any(walk(v) for v in x)
+        return isinstance(x, str) and "stripped" in x.lower()
+
+    return walk(obj)
+
+
+
 REMOVED_RECIPE_TYPES = (
     "minecraft:smithing_transform",
-    # Custom GT crafting types that need their own server-side click handler
-    # (facade application onto a held cover, in-place tool-head swap with NBT
-    # preservation). Neither is wired up in the Terraria port - they would
-    # show in the recipe browser as no-op rows. Drop at extraction.
     "gtceu:crafting_facade_cover",
     "gtceu:crafting_tool_head_replace",
 )
@@ -426,40 +322,33 @@ def main():
     dropped_ore_host = 0
     dropped_concrete = 0
     dropped_ae2 = 0
+    dropped_stripped = 0
     dropped_recipe_type = 0
     for recipe_id, obj in walk_recipes(args.input):
-        # Inject id at the top of the entry so it's the first field when
-        # pretty-printed. Use a fresh dict to control key ordering.
         entry = {"id": recipe_id}
         entry.update(obj)
-        # Drop whole recipe types not ported (see REMOVED_RECIPE_TYPES).
         if obj.get("type") in REMOVED_RECIPE_TYPES:
             dropped_recipe_type += 1
             continue
-        # Drop non-oak wood-species variants - only the oak recipe is kept.
         if is_non_oak_wood_recipe(recipe_id):
             dropped_wood += 1
             continue
-        # Drop recipes for deliberately-unported content (see REMOVED_TOKENS).
         if mentions_removed(recipe_id, obj):
             dropped_removed += 1
             continue
-        # Drop alt-stone-host ore variants - only the plain stone host is kept.
         if is_alt_host_ore_recipe(obj):
             dropped_ore_host += 1
             continue
-        # Drop concrete-block recipes - only the concrete dust material is kept.
         if is_concrete_block_recipe(recipe_id, obj):
             dropped_concrete += 1
             continue
-        # Drop AE2 ME-part recipes until the AE2 integration is ported.
         if is_ae2_recipe(obj):
             dropped_ae2 += 1
             continue
-        # Rock Crusher: strip the `adjacent_fluid` (lava + water) recipe
-        # condition. The machine is ported, but its "needs lava AND water
-        # adjacent" gate is NOT - sandwiching both next to a 2x2 machine is
-        # impractical in Terraria's 2D world, so the recipes run unconditionally.
+        if is_stripped_wood_recipe(recipe_id, obj):
+            dropped_stripped += 1
+            continue
+        # Rock Crusher: strip the `adjacent_fluid` (lava + water) recipe condition
         if entry.get("type") == "gtceu:rock_breaker":
             entry.pop("recipeConditions", None)
         recipes.append(entry)
@@ -480,6 +369,8 @@ def main():
         print(f"  dropped {dropped_concrete:,} concrete-block recipes (kept concrete dust material)")
     if dropped_ae2:
         print(f"  dropped {dropped_ae2:,} AE2 ME-part recipes (gtceu:me_* - unported until AE2 lands)")
+    if dropped_stripped:
+        print(f"  dropped {dropped_stripped:,} log-stripping recipes (stripped wood is a no-op in Terraria)")
     if dropped_recipe_type:
         print(f"  dropped {dropped_recipe_type:,} recipes of unported types ({', '.join(REMOVED_RECIPE_TYPES)})")
 
@@ -489,7 +380,6 @@ def main():
         if args.pretty:
             json.dump(recipes, f, ensure_ascii=False, indent=2)
         else:
-            # Compact mode - saves ~40% on disk vs pretty.
             json.dump(recipes, f, ensure_ascii=False, separators=(",", ":"))
 
     size_mb = args.output.stat().st_size / (1024 * 1024)

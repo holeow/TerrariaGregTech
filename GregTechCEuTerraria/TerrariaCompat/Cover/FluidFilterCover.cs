@@ -10,8 +10,7 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Cover;
 
-// Port of common.cover.FluidFilterCover - fluid mirror of ItemFilterCover; see
-// that file for the family/AttachItem design.
+// Port of common.cover.FluidFilterCover - fluid mirror of ItemFilterCover
 public class FluidFilterCover : CoverBehavior, IUICover
 {
 	private IFluidFilter? _fluidFilter;
@@ -55,7 +54,7 @@ public class FluidFilterCover : CoverBehavior, IUICover
 	public override void OnAttached(Item itemStack)
 	{
 		base.OnAttached(itemStack);
-		_fluidFilter = null;   // force re-dispatch via FilterItemRegistry off new AttachItem
+		_fluidFilter = null;
 	}
 
 	public override bool CanAttach() => base.CanAttach() && CoverHolder is IFluidHandler;
@@ -103,10 +102,7 @@ public class FluidFilterCover : CoverBehavior, IUICover
 		tag["filterMode"] = (int)_filterMode;
 		tag["manualIO"] = (int)_allowFlow;
 		if (_fluidFilter is IFilter<FluidStack> f)
-		{
-			var cfg = f.SaveFilter();
-			if (cfg is not null) _filterConfig = cfg;
-		}
+			_filterConfig = f.SaveFilter();
 		if (_filterConfig is not null) tag["filterConfig"] = _filterConfig;
 	}
 

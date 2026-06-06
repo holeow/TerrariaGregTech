@@ -13,35 +13,26 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Bosses.FallenEBF;
 
-// The Fallen EBF - the first custom GregTech boss. A flying Electric Blast
-// Furnace (heatproof casing + cupronickel coils + muffler + EBF controller
-// face, see FallenEBFRenderer) on spectral wings. It fights by smelting:
-// telegraphs with a coil-glow flash + muffler smoke, then dumps a volley of
-// freshly-smelted hot ingots. Progression slot: between Eye of Cthulhu and
-// Skeletron (LV age). Summoned by the Overburned Coil Block.
+// The Fallen EBF - the first custom GregTech boss
+// TODO Very approximate and dirty implementation, gonna be reworken completely
 //
 // State is held entirely in ai[0..3] (synced) + localAI[0..3] (client visuals),
 // so no SendExtraAI is needed.
-//   ai[0] = attack state   ai[1] = state timer
-//   ai[2] = last attack (avoid repeats)   ai[3] = phase (0 = normal, 1 = overclock)
+// ai[0] = attack state   ai[1] = state timer
+// ai[2] = last attack (avoid repeats)
+// ai[3] = phase (0 = normal, 1 = overclock)
 [AutoloadBossHead]
 public class FallenEBF : ModNPC, IDebuggableBoss
 {
 	private const int S_Hover = 0, S_Fan = 1, S_Charge = 2, S_Pour = 3,
 		S_Rain = 4, S_Spiral = 5, S_MachineGun = 6;
 
-	// Hostile ingot damage (separate from the heavier contact damage).
 	private const int IngotDamage = 22;
 
 	private static bool _headSwapped;
 
-	// ModNPC needs a real autoloadable texture even though PreDraw draws a
-	// composite and returns false - point it at an existing upstream PNG.
 	public override string Texture => "GregTechCEuTerraria/Content/Textures/block/casings/solid/machine_casing_heatproof";
 
-	// Register a boss head (enables the bottom HP bar + minimap/off-screen
-	// icon) without shipping custom art - point at an existing GregTech PNG as
-	// the load-time placeholder, then swap in the baked core on first draw.
 	public override string BossHeadTexture => "GregTechCEuTerraria/Content/Textures/block/casings/solid/machine_casing_heatproof";
 
 	public override void SetStaticDefaults()
@@ -50,7 +41,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		NPCID.Sets.MPAllowedEnemies[Type] = true;
 		NPCID.Sets.BossBestiaryPriority.Add(Type);
 
-		// A furnace doesn't care about fire.
 		NPCID.Sets.SpecificDebuffImmunity[Type] ??= new bool?[BuffLoader.BuffCount];
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.OnFire] = true;
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.OnFire3] = true;
@@ -63,13 +53,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override void SetDefaults()
 	{
-		// 2x bigger for a more epic presence. The sprite is drawn in PreDraw at
-		// (renderer size * NPC.scale) = 192x256, INDEPENDENT of width/height, so
-		// the hitbox below only controls collision. Inset it well inside the
-		// sprite (~70%) - contact damage at the full bounding box feels too big;
-		// vanilla bosses use hitboxes tighter than their visual. Both the sprite
-		// and the hitbox stay centred on NPC.Center, so the inset box sits under
-		// the machine core.
 		NPC.scale = 2f;
 		NPC.width = (int)(FallenEBFRenderer.Width * NPC.scale * 0.68f);   // ~130
 		NPC.height = (int)(FallenEBFRenderer.Height * NPC.scale * 0.72f); // ~184
@@ -93,7 +76,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment)
 	{
-		// Base 3300 -> ~4500 in expert single-player via tML's balance factor.
+		// Base 3300 -> ~4500 in expert single-player
 		NPC.lifeMax = (int)(NPC.lifeMax * balance * bossAdjustment);
 	}
 
@@ -104,16 +87,9 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override void ModifyNPCLoot(NPCLoot npcLoot)
 	{
-		// Signature reward: 15 cupronickel coil blocks - the coils for your
-		// first real EBF. Always drops (the boss's own loot, not the
-		// configurable "GregTech boss drops" feature).
 		if (Mod.TryFind<ModItem>("cupronickel_coil_block", out var coil))
 			npcLoot.Add(ItemDropRule.Common(coil.Type, 1, 15, 15));
 
-		// Plus the same LV-tier "age loot" Eye of Cthulhu drops (tier 1 +
-		// components), gated by the EnableBossDrops config flag like every
-		// other GregTech boss drop. Mirrors the registry so a tier change
-		// shifts both together.
 		var condition = new BossDrops.BossDropCondition();
 		foreach (var d in BossDrops.BossDropRegistry.GetTierDrops(1, withComponents: true))
 			npcLoot.Add(new ItemDropWithConditionRule(d.ItemType, chanceDenominator: 1,
@@ -122,12 +98,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override void OnKill()
 	{
-		// Mark the world flag (gates her normal town spawn + recipes) and spawn her
-		// from the wreckage. DoDeathEvents (which calls OnKill) only runs server-side
-		// / in SP, so this is server-authoritative. She re-emerges on every kill while
-		// she isn't already present (wandering or housed) - see EBFChanSpawner.
 		FallenEBFWorld.MarkDowned();
-		NPCs.EBFChan.EBFChanSpawner.SpawnFromBossDeath(NPC.Center);
 		Mod.Logger.Info($"[EBF-chan] Fallen EBF defeated at {NPC.Center} -> Downed = {FallenEBFWorld.Downed}");
 	}
 
@@ -140,7 +111,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		float glow = NPC.localAI[2];
 		Lighting.AddLight(NPC.Center, 0.9f * glow, 0.45f * glow, 0.12f * glow);
 
-		// Target + despawn (two-pass).
 		if (!BossAI.TryAcquireTarget(NPC, out Player player))
 		{
 			Despawn();
@@ -174,11 +144,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	private void Hover(Player player, bool phase2)
 	{
-		// Weave side-to-side above the player instead of locking dead-centre,
-		// and chase loosely (low accel) so it lags behind player movement.
-		// Driven by the SYNCED state timer (not a wall clock) so server and MP
-		// clients steer the identical path - no rubberbanding. Direction varies
-		// per hover via the (synced) last-attack parity.
 		float swayDir = ((int)NPC.ai[2] & 1) == 0 ? 1f : -1f;
 		float sway = (float)Math.Sin(NPC.ai[1] * 0.06f) * 320f * swayDir;
 		Vector2 dest = player.Center + new Vector2(sway, -200f);
@@ -189,8 +154,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= wait)
 		{
 			NPC.ai[1] = 0f;
-			// Server picks the next attack at random (clients wait for the
-			// synced ai[0]); avoids the old fixed Fan->Charge->Pour cycle.
 			if (Main.netMode != NetmodeID.MultiplayerClient)
 			{
 				NPC.ai[0] = PickAttack(phase2, (int)NPC.ai[2]);
@@ -202,8 +165,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	private int PickAttack(bool phase2, int last)
 	{
-		// Pour is a phase-2 overhead-rain finisher; the rest are available from
-		// the start so the fight feels varied immediately.
 		ReadOnlySpan<int> pool = phase2
 			? stackalloc int[] { S_Fan, S_Charge, S_Pour, S_Rain, S_Spiral, S_MachineGun }
 			: stackalloc int[] { S_Fan, S_Charge, S_Rain, S_Spiral, S_MachineGun };
@@ -231,8 +192,8 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		int sinceTel = (int)NPC.ai[1] - telegraph;
 		if (sinceTel % burstEvery == 0 && (sinceTel / burstEvery) < bursts)
 		{
-			SoundEngine.PlaySound(SoundID.Item20, NPC.Center); // all clients hear it
-			FireFan(player, phase2);                           // server-only spawn
+			SoundEngine.PlaySound(SoundID.Item20, NPC.Center);
+			FireFan(player, phase2);
 		}
 
 		if (NPC.ai[1] >= telegraph + burstEvery * bursts + 10)
@@ -288,7 +249,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 	private void Pour(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
-		float pourSway = (float)Math.Sin(NPC.ai[1] * 0.08f) * 160f; // synced timer (MP-deterministic)
+		float pourSway = (float)Math.Sin(NPC.ai[1] * 0.08f) * 160f;
 		Vector2 dest = player.Center + new Vector2(pourSway, -270f);
 		BossAI.MoveToward(NPC, dest, 9f, 0.1f);
 
@@ -307,7 +268,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 	private void Rain(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
-		float rainSway = (float)Math.Sin(NPC.ai[1] * 0.07f) * 200f; // synced timer (MP-deterministic)
+		float rainSway = (float)Math.Sin(NPC.ai[1] * 0.07f) * 200f;
 		BossAI.MoveToward(NPC, player.Center + new Vector2(rainSway, -260f), 9f, 0.09f);
 
 		const int telegraph = 24;
@@ -328,7 +289,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 	private void Spiral(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
-		NPC.velocity *= 0.95f; // hold roughly still while spinning
+		NPC.velocity *= 0.95f;
 
 		const int telegraph = 20;
 		if (NPC.ai[1] < telegraph) { Telegraph(); return; }
@@ -338,7 +299,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		int arms = phase2 ? 3 : 2;
 		if (Main.netMode != NetmodeID.MultiplayerClient && ((int)NPC.ai[1] - telegraph) % every == 0)
 		{
-			// Deterministic angle from the timer so server-only spawns stay coherent.
 			float baseAng = ((int)NPC.ai[1] - telegraph) * 0.35f;
 			for (int a = 0; a < arms; a++)
 			{
@@ -349,7 +309,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= telegraph + dur) ReturnToHover();
 	}
 
-	// A rapid aimed stream with slight jitter - the "smelter on full blast".
+	// A rapid aimed stream with slight spread
 	private void MachineGun(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -387,7 +347,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		NPC.ai[3] = 1f;
 		NPC.netUpdate = true;
 		SoundEngine.PlaySound(SoundID.ForceRoar, NPC.Center);
-		NPC.localAI[3] = 0.9f; // big glow flash
+		NPC.localAI[3] = 0.9f;
 
 		if (!Main.dedServ)
 			for (int i = 0; i < 24; i++)
@@ -396,7 +356,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 				d.noGravity = true;
 			}
 
-		// One-time "overclock nova" - a ring of ingots.
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 		{
 			const int n = 14;
@@ -444,9 +403,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 	{
 		Player p = Main.player[NPC.target];
 		if (p is null || !p.active) return;
-		// Crosshair only - the boss -> player line spans the whole screen
-		// diagonally and reads as a screen-blocking rectangle. Distance is in
-		// the text panel instead.
 		DebugOverlaySystem.DrawCrosshair(sb, p.Center, screenPos,
 			new Color(255, 140, 80), 10f, 1);
 	}
@@ -459,19 +415,15 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			ai0: gravity ? 1f : 0f, ai1: Main.rand.Next(HotIngotProjectile.PaletteCount));
 	}
 
-	// Coil-glow flash + a heavier smoke burst - the "about to smelt a batch" tell.
 	private void Telegraph()
 	{
 		NPC.localAI[3] = Math.Max(NPC.localAI[3], 0.55f);
 		EmitMufflerSmoke(2);
 	}
 
-	// Smoke billowing from the muffler (top-centre cell of the body). Spawns
-	// client-side; `count` particles per call.
 	private void EmitMufflerSmoke(int count)
 	{
 		if (Main.dedServ) return;
-		// Muffler cell centre = top row of the 4-row body, drawn at NPC.scale.
 		Vector2 muffler = NPC.Center + new Vector2(0f, -FallenEBFRenderer.Height * 0.375f * NPC.scale);
 		for (int i = 0; i < count; i++)
 		{
@@ -483,7 +435,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// ---- visuals (run on all clients) --------------------------------------
+	// ---- visuals --------------------------------------
 
 	private void UpdateVisuals()
 	{
@@ -498,7 +450,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			NPC.localAI[1] = (NPC.localAI[1] + 1f) % 4f;
 		}
 
-		// Glow pulse: hotter in phase 2, plus a decaying telegraph boost.
 		float baseG = phase2 ? 0.85f : 0.5f;
 		float pulse = baseG + 0.12f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 4f);
 		if (NPC.localAI[3] > 0f)
@@ -509,7 +460,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		}
 		NPC.localAI[2] = MathHelper.Clamp(pulse, 0f, 1.5f);
 
-		// Constant exhaust from the muffler - heavier when overheating (phase 2).
 		if (Main.rand.NextBool(phase2 ? 1 : 2))
 			EmitMufflerSmoke(1);
 	}
@@ -527,11 +477,10 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
 	{
-		// Swap the load-time placeholder boss head for the baked core, once.
 		BossHeadHelper.SwapBakedHead(NPC, FallenEBFRenderer.BossHeadAsset, ref _headSwapped);
 
 		var body = FallenEBFRenderer.Body;
-		if (body is null) return true; // composite failed -> fall back to placeholder sprite
+		if (body is null) return true;
 
 		Vector2 pos = NPC.Center - screenPos;
 		float scale = NPC.scale;

@@ -148,3 +148,13 @@ Some people asked, yes, Claude was used to speed up the porting process, of cour
 ## License
 
 LGPL-3.0-or-later - inherited from GTCEu. See [COPYING.LESSER](COPYING.LESSER) and [COPYING](COPYING).
+
+Credits: GregTech Modern team
+Source: https://github.com/GregTechCEu/GregTech-Modern
+License: LGPL-3.0-or-later
+
+Credits: GregTech Modern Community Pack (questbook content)
+Source: https://github.com/GregTechCEu/GregTech-Modern-Community-Pack
+License: LGPL-2.1
+
+Credits: EBF-chan sprite by Qiuqiu, used from their permission

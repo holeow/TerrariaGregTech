@@ -8,11 +8,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Tools;
 
-// World-side identity-tool behaviour: soft-digger tile filter (CanKillTile),
-// saw -> rubber wood + mortar -> silt/sand (CanDrop), hoe -> tier-scaled extra
-// seeds (Drop). Drop runs server-side in MP (server-authoritative drops); the
-// breaking player is resolved via the nearest tool-holder (a stand-in for
-// vanilla's non-public GetPlayerForTile).
 public sealed class ToolWorldEffects : GlobalTile
 {
 	private static int _rubberWood = -1;
@@ -32,28 +27,31 @@ public sealed class ToolWorldEffects : GlobalTile
 
 	public override bool CanKillTile(int i, int j, int type, ref bool blockDamaged)
 	{
-		if (Main.netMode == NetmodeID.Server) return true;       // client-side gate only
+		if (Main.netMode == NetmodeID.Server) return true;
 		var p = Main.LocalPlayer;
-		if (p?.HeldItem?.ModItem is ToolItem t && t.IsSoftDigger && p.itemAnimation > 0)
-			return SoftTiles.Contains(type);
+		if (p?.HeldItem?.ModItem is ToolItem t && p.itemAnimation > 0)
+		{
+			if (t.IsSoftDigger) return SoftTiles.Contains(type);
+			if (t.IsHoe)
+				return type == TileID.ImmatureHerbs
+				    || type == TileID.MatureHerbs
+				    || type == TileID.BloomingHerbs;
+		}
 		return true;
 	}
 
-	// REPLACE cases: TileLoader.Drop early-returns BEFORE Drop hooks when
-	// CanDrop is false, so the substitute MUST be spawned here, not in Drop.
+	// TileLoader.Drop early-returns before Drop hooks when CanDrop is false
 	public override bool CanDrop(int i, int j, int type)
 	{
 		var holder = NearestToolHolder(i, j);
 		if (holder?.HeldItem?.ModItem is not ToolItem tool) return true;
 
-		// Saw / buzzsaw: trees yield rubber wood instead of Wood.
 		if (tool.IsSawLike && (type == TileID.Trees || type == TileID.PalmTree) && RubberWood > 0)
 		{
 			SpawnItem(i, j, RubberWood, 1);
 			return false;
 		}
 
-		// Mortar: stone yields Silt Block, dirt yields Sand Block.
 		if (tool.IsMortar && type == TileID.Stone)
 		{
 			SpawnItem(i, j, ItemID.SiltBlock, 1);
@@ -68,9 +66,6 @@ public sealed class ToolWorldEffects : GlobalTile
 		return true;
 	}
 
-	// ADDITIVE: hoe's tier-scaled Staff-of-Regrowth bonus (vanilla's
-	// staffOfRegrowthBonus flag isn't exposed to mods). Anchored so Aluminium
-	// (MV/tier 2) ~ vanilla Staff's 1-5 bonus seeds + 1 extra herb.
 	public override void Drop(int i, int j, int type)
 	{
 		if (type != TileID.MatureHerbs && type != TileID.BloomingHerbs) return;
@@ -94,12 +89,11 @@ public sealed class ToolWorldEffects : GlobalTile
 	private static void SpawnItem(int i, int j, int itemType, int stack)
 	{
 		if (itemType <= 0 || stack <= 0) return;
-		if (Main.netMode == NetmodeID.MultiplayerClient) return;     // server-authoritative
+		if (Main.netMode == NetmodeID.MultiplayerClient) return;
 		Item.NewItem(WorldGen.GetItemSource_FromTileBreak(i, j),
 			i * 16, j * 16, 16, 16, itemType, stack);
 	}
 
-	// Stand-in for vanilla's non-public WorldGen.GetPlayerForTile.
 	private static Player? NearestToolHolder(int i, int j)
 	{
 		var c = new Vector2(i * 16f + 8f, j * 16f + 8f);

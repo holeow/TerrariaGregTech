@@ -242,8 +242,20 @@ public static class VanillaItemMap
 		("_log",      ItemID.Wood),         // oak_log, stripped_birch_log, ...
 		("_wood",     ItemID.Wood),         // oak_wood, stripped_birch_wood, ...
 		("_stem",     ItemID.Wood),         // crimson_stem, warped_stem
-		("_planks",   ItemID.WoodPlatform), // oak_planks, dark_oak_planks, ...
 		("_sapling",  ItemID.Acorn),        // oak_sapling, birch_sapling, ... (all -> acorn)
+	};
+
+	// ---- SuffixMaterialSubs: pattern fallback to a dynamic (material, prefix)
+	private static readonly (string Suffix, string Material, string Prefix)[] SuffixMaterialSubs =
+		new (string, string, string)[]
+	{
+		("_planks", "wood", "plate"),
+	};
+
+	// ---- TagMaterialSubs: tag -> dynamic (material, prefix) item
+	private static readonly Dictionary<string, (string Material, string Prefix)> TagMaterialSubs = new()
+	{
+		{ "minecraft:planks", ("wood", "plate") },
 	};
 
 	// ---- TagItems: tag -> representative Terraria item ------------------------
@@ -257,7 +269,6 @@ public static class VanillaItemMap
 		{ "minecraft:logs_that_burn",             ItemID.Wood },
 		{ "minecraft:oak_logs",                   ItemID.Wood },
 		{ "forge:oak_logs",                       ItemID.Wood },
-		{ "minecraft:planks",                     ItemID.WoodPlatform },
 		{ "minecraft:saplings",                   ItemID.Acorn },
 		{ "minecraft:stone_crafting_materials",   ItemID.StoneBlock },
 		{ "forge:wood",                           ItemID.Wood },
@@ -320,7 +331,6 @@ public static class VanillaItemMap
 		// Wood tag - Terraria's vanilla "Wood" group covers every wood type.
 		{ "minecraft:logs",             RecipeGroupID.Wood },
 		{ "minecraft:logs_that_burn",   RecipeGroupID.Wood },
-		{ "minecraft:planks",           RecipeGroupID.Wood },
 		{ "forge:wood",                 RecipeGroupID.Wood },
 
 		// Iron-bar-equivalent (Iron OR Lead in Terraria).
@@ -348,6 +358,12 @@ public static class VanillaItemMap
 		// (lathe_planks and treated_wood_sticks both showing WoodPlatform -> rods).
 		if (item.StartsWith("minecraft:", System.StringComparison.Ordinal))
 		{
+			foreach (var (suffix, mat, prefix) in SuffixMaterialSubs)
+			{
+				if (!item.EndsWith(suffix)) continue;
+				var t = MaterialItemRegistry.Get(mat, prefix);
+				if (t.HasValue) { itemType = t.Value; return true; }
+			}
 			foreach (var (suffix, t) in SuffixRules)
 			{
 				if (item.EndsWith(suffix)) { itemType = t; return true; }
@@ -357,8 +373,17 @@ public static class VanillaItemMap
 		return false;
 	}
 
-	public static bool TryGetTagItem(string tag, out int itemType) =>
-		TagItems.TryGetValue(tag, out itemType);
+	public static bool TryGetTagItem(string tag, out int itemType)
+	{
+		if (TagItems.TryGetValue(tag, out itemType)) return true;
+		if (TagMaterialSubs.TryGetValue(tag, out var mp))
+		{
+			var t = MaterialItemRegistry.Get(mp.Material, mp.Prefix);
+			if (t.HasValue) { itemType = t.Value; return true; }
+		}
+		itemType = 0;
+		return false;
+	}
 
 	public static bool TryGetTagItems(string tag, out int[] itemTypes)
 	{

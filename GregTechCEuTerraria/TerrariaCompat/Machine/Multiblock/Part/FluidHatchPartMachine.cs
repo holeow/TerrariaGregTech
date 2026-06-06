@@ -11,10 +11,7 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of FluidHatchPartMachine. Sister to ItemBusPartMachine for fluids.
-// _1X (1 tank, 8 buckets/tier-1), _4X (4 tanks, 2 buckets), _9X (9 tanks, 1
-// bucket). See ItemBusPartMachine header for the full adaptation list -
-// same shape applies here.
+// Port of FluidHatchPartMachine, _1X, _4X, _9X. See ItemBusPartMachine header for the full adaptation list
 public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 {
 	public const int BUCKET_VOLUME           = 1000;
@@ -28,7 +25,6 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 	public NotifiableItemStackHandler?  CircuitInventory { get; protected set; }
 	public bool                         CircuitSlotEnabled { get; protected set; }
 
-	// CircuitInventory deliberately NOT exposed.
 	public override Api.Capability.IFluidHandler? ExposedFluidHandler => Tank;
 
 	protected int Slots;
@@ -82,13 +78,14 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 		if (Io == IO.IN)
 		{
 			CircuitSlotEnabled = true;
-			CircuitInventory = new NotifiableItemStackHandler(1, IO.IN, IO.NONE)
-				.SetFilter(IsProgrammedCircuit);
+			CircuitInventory = new NotifiableItemStackHandler(1, IO.IN, IO.NONE).SetFilter(IsProgrammedCircuit);
+			CircuitInventory.ShouldDropInventoryInWorld = false;
+			CircuitInventory.ShouldSearchContent = false;
 		}
 		else
 		{
 			CircuitSlotEnabled = false;
-			CircuitInventory = new NotifiableItemStackHandler(0, IO.NONE);
+			CircuitInventory = new NotifiableItemStackHandler(0, IO.NONE) { ShouldSearchContent = false };
 		}
 		Traits.Attach(CircuitInventory);
 		Traits.RegisterPersistent("CircuitInventory", CircuitInventory);
@@ -113,7 +110,7 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 	{
 		if (!controller.AllowCircuitSlots())
 		{
-			DropCircuitToWorld();
+			ClearCircuit();
 			SetCircuitSlotEnabled(false);
 		}
 		base.AddedToController(controller);
@@ -129,17 +126,11 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 		SetCircuitSlotEnabled(true);
 	}
 
-	private void DropCircuitToWorld()
+	private void ClearCircuit()
 	{
 		if (CircuitInventory == null) return;
 		for (int i = 0; i < CircuitInventory.SlotCount; i++)
-		{
-			var stack = CircuitInventory.GetSlot(i);
-			if (stack == null || stack.IsAir) continue;
-			Item.NewItem(new Terraria.DataStructures.EntitySource_TileBreak(Position.X, Position.Y),
-				Position.X * 16, Position.Y * 16, 16, 16, stack.type, stack.stack);
-			CircuitInventory.Extract(i, stack.stack, simulate: false);
-		}
+			CircuitInventory.SetSlot(i, new Item());
 	}
 
 	private void EnsureAutoIOSubscription()
@@ -147,7 +138,7 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 		_autoIOSubs ??= SubscribeServerTick(AutoIOTick);
 	}
 
-	// See ItemBusPartMachine.AutoIOTick for the design notes.
+	// See ItemBusPartMachine.AutoIOTick
 	protected virtual void AutoIOTick()
 	{
 		if (GetOffsetTimer() % global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(5) != 0) return;
@@ -206,7 +197,6 @@ public class FluidHatchPartMachine : TieredIOPartMachine, IHasCircuitSlot
 		Slots              = tag.GetInt("slots");
 		CircuitSlotEnabled = !tag.ContainsKey("circuitSlotEnabled") || tag.GetBool("circuitSlotEnabled");
 		EnsureTraits();
-		// Re-load after late trait registration (ItemBus pattern).
 		Traits.Load(tag);
 		EnsureAutoIOSubscription();
 	}

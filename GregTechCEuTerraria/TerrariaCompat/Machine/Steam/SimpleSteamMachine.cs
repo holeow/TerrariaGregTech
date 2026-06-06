@@ -4,6 +4,7 @@ using GregTechCEuTerraria.Api.Fluids;
 using GregTechCEuTerraria.Api.Machine.Trait;
 using GregTechCEuTerraria.Api.Recipe;
 using GregTechCEuTerraria.Api.Recipe.Content;
+using GregTechCEuTerraria.Api.Recipe.Modifier;
 using GregTechCEuTerraria.Common.Energy;
 using Terraria;
 using RecipeIO = GregTechCEuTerraria.Api.Capability.Recipe.IO;
@@ -20,15 +21,11 @@ public class SimpleSteamMachine : SteamWorkableMachine, IItemHandler
 	protected override string Label => Definition?.Label ?? "Steam Machine";
 	public override GTRecipeType GetRecipeType() => Definition?.RecipeType!;
 
-	// mB/EU - upstream 1.0 LP / 2.0 HP.
 	public double ConversionRate => IsHighPressure ? 2.0 : 1.0;
 
-	// Steam tank is INPUT here (boiler/pipe pushes in); base defaults to OUT.
 	protected override NotifiableFluidTank CreateSteamTank() =>
 		new(1, SteamTankCapacity, RecipeIO.IN);
 
-	// SteamMachine.Fill rejects all fill (boiler tank is OUT). Processing
-	// machine needs INPUT fill from adjacent boilers / steam pipes.
 	public override bool IsFluidValid(int tank, FluidStack fluid) =>
 		!fluid.IsEmpty && fluid.Type!.Id == FluidRegistry.Steam.Id;
 
@@ -61,13 +58,9 @@ public class SimpleSteamMachine : SteamWorkableMachine, IItemHandler
 		Traits.RegisterPersistent("ImportItems", _importItems);
 		Traits.RegisterPersistent("ExportItems", _exportItems);
 
-		// Mirrors upstream onLoad: RecipeHandlerList.of(IO.IN,
-		// new SteamEnergyRecipeHandler(steamTank, rate)).
 		_steamEnergy = new SteamEnergyRecipeHandler(SteamTank, ConversionRate);
 	}
 
-	// SteamWorkableMachine stubs these (boilers); processing machines route EU
-	// through the steam-energy handler.
 	protected override long EnergyStoredCore
 	{
 		get { EnsureSteamTraits(); return _steamEnergy!.StoredEu; }
@@ -81,18 +74,14 @@ public class SimpleSteamMachine : SteamWorkableMachine, IItemHandler
 			: ActionResult.Fail("gtceu.recipe.insufficient_eu", Api.Capability.Recipe.EURecipeCapability.CAP, RecipeIO.IN);
 	}
 
-	// Verbatim: reject above LV; x2 duration on LP. Vent reject + VentCondition
-	// dropped (see header).
 	public override GTRecipe? FullModifyRecipe(GTRecipe recipe)
 	{
 		if (RecipeHelper.GetRecipeEUtTier(recipe) > (int)VoltageTier.LV)
 			return null;
 		if (!IsHighPressure)
-			return recipe.Copy(ContentModifier.Multiplier_(2.0), modifyDuration: true);
+			return ModifierFunction.Builder().DurationMultiplier(2).Build().Apply(recipe);
 		return recipe;
 	}
-
-	// Combined surface: slots [0..InCount) = import; rest = export.
 
 	public int SlotCount { get { EnsureSteamTraits(); return _importItems!.SlotCount + _exportItems!.SlotCount; } }
 
@@ -122,7 +111,6 @@ public class SimpleSteamMachine : SteamWorkableMachine, IItemHandler
 	public bool IsItemValid(int slot, Item item)
 	{
 		EnsureSteamTraits();
-		// Import accepts anything (recipe match is the real gate); export = output-only.
 		return slot < _importItems!.SlotCount;
 	}
 
@@ -154,7 +142,6 @@ public class SimpleSteamMachine : SteamWorkableMachine, IItemHandler
 		else if (group == SlotGroup.InventoryOutput) ExportItems.OnContentsChanged();
 	}
 
-	// UI accessors (parity with WorkableTieredMachine).
 	public int  InputSlots  => Definition?.InputSlotCount  ?? 0;
 	public int  OutputSlots => Definition?.OutputSlotCount ?? 0;
 	public bool UsesCircuit => Definition?.UsesCircuit ?? false;

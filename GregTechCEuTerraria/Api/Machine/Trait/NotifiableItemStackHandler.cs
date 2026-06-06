@@ -11,23 +11,11 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.Api.Machine.Trait;
 
-// PORTED - port of
-// com.gregtechceu.gtceu.api.machine.trait.NotifiableItemStackHandler.
+// port of com.gregtechceu.gtceu.api.machine.trait.NotifiableItemStackHandler.
 //
-// Trait that holds a slot-backed item buffer and acts as a recipe-handler
-// for ItemRecipeCapability. The HandleRecipeInner walker consumes / produces
-// items via the slot range, returning the un-handled remainder so the
-// recipe-logic loop can move on to other handler instances (multiple
-// handlers can split a recipe's inputs/outputs across the machine).
-//
-// Documented adaptations:
-//   - Forge ItemStack / IItemHandlerModifiable -> Terraria Item /
-//     our IItemHandlerModifiable (same shape, different ItemStack type).
-//   - Direction -> IODirection at the export/import boundary. (Machines
-//     don't have facings yet; the methods are kept for future cover work
-//     but no current call site uses them.)
-//   - KubeJS IngredientAction filter dropped (we have no KubeJS).
-//   - @SaveField/@SyncToClient -> trait Save/Load through MachineTraitHolder.
+// adaptations:
+//  forge ItemStack / IItemHandlerModifiable -> Terraria Item / our IItemHandlerModifiable
+//  kubeJS IngredientAction filter dropped
 public class NotifiableItemStackHandler
 	: NotifiableRecipeHandlerTrait<Ingredient>, IItemHandlerModifiable
 {
@@ -55,10 +43,6 @@ public class NotifiableItemStackHandler
 	}
 
 	// === Construction =======================================================
-	// Mirrors upstream's three constructors. The factory-taking overload lets
-	// subclasses inject a custom storage variant (filtered, slot-limit
-	// override, etc.).
-
 	public NotifiableItemStackHandler(int slots, IO handlerIO, IO capabilityIO,
 	                                  Func<int, CustomItemStackHandler> storageFactory)
 	{
@@ -86,23 +70,10 @@ public class NotifiableItemStackHandler
 		NotifyListeners();
 	}
 
-	// === handleRecipeInner (verbatim port) ==================================
-	//
-	// Upstream's walker - single-pass over `left`, mutating each Ingredient's
-	// remaining count as we consume/produce slots. Removes fully-handled
-	// entries from `left` so the recipe-logic loop knows what's still
-	// outstanding.
-	//
-	// IO direction must match this handler's handlerIO; otherwise return
-	// `left` unchanged. For the wrong direction we don't even iterate.
 	public override List<Ingredient>? HandleRecipeInner(IO io, GTRecipe recipe,
 	                                                    List<Ingredient> left, bool simulate)
 		=> HandleRecipe(io, recipe, left, simulate, HandlerIO, Storage);
 
-	// Verbatim port of upstream's static handleRecipe(io, recipe, left,
-	// simulate, handlerIO, storage). Public+static so other callers
-	// (MinerLogic, future ItemRecipeHandler) can reuse without going through
-	// a trait instance - mirrors upstream's note about ItemRecipeHandler.
 	public static List<Ingredient>? HandleRecipe(IO io, GTRecipe recipe,
 	                                              List<Ingredient> left, bool simulate,
 	                                              IO handlerIO, CustomItemStackHandler storage)
@@ -110,14 +81,12 @@ public class NotifiableItemStackHandler
 		if (io != handlerIO) return left;
 		if (io != IO.IN && io != IO.OUT) return left.Count == 0 ? null : left;
 
-		// Temporarily remove listener so we can broadcast the entire set of
-		// transactions once.
+		// Temporarily remove listener so we can broadcast the entire set of transactions once.
 		var listener = storage.OnContentsChangedAction;
 		storage.OnContentsChangedAction = () => { };
 		bool changed = false;
 
-		// Visited[] tracks per-slot post-op state so simulation works without
-		// mutating the storage, and so non-simulation runs avoid clobbering.
+		// Visited[] tracks per-slot post-op state so simulation works without mutating the storage
 		var visited = new Item?[storage.GetSlots()];
 
 		for (int idx = 0; idx < left.Count; )
@@ -206,8 +175,6 @@ public class NotifiableItemStackHandler
 				}
 			}
 
-			// Didn't finish off this ingredient - mutate it so the next handler
-			// sees the remaining count.
 			if (amount > 0)
 			{
 				if (ingredient is SizedIngredient si) si.Amount = amount;
@@ -276,16 +243,8 @@ public class NotifiableItemStackHandler
 	}
 
 	// === IItemHandlerModifiable =============================================
-	// canCapInput / canCapOutput in upstream guard external pipe access so a
-	// "this handler is OUT-only" trait rejects inserts from pipes. Mirror.
-
 	public int SlotCount => Storage.SlotCount;
 	public Item GetSlot(int slot) => Storage.GetSlot(slot);
-	// virtual: upstream's NotifiableItemStackHandler methods are overridable
-	// (Java default). ObjectHolderHandler @Overrides getSlotLimit / isItemValid /
-	// extractItem - so these MUST be virtual here for that verbatim override to bind
-	// (a non-virtual method + subclass `new` is the documented C# method-hiding trap,
-	// which silently no-ops the override through any base/interface reference).
 	public virtual int GetSlotLimit(int slot) => Storage.GetSlotLimit(slot);
 	public virtual bool IsItemValid(int slot, Item item) => Storage.IsItemValid(slot, item);
 	public void SetSlot(int slot, Item item) => Storage.SetSlot(slot, item);
@@ -308,8 +267,6 @@ public class NotifiableItemStackHandler
 	public Item ExtractInternal(int slot, int amount, bool simulate) =>
 		Storage.Extract(slot, amount, simulate);
 
-	// CapabilityIO guards external pipe insert/extract - mirrors upstream's
-	// canCapInput / canCapOutput on ICapabilityTrait.
 	public bool CanCapInput()  => CapabilityIO == IO.IN  || CapabilityIO == IO.BOTH;
 	public bool CanCapOutput() => CapabilityIO == IO.OUT || CapabilityIO == IO.BOTH;
 
@@ -329,15 +286,11 @@ public class NotifiableItemStackHandler
 	{
 		tag["storage"]                    = Storage.SerializeNBT();
 		tag["isDistinct"]                 = IsDistinct;
-		tag["shouldSearchContent"]        = _shouldSearchContent;
-		tag["shouldDropInventoryInWorld"] = _shouldDropInventoryInWorld;
 	}
 
 	public override void Load(TagCompound tag)
 	{
 		if (tag.ContainsKey("storage"))                    Storage.DeserializeNBT(tag.Get<TagCompound>("storage"));
 		if (tag.ContainsKey("isDistinct"))                 SetDistinct(tag.GetBool("isDistinct"));
-		if (tag.ContainsKey("shouldSearchContent"))        _shouldSearchContent       = tag.GetBool("shouldSearchContent");
-		if (tag.ContainsKey("shouldDropInventoryInWorld")) _shouldDropInventoryInWorld = tag.GetBool("shouldDropInventoryInWorld");
 	}
 }

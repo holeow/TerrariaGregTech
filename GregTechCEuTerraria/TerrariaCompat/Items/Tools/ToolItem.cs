@@ -19,11 +19,8 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Tools;
 
-// One (Material x GTToolType) pair, mirroring upstream's GTToolItem. Stats are
-// computed in the ctor from the material's ToolProperty via verbatim IGTTool
-// total-stat formulas. Durability NOT modelled (project decision; dump still
-// carries the data). Electric tools store EU per-stack - same BatteryItem
-// charge contract, so machine charger slots top them up unchanged.
+// One (Material x GTToolType) pair, mirroring upstream's GTToolItem
+// Electric tools store EU per-stack - same BatteryItem charge
 public sealed class ToolItem : ModItem, IElectricItem
 {
 	private readonly string? _id;
@@ -32,13 +29,11 @@ public sealed class ToolItem : ModItem, IElectricItem
 	private readonly ToolLayer[] _layers = System.Array.Empty<ToolLayer>();
 	private readonly string _texture = "Terraria/Images/Item_22";
 
-	// Computed Terraria stats.
 	private readonly int _pick, _axe, _hammer, _damage, _useTime;
 	private readonly int _harvestLevel;
 	private readonly int _tier;
 	private readonly float _toolSpeed, _attackDamage;
 
-	// Electric - 0 maxCharge for non-electric tools.
 	private readonly long _maxCharge;
 	private readonly long _euPerUse;
 	private long _storedEu;
@@ -54,31 +49,25 @@ public sealed class ToolItem : ModItem, IElectricItem
 		_texture = texture;
 
 		var def = type.Definition;
-		var tp = material.Tool!; // loader filters to materials with a Tool property
+		var tp = material.Tool!;
 
-		// Verbatim IGTTool total-stat formulas.
 		_toolSpeed = def.EfficiencyMultiplier * tp.HarvestSpeed + def.BaseEfficiency;
 		_attackDamage = def.BaseDamage == ToolDefinition.NoAttackSentinel
 			? 0f
 			: tp.AttackDamage + def.BaseDamage;
 		_harvestLevel = tp.HarvestLevel + def.BaseQuality;
 
-		// Map onto Terraria's tool model.
 		bool isPick = type.ToolClassNames.Contains("pickaxe") || type.Name.Contains("drill");
 		bool isAxe = type.ToolClassNames.Contains("axe") || type.Name.Contains("chainsaw");
 		bool isHammer = ReferenceEquals(type, GTToolType.HARD_HAMMER);
 
-		// Upstream-formula stats - keeps per-material variation in tier.
 		int upPick    = isPick   ? Math.Min(250, 28 + _harvestLevel * 20) : 0;
 		int upAxe     = isAxe    ? Math.Max(5, 7 + _harvestLevel * 4)     : 0;
 		int upHammer  = isHammer ? 35 + _harvestLevel * 20                : 0;
 		int upDamage  = Math.Max(1, (int)Math.Round(2 + _attackDamage));
-		// Crowbar repurposed as pure melee - Zombie-Arm damage curve.
 		if (IsCrowbar) upDamage = 12 + _harvestLevel * 3;
 		int upUseTime = Math.Clamp((int)Math.Round(19 - _toolSpeed * 0.6f), 9, 18);
 
-		// Blend toward a Terraria-progression anchor (see ToolTier.AnchorBlend)
-		// so per-material variation still survives at reduced amplitude.
 		int tier = ToolTier.For(material);
 		_tier = tier;
 		var anchor = ToolTier.AnchorFor(tier);
@@ -88,37 +77,35 @@ public sealed class ToolItem : ModItem, IElectricItem
 		_damage  = Math.Max(1, ToolTier.Blend(upDamage, anchor.Damage));
 		_useTime = Math.Max(2, ToolTier.Blend(upUseTime, anchor.UseTime));
 
-		// Terraria-side identity overrides (TerrariaCompat glue, no upstream
-		// parity) - gives the otherwise-samey tools distinct feel.
 		string n = type.Name;
 		if (n == "shovel" || n == "spade")
 		{
-			// Soft-digger; stone is barred by the tile-type filter in
-			// ToolWorldEffects, not by raw pick power.
 			_pick = Math.Max(35, anchor.Pick / 4);
 			_axe = 0; _hammer = 0;
 			_useTime = Math.Max(2, (int)Math.Round(_useTime / (n == "shovel" ? 3.0 : 2.0)));
 		}
 		else if (n == "saw" || n == "buzzsaw")
 		{
-			_axe = anchor.Axe;                                  // tree drops swap to rubber wood in ToolWorldEffects
+			_axe = anchor.Axe;
 		}
 		else if (n == "mortar")
 		{
-			// 0.75x same-material pickaxe; stone drops Silt.
 			int pickaxePick = ToolTier.Blend(Math.Min(250, 28 + _harvestLevel * 20), anchor.Pick);
 			_pick = Math.Max(1, (int)Math.Round(pickaxePick * 0.75));
 		}
 		else if (n == "screwdriver" || n == "file")
 		{
-			// Spear-poke (Palladium-Pike thrust). File = 0.75x screwdriver.
 			_damage = Math.Max(1, (int)Math.Round(anchor.Damage * (n == "file" ? 0.75 : 1.0)));
 			_useTime = n == "file" ? 22 : 14;
 		}
 		else if (n == "plunger")
 		{
-			// Super-Absorbent-Sponge speed; reaches Sponge cadence ~EV/4.
 			_useTime = Math.Clamp(24 - 5 * tier, 2, 60);
+		}
+		else if (n == "hoe")
+		{
+			_pick = 50;
+			_axe = 0; _hammer = 0; _damage = 0;
 		}
 
 		if (type.IsElectric)
@@ -140,15 +127,13 @@ public sealed class ToolItem : ModItem, IElectricItem
 	public int AoeRow => _type?.Definition.Aoe.Row ?? 0;
 	public bool IsElectric => _type?.IsElectric ?? false;
 
-	// IElectricItem - same contract as BatteryItem. Non-electric tools report
-	// 0 capacity, so charger slots no-op on them.
 	public long StoredEu
 	{
 		get => _storedEu;
 		set => _storedEu = Math.Clamp(value, 0, _maxCharge);
 	}
 
-	public bool CanProvideChargeExternally() => false; // chargers fill, never drain
+	public bool CanProvideChargeExternally() => false;
 	public bool Chargeable() => IsElectric;
 	public long GetTransferLimit() => IsElectric ? VoltageTiers.Voltage((VoltageTier)_type!.ElectricTier) : 0;
 	public long GetMaxCharge() => _maxCharge;
@@ -172,7 +157,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 	public long Discharge(long amount, int dischargerTier, bool ignoreTransferLimit, bool externally, bool simulate)
 	{
-		// `externally`=true blocks the tool as a power source; internal use OK.
 		if (Item.stack != 1 || !IsElectric || externally) return 0L;
 		int tier = _type!.ElectricTier;
 		if (dischargerTier >= tier && amount > 0L)
@@ -192,11 +176,8 @@ public sealed class ToolItem : ModItem, IElectricItem
 				$"Mods.GregTechCEuTerraria.Items.{Name}.DisplayName", () => _label);
 	}
 
-	// Drills/chainsaws - drawn via a rotating held projectile.
-	public bool DrillLike => _type != null &&
-		(_type.Name.Contains("drill") || _type.Name.Contains("chainsaw"));
+	public bool DrillLike => _type != null && (_type.Name.Contains("drill") || _type.Name.Contains("chainsaw"));
 
-	// Machine-interaction tool classifications.
 	public bool IsWrench => _type != null && _type.ToolClassNames.Contains("wrench");
 	public bool IsWireCutter => _type != null && _type.ToolClassNames.Contains("wire_cutter");
 	public bool IsMallet => _type != null && _type.Name == "mallet";
@@ -204,7 +185,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 	public bool IsKnife => _type != null && _type.Name == "knife";
 	public bool IsButcheryKnife => _type != null && _type.Name == "butchery_knife";
 
-	// Terraria-identity tool flags (read by ToolWorldEffects / SetDefaults).
 	public int Tier => _tier;
 	public bool IsSoftDigger => _type != null && (_type.Name == "shovel" || _type.Name == "spade");
 	public bool IsSawLike => _type != null && (_type.Name == "saw" || _type.Name == "buzzsaw");
@@ -223,10 +203,7 @@ public sealed class ToolItem : ModItem, IElectricItem
 		Item.damage = _damage;
 		Item.knockBack = IsCrowbar ? 9.5f : 3f;
 		Item.useTime = Item.useAnimation = _useTime;
-		// Auto-attack on for combat/mining tools. Utility one-shots stay
-		// click-only so a held LMB doesn't fire the action 30 times/sec.
-		bool isUtilityOneShot = IsWrench || IsWireCutter || IsMallet
-			|| (_type != null && _type.Name == "soft_hammer");
+		bool isUtilityOneShot = IsWrench || IsWireCutter || IsMallet || (_type != null && _type.Name == "soft_hammer");
 		Item.autoReuse = !isUtilityOneShot;
 		Item.pick = _pick;
 		Item.axe = _axe;
@@ -236,8 +213,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 		if (DrillLike)
 		{
-			// Held projectile rotates to aim direction; item graphic hidden,
-			// DrillHeldProjectile draws it in-hand. Inventory icon untouched.
 			Item.useStyle = ItemUseStyleID.Shoot;
 			Item.DamageType = DamageClass.MeleeNoSpeed;
 			Item.shoot = ModContent.ProjectileType<DrillHeldProjectile>();
@@ -248,8 +223,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		}
 		else if (IsButcheryKnife)
 		{
-			// Infinite-throw knife (never consumable). ButcheryKnifeProjectile
-			// runs vanilla knife AI but draws this knife (Shoot stamps Item.type).
 			Item.useStyle = ItemUseStyleID.Swing;
 			Item.UseSound = SoundID.Item1;
 			Item.shoot = ModContent.ProjectileType<ButcheryKnifeProjectile>();
@@ -268,8 +241,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		}
 		else if (IsPoker)
 		{
-			// Held spear projectile (vanilla AI 19); ToolPokeProjectile draws
-			// this tool in-hand.
 			Item.useStyle = ItemUseStyleID.Shoot;
 			Item.DamageType = DamageClass.Melee;
 			Item.shoot = ModContent.ProjectileType<ToolPokeProjectile>();
@@ -282,20 +253,25 @@ public sealed class ToolItem : ModItem, IElectricItem
 		}
 		else if (IsScythe)
 		{
-			// Wide crowd-clear (Death-Sickle feel); cordage flag set in HoldItem.
 			Item.useStyle = ItemUseStyleID.Swing;
 			Item.UseSound = SoundID.Item1;
 			Item.autoReuse = true;
 			Item.useTurn = false;
 			Item.scale = 1.5f;
 		}
+		else if (IsHoe)
+		{
+			Item.useStyle = ItemUseStyleID.Swing;
+			Item.useTurn = true;
+			Item.UseSound = SoundID.Item1;
+			Item.noMelee = true;
+			Item.autoReuse = true;
+		}
 		else
 		{
 			Item.useStyle = ItemUseStyleID.Swing;
 			Item.useTurn = true;
 			Item.UseSound = SoundID.Item1;
-			// Sword scale: tier 0 (flint) = Copper Shortsword 0.8, tier 2
-			// (Aluminium) = Volcano 1.0, +0.1 per tier above.
 			if (IsSword) Item.scale = MathHelper.Clamp(0.8f + 0.1f * _tier, 0.8f, 2.0f);
 		}
 	}
@@ -303,17 +279,12 @@ public sealed class ToolItem : ModItem, IElectricItem
 	public override bool CanUseItem(Player player) =>
 		!IsElectric || _storedEu >= _euPerUse;
 
-	// Knife is the lone GT tool that hits town NPCs (flagged red in tooltip).
-	// MUST return an explicit bool: tML's CombinedHooks.CanPlayerHitNPCWithItem
-	// only bypasses vanilla's "only the Rotten Egg can hit town NPCs" gate when
-	// a hook returns true; null falls through to that gate.
 	public override bool? CanHitNPC(Player player, NPC target)
 	{
 		if (target.townNPC) return IsKnife;
 		return null;
 	}
 
-	// ai[0] carries this knife's item type so the projectile draws THIS knife.
 	public override bool Shoot(Player player, Terraria.DataStructures.EntitySource_ItemUse_WithAmmo source,
 		Vector2 position, Vector2 velocity, int type, int damage, float knockback)
 	{
@@ -337,9 +308,7 @@ public sealed class ToolItem : ModItem, IElectricItem
 		return true;
 	}
 
-	// Port of vanilla absorbing-sponge (Player.cs:45724) - zero cursor tile,
-	// pull matching-type liquid from 8 neighbours (cap 255). Removes every
-	// liquid type. Throughput gated by tier-scaled Item.useTime.
+	// Port of vanilla absorbing-sponge (Player.cs:45724)
 	private void AbsorbLiquid(Player player)
 	{
 		int tx = Player.tileTargetX, ty = Player.tileTargetY;
@@ -375,8 +344,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		}
 	}
 
-	// Owning-client only; mutations go through action packets / TileManipulation
-	// sync, never direct shared-state writes.
 	private void DoMachineInteraction(Player player)
 	{
 		int x = (int)(Main.MouseWorld.X / 16f);
@@ -386,7 +353,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		if (IsWireCutter)
 		{
 			if (WireItem.CutCableAt(player, x, y)) return;
-			// Upstream parity: laser pipe tune-tool = wire cutter.
 			Pipelike.Laser.LaserPipeLayerHandle.Instance.CutAt(x, y, player);
 			return;
 		}
@@ -396,8 +362,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 		if (IsWrench)
 		{
-			// Upstream parity: item + fluid pipe tune-tool = wrench. Pipes
-			// checked FIRST; machine dismantle below falls through cleanly.
 			if (Pipelike.ItemPipe.ItemPipeLayerHandle.Instance.CutAt(x, y, player)) return;
 			if (Pipelike.Fluid.FluidPipeLayerHandle.Instance.CutAt(x, y, player)) return;
 			if (Pipelike.LongDistance.LongDistancePipeLayerHandle.Item.CutAt(x, y, player)) return;
@@ -407,7 +371,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 		if (IsWrench)
 		{
-			// Break at origin so multi-tile + entity go in one hit.
 			var pos = machine.Position;
 			WorldGen.KillTile(pos.X, pos.Y);
 			if (Main.netMode == NetmodeID.MultiplayerClient)
@@ -415,8 +378,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		}
 		else // IsMallet
 		{
-			// Audible/CombatText feedback so the toggle is visible even when
-			// the machine is idle and has no running-state change.
 			bool newState = !machine.WorkingEnabled;
 			MachineActions.Send(new PowerToggleAction(newState), machine);
 
@@ -456,9 +417,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		if (IsElectric) _storedEu = reader.ReadInt64();
 	}
 
-	// Held-tool draw goes straight from TextureAssets.Item (no PreDraw hook
-	// reaches it), so the upstream layer composite is baked once and installed
-	// there - vanilla then draws it identically in slots, on ground, in-hand.
 	public override bool PreDrawInInventory(SpriteBatch sb, Vector2 position, Rectangle frame,
 		Color drawColor, Color itemColor, Vector2 origin, float scale)
 	{
@@ -473,19 +431,13 @@ public sealed class ToolItem : ModItem, IElectricItem
 		return true;
 	}
 
-	// Bake before held-item draw + flip vanilla plant-harvest flags so the herb/
-	// vine drop code (KillTile_GetItemDrops) treats this tool like its analogue.
 	public override void HoldItem(Player player)
 	{
 		EnsureTextureBaked();
 		// Scythe: Guide-To-Plant-Fiber-Cordage parity (50% Vine drop).
 		if (IsScythe) player.cordage = true;
-		// Hoe herb-seed bonus is in ToolWorldEffects.Drop (the vanilla
-		// staffOfRegrowthBonus flag isn't exposed to mods).
 	}
 
-	// Public so callers that render this tool outside the item-draw pipeline
-	// (e.g. the Gregith projectile) can pre-bake. Idempotent.
 	public void EnsureTextureBaked()
 	{
 		if (_layers.Length == 0) return;
@@ -495,7 +447,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 		ItemIconBaker.Install(Item.type, iconLayers);
 	}
 
-	// Charge bar - same readout as BatteryItem.
 	public override void PostDrawInInventory(SpriteBatch sb, Vector2 position, Rectangle frame,
 		Color drawColor, Color itemColor, Vector2 origin, float scale)
 	{
@@ -561,7 +512,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 			}
 		}
 
-		// Electric tool families (per-tier id like "lv_drill", ...).
 		if (n.Contains("drill"))      return $"Powered drill - mines a {aoeLen}-tile line.";
 		if (n.Contains("chainsaw"))   return $"Powered chainsaw - chops a {aoeLen}-tile line of trees.";
 		if (n.Contains("wirecutter")) return "Powered wire cutter - cuts cables and laser pipes.";

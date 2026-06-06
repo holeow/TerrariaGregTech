@@ -9,14 +9,9 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Cover;
 
-// Port of common.cover.ItemFilterCover - UPSTREAM-FAITHFUL. One CoverDefinition
-// (GTCovers.ITEM_FILTER) for the whole family; Simple/Tag/Smart are different
-// AttachItems that pick the concrete filter via FilterItemRegistry. The cover's
-// filter is fixed once AttachItem is set - the pipe-UI's None/Simple/Tag
-// toggle replaces the cover INSTANCE (PipeCoverable + CoverFilterAction).
-//
+// Port of common.cover.ItemFilterCover. One CoverDefinition for the whole family - Simple/Tag/Smart
 // Adaptation: Terraria items have no NBT bag, so per-filter config is in the
-// cover's own Save/Load blob as `filterConfig` (vs upstream's attachItem.NBT).
+// cover's own Save/Load blob as `filterConfig`
 public class ItemFilterCover : CoverBehavior, IUICover
 {
 	private IItemFilter? _itemFilter;
@@ -31,7 +26,6 @@ public class ItemFilterCover : CoverBehavior, IUICover
 	public ItemFilterCover(CoverDefinition definition, ICoverable coverHolder, CoverSide attachedSide)
 		: base(definition, coverHolder, attachedSide) { }
 
-	// Verbatim getItemFilter - lazy load via FILTERS dispatch on AttachItem.
 	public IItemFilter GetItemFilter()
 	{
 		if (_itemFilter is null)
@@ -39,8 +33,6 @@ public class ItemFilterCover : CoverBehavior, IUICover
 		return _itemFilter;
 	}
 
-	// UiItemFilterHandler is NOT overridden - upstream's ItemFilterCover has
-	// no install-slot.
 	public override SimpleItemFilter? UiItemFilter => GetItemFilter() as SimpleItemFilter;
 	public override TagItemFilter?    UiTagItemFilter => GetItemFilter() as TagItemFilter;
 
@@ -60,8 +52,6 @@ public class ItemFilterCover : CoverBehavior, IUICover
 		}
 	}
 
-	// Reset lazy filter so the new AttachItem dispatches via FilterItemRegistry
-	// on next read (pipe-UI swap + Save/Load roundtrips).
 	public override void OnAttached(Item itemStack)
 	{
 		base.OnAttached(itemStack);
@@ -113,12 +103,8 @@ public class ItemFilterCover : CoverBehavior, IUICover
 		base.Save(tag);
 		tag["filterMode"] = (int)_filterMode;
 		tag["manualIO"] = (int)_allowFlow;
-		// Refresh _filterConfig from the live filter so player edits persist.
 		if (_itemFilter is IFilter<Item> f)
-		{
-			var cfg = f.SaveFilter();
-			if (cfg is not null) _filterConfig = cfg;
-		}
+			_filterConfig = f.SaveFilter();
 		if (_filterConfig is not null) tag["filterConfig"] = _filterConfig;
 	}
 
@@ -128,6 +114,6 @@ public class ItemFilterCover : CoverBehavior, IUICover
 		if (tag.ContainsKey("filterMode")) _filterMode = (FilterMode)tag.GetInt("filterMode");
 		if (tag.ContainsKey("manualIO")) _allowFlow = (ManualIOMode)tag.GetInt("manualIO");
 		_filterConfig = tag.ContainsKey("filterConfig") ? tag.GetCompound("filterConfig") : null;
-		_itemFilter = null;   // force lazy reload from AttachItem + _filterConfig
+		_itemFilter = null;
 	}
 }

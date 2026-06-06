@@ -28,7 +28,6 @@ public static class CoverSettingsUI
 	{
 		return entity.GetCoverAtSide(side) switch
 		{
-			// Advanced voiding extends basic voiding - match first.
 			AdvancedItemVoidingCover or AdvancedFluidVoidingCover => BuildAdvancedVoiding(entity, side, scale),
 			ItemVoidingCover or FluidVoidingCover => BuildVoiding(entity, side, scale),
 			MachineControllerCover => BuildMachineController(entity, side, scale),
@@ -37,7 +36,6 @@ public static class CoverSettingsUI
 			IEnderLinkCover => BuildEnderLink(entity, side, scale),
 			ItemFilterCover  => BuildSimpleFilter(entity, side, scale, fluid: false),
 			FluidFilterCover => BuildSimpleFilter(entity, side, scale, fluid: true),
-			// Conveyor/pump + their robot-arm/fluid-regulator subclasses.
 			ConveyorCover => BuildIOCover(entity, side, scale, fluid: false),
 			PumpCover     => BuildIOCover(entity, side, scale, fluid: true),
 			ShutterCover  => BuildShutter(entity, side, scale),
@@ -45,8 +43,6 @@ public static class CoverSettingsUI
 		};
 	}
 
-	// 0 = none, 1 = SimpleFilter grid, 2 = TagFilter expression field.
-	// MachineUIState polls this and rebuilds the popup when it changes.
 	public static int FilterEditorSignature(ICoverable entity, CoverSide side)
 	{
 		var c = entity.GetCoverAtSide(side);
@@ -56,7 +52,6 @@ public static class CoverSettingsUI
 		return 0;
 	}
 
-	// Verbatim from upstream lang cover.tag_filter.info.* (section-codes stripped).
 	private const string TagFilterInfo =
 		"Accepts complex expressions:\n"
 		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"
@@ -68,8 +63,6 @@ public static class CoverSettingsUI
 		+ "matches all gold dusts, or all circuits except LV ones.\n"
 		+ "Type, then press Enter (or click away) to set.";
 
-	// Item/Fluid Filter cover - owns its SimpleFilter directly (no install slot).
-	// Popup: title + the shared filter block (matcher grid + toggles).
 	private static UITerrariaPanel BuildSimpleFilter(ICoverable entity, CoverSide side, float scale, bool fluid)
 	{
 		const int Pad = 6, W = 180, BtnH = 16;
@@ -81,11 +74,9 @@ public static class CoverSettingsUI
 			Top  = StyleDimension.FromPixels(Pad * scale),
 		});
 
-		// FilterMode + ManualIOMode cycle - verbatim port of upstream
-		// ItemFilterCover.createUIWidget. Fields 10 / 11 per ApplySetting.
 		int rowY = Pad + 16;
 		panel.Append(new UITextButton(
-			() => FilterModeName((entity.GetCoverAtSide(side) as ItemFilterCover)?.FilterMode ?? FilterMode.FilterInsert),
+			() => FilterModeName(FilterCoverMode(entity, side)),
 			onLeft:  () => CycleFilterMode(entity, side),
 			onRight: () => CycleFilterMode(entity, side),
 			tooltip: "Which direction the filter applies to\n"
@@ -100,7 +91,7 @@ public static class CoverSettingsUI
 		});
 		rowY += BtnH + 4;
 		panel.Append(new UITextButton(
-			() => ManualIoName((entity.GetCoverAtSide(side) as ItemFilterCover)?.AllowFlow ?? ManualIOMode.Disabled),
+			() => ManualIoName(FilterCoverAllowFlow(entity, side)),
 			onLeft:  () => CycleFilterAllowFlow(entity, side),
 			onRight: () => CycleFilterAllowFlow(entity, side),
 			tooltip: "Behaviour for the direction the filter doesn't apply to\n"
@@ -122,7 +113,6 @@ public static class CoverSettingsUI
 		return panel;
 	}
 
-	// Machine-context wording; PipeSettingsState uses pipe/inv antipods.
 	private static string FilterModeName(FilterMode m) => m switch
 	{
 		FilterMode.FilterInsert  => "Inv->Machine",
@@ -131,20 +121,32 @@ public static class CoverSettingsUI
 		_                        => "?",
 	};
 
+	private static FilterMode FilterCoverMode(ICoverable entity, CoverSide side) => entity.GetCoverAtSide(side) switch
+	{
+		ItemFilterCover f  => f.FilterMode,
+		FluidFilterCover f => f.FilterMode,
+		_                  => FilterMode.FilterInsert,
+	};
+
+	private static ManualIOMode FilterCoverAllowFlow(ICoverable entity, CoverSide side) => entity.GetCoverAtSide(side) switch
+	{
+		ItemFilterCover f  => f.AllowFlow,
+		FluidFilterCover f => f.AllowFlow,
+		_                  => ManualIOMode.Disabled,
+	};
+
 	private static void CycleFilterMode(ICoverable entity, CoverSide side)
 	{
-		if (entity.GetCoverAtSide(side) is ItemFilterCover f)
-			CoverActions.Send(new CoverConfigAction(side, 10, ((int)f.FilterMode + 1) % 3), entity);
+		if (entity.GetCoverAtSide(side) is ItemFilterCover or FluidFilterCover)
+			CoverActions.Send(new CoverConfigAction(side, 10, ((int)FilterCoverMode(entity, side) + 1) % 3), entity);
 	}
 
 	private static void CycleFilterAllowFlow(ICoverable entity, CoverSide side)
 	{
-		if (entity.GetCoverAtSide(side) is ItemFilterCover f)
-			CoverActions.Send(new CoverConfigAction(side, 11, ((int)f.AllowFlow + 1) % 3), entity);
+		if (entity.GetCoverAtSide(side) is ItemFilterCover or FluidFilterCover)
+			CoverActions.Send(new CoverConfigAction(side, 11, ((int)FilterCoverAllowFlow(entity, side) + 1) % 3), entity);
 	}
 
-	// Basic voiding - single working-enabled toggle (voiding on/off). The cover
-	// ships disabled; this toggle is what actually switches voiding on.
 	private static UITerrariaPanel BuildVoiding(ICoverable entity, CoverSide side, float scale)
 	{
 		const int W = 180, Pad = 6, Btn = 22;
@@ -176,7 +178,6 @@ public static class CoverSettingsUI
 		return panel;
 	}
 
-	// Advanced voiding - power toggle + voiding-mode selector + keep-limit stepper.
 	private static UITerrariaPanel BuildAdvancedVoiding(ICoverable entity, CoverSide side, float scale)
 	{
 		const int W = 180, Pad = 6, Btn = 22;
@@ -340,8 +341,6 @@ public static class CoverSettingsUI
 			CoverActions.Send(new CoverConfigAction(side, 3, c.PreventPowerFail ? 0 : 1), entity);
 	}
 
-	// Cycle through the cover's currently-allowed modes (a side with no
-	// IControllable target isn't offered), mirroring upstream's selectNextMode.
 	private static void CycleControllerMode(ICoverable entity, CoverSide side, int dir)
 	{
 		var c = Controller(entity, side);
@@ -576,8 +575,6 @@ public static class CoverSettingsUI
 
 	private static bool IsHexDigit(char c) => (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
 
-	// Conveyor (item) / Pump (fluid) covers - IO direction, manual-IO mode,
-	// transfer rate (+ bucket unit for pump), + shared filter block.
 	private static UITerrariaPanel BuildIOCover(ICoverable entity, CoverSide side, float scale, bool fluid)
 	{
 		const int W = 196, Pad = 6, RowH = 16, RowGap = 20;
@@ -784,8 +781,7 @@ public static class CoverSettingsUI
 	}
 
 	// Shared filter editor: optional install slot + 3x3 matcher grid +
-	// blacklist/ignore-NBT toggles. Returns the block height in logical px.
-	// Live-resolved per frame; inert until a filter is present.
+	// blacklist/ignore-NBT toggles. Returns the block height in logical px
 	private static int AppendFilterBlock(
 		UITerrariaPanel panel, ICoverable entity, CoverSide side, bool fluid, int x, int y, float scale)
 	{
@@ -906,7 +902,6 @@ public static class CoverSettingsUI
 	private static void ToggleFilterIgnoreNbt(ICoverable entity, CoverSide side, bool fluid) =>
 		CoverActions.Send(CoverFilterAction.Toggle(side, fluid, CoverFilterAction.Op.ToggleIgnoreNbt), entity);
 
-	// e.g. "Item Voiding Cover  *  Up". Shared by every cover popup.
 	private static string Title(ICoverable entity, CoverSide side)
 	{
 		var cover = entity.GetCoverAtSide(side);

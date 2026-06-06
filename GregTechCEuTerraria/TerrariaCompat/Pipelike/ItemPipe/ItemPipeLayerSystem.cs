@@ -8,9 +8,9 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.ItemPipe;
 
-// Per-world ItemPipeLayer. Mirrors CableLayerSystem lifecycle + render hook.
+// Per-world ItemPipeLayer
 // Save format = co-indexed lists; one PipeCoverable per cell with any
-// configured side (default-state cells skip allocation).
+// configured side (default-state cells skip allocation)
 public sealed class ItemPipeLayerSystem : ModSystem
 {
 	public static ItemPipeLayer Pipes { get; } = new();
@@ -30,7 +30,20 @@ public sealed class ItemPipeLayerSystem : ModSystem
 		return c;
 	}
 
-	// Called from CutAt so a cut+replaced pipe doesn't inherit stale state.
+	internal static ItemNetHandler? ResolveRawHandler(PipeCoverable coverable, CoverSide side)
+	{
+		if (!Pipes.Has(coverable.X, coverable.Y)) return null;
+		if (coverable.GetMode(side) == PipeSideMode.Off) return null;
+		int idx = (int)side;
+		if (coverable.CachedItemHandlers[idx] is ItemNetHandler cached) return cached;
+		var net = ItemPipeNetSystem.Level?.GetNetFromPos((coverable.X, coverable.Y));
+		if (net is null) return null;
+		var handler = new ItemNetHandler(net, coverable, side);
+		coverable.CachedItemHandlers[idx] = handler;
+		return handler;
+	}
+
+
 	public static void DropSides(int x, int y)
 	{
 		if (_sides.TryGetValue((x, y), out var c)) ((ICoverable)c).OnCoversUnload();
@@ -61,8 +74,6 @@ public sealed class ItemPipeLayerSystem : ModSystem
 		_sides.Clear();
 	}
 
-	// Re-render layer above tiles while holding any item-pipe item (regular
-	// PipeItem or SimpleItemPipeItem - both place into this layer).
 	public override void PostDrawTiles()
 	{
 		var held = Main.LocalPlayer?.HeldItem;
@@ -94,10 +105,6 @@ public sealed class ItemPipeLayerSystem : ModSystem
 			xs.Add(kv.Key.x); ys.Add(kv.Key.y);
 			mats.Add(c.MaterialId);
 			sizes.Add((byte)c.Size);
-			// flags bit 0 = Restrictive, bit 1 = IsSimple. Bit 1 is
-			// backward-compatible: pre-IsSimple saves have bit 1 = 0,
-			// loading produces IsSimple=false which is the original behaviour.
-			// flags bit 0 = Restrictive, bit 1 = IsSimple (back-compat).
 			byte f = 0;
 			if (c.Restrictive) f |= 1;
 			if (c.IsSimple)    f |= 2;
@@ -113,7 +120,6 @@ public sealed class ItemPipeLayerSystem : ModSystem
 		tag["item_pipes.prio"]  = prios;
 		tag["item_pipes.rate"]  = rates;
 
-		// Sparse: one row per cell with at least one cover.
 		var cxs   = new List<int>();
 		var cys   = new List<int>();
 		var cdata = new List<TagCompound>();
@@ -173,8 +179,5 @@ public sealed class ItemPipeLayerSystem : ModSystem
 				_sides[(cxs[i], cys[i])] = pcv;
 			}
 		}
-
-		// Pipes.IsDirty was set; net rebuild fires on next PostUpdateEverything
-		// via ItemPipeNetSystem.MaybeRebuild.
 	}
 }

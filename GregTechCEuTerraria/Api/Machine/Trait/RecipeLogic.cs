@@ -14,54 +14,25 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.Api.Machine.Trait;
 
-// PORTED - verbatim port of
-// com.gregtechceu.gtceu.api.machine.trait.RecipeLogic.
+// port of com.gregtechceu.gtceu.api.machine.trait.RecipeLogic.
 //
-// Field-for-field, method-for-method mirror of upstream's RecipeLogic.java.
-// A side-by-side diff against the upstream file should produce only the
-// documented adaptations below.
-//
-// Documented adaptations (everything else is verbatim):
-//   - Component -> string (Terraria has no Component system; tooltip strings
-//     render plain).
-//   - ChanceCacheMap (per-capability IdentityHashMap) -> flat Dictionary<string,
-//     int> keyed by ChanceKey(Ingredient). Per-capability dispatch isn't
-//     needed yet because we only have ItemRecipeCapability + FluidRecipeCapability
-//     at the recipe-payload level and ChanceKey produces distinct keys for
-//     each.
-//   - sync_system annotations (@SaveField, @SyncToClient, ClientFieldChangeListener)
-//     dropped - MachineStateSyncPacket carries the trait's Save() blob;
-//     client-side fields update on packet receive. updateSound + scheduleRenderUpdate
-//     callbacks are dropped (sound is machine-side via IRecipeLogicMachine).
+// adaptations:
+//   - Component -> string
+//   - ChanceCacheMap -> flat Dictionary<string, int> keyed by ChanceKey(Ingredient)
+//   - @SaveField, @SyncToClient, ClientFieldChangeListener dropped - MachineStateSyncPacket carries the Save() blob
 //   - RecipeHelper.matchContents / handleRecipeIO / matchTickRecipe collapsed
 //     into IRecipeLogicMachine.TryMatchInputContents / TryConsumeInputContents
 //     / HasOutputRoomContents / DepositOutputContents. Items and fluids are
 //     passed as separate args. ActionResult preserved so EU brownout
 //     detection works precisely (gates on io == IN && capability == EU).
-//   - MultiblockControllerCover detection (for preventPowerFail) collapsed
-//     to IRecipeLogicMachine.PreventPowerFail - the machine-side flag, which
-//     WorkableTieredMachine backs with a MachineControllerCover cover walk.
-//   - GTRecipe save/load via id (LastRecipeId on IRecipeLogicMachine).
-//     Upstream serializes the full GTRecipe blob; we resolve from
-//     RecipeRegistry on first post-load tick.
-//   - regressRecipe gate moved INTO regressRecipe per upstream (was inside
-//     handleRecipeWorking in PMT's earlier port - drift).
-//   - IFancyTooltip NOT implemented (it's a tML-GUI type in TerrariaCompat; an
-//     Api type can't depend on it). The reason data is still exposed via
-//     GetWaitingReason() / GetFailureReasons(), surfaced on the machine hover
-//     by RecipeStatusText.StatusLine / .AppendFailureDetail.
+//   - MultiblockControllerCover detection collapsed to IRecipeLogicMachine.PreventPowerFail
+//   - IFancyTooltip dropped
 public class RecipeLogic : MachineTrait, IWorkable
 {
 	public static readonly MachineTraitType<RecipeLogic> TYPE = new(allowMultipleInstances: false);
 	public override MachineTraitType TraitType => TYPE;
 
-	// Recipe status uses the top-level `RecipeLogicStatus` enum. Upstream
-	// nests this inside RecipeLogic; we alias via `using Status = ...` at
-	// file scope so trait-internal callsites read identically to upstream
-	// (`Status.WORKING` etc) while `IRecipeLogicMachine.NotifyStatusChanged`
-	// can keep its public top-level enum type with no cast.
-
-	// === Mutable state (verbatim upstream field-for-field) ==================
+	// === Mutable state ==================
 
 	public List<GTRecipe>? lastFailedMatches;
 
@@ -106,16 +77,13 @@ public class RecipeLogic : MachineTrait, IWorkable
 	public bool IsSuspendAfterFinish() => _suspendAfterFinish;
 	public void SetSuspendAfterFinish(bool v) => _suspendAfterFinish = v;
 
-	// Chance accumulator - flat Dictionary<string, int> keyed by
-	// ChanceKey(Ingredient). See class-level note about per-cap collapse.
+	// Chance accumulator - flat Dictionary<string, int> keyed by ChanceKey(Ingredient)
 	protected readonly Dictionary<string, int> _chanceCaches = new();
 	public IReadOnlyDictionary<string, int> GetChanceCaches() => _chanceCaches;
 	private static readonly Random Rng = new();
 
 	protected TickableSubscription? _subscription;
 
-	// Active-sound handle - machine-side (the trait only tells the machine
-	// when to start / stop / play-finish).
 	protected object? _workingSound;
 
 	// === Construction / attachment ==========================================
@@ -127,10 +95,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 	protected override IReadOnlyList<Type> ValidMachineClasses() =>
 		new[] { typeof(IRecipeLogicMachine) };
 
-	// === resetRecipeLogic (line 171) ========================================
-	// Verbatim from upstream - abort current cycle, drop to IDLE unless
-	// already SUSPEND. The resyncAllFields() call is dropped (sync system
-	// adaptation - MachineStateSyncPacket re-sends the full trait blob).
 	public void ResetRecipeLogic()
 	{
 		_recipeDirty = false;
@@ -148,7 +112,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		UpdateTickSubscription();
 	}
 
-	// === onMachineLoad (line 190) ===========================================
 	public override void OnMachineLoad()
 	{
 		base.OnMachineLoad();
@@ -156,14 +119,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		UpdateTickSubscription();
 	}
 
-	// Re-attach the running recipe object from its persisted id after a load.
-	// Only LastRecipeId round-trips (not the GTRecipe), so a machine loaded
-	// mid-recipe has _lastRecipe == null and would restart at progress 0 once it
-	// resumes ticking. Done here (one-shot, right after LoadData) rather than
-	// only in ServerTick because a multi loads with IsFormed=true + UNINIT_ERROR,
-	// so its recipe logic isn't subscribed to ServerTick until the structure
-	// re-walks - by which point a transient invalidation may already have wiped
-	// the state. Resolving here keeps _lastRecipe set across that window.
 	public void TryRestoreLastRecipe()
 	{
 		if (_lastRecipe != null) return;
@@ -174,7 +129,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 			_lastRecipe = m.GetRecipeType()?.GetRecipeById(rid!);
 	}
 
-	// === updateTickSubscription (line 195) ==================================
 	public void UpdateTickSubscription()
 	{
 		if (IsSuspend() || !GetRLMachine().IsRecipeLogicAvailable())
@@ -191,38 +145,15 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === setProgress (line 206) =============================================
 	public void SetProgress(int progress) { _progress = progress; }
 
-	// === getProgressPercent (line 211) ======================================
 	public double GetProgressPercent() => _duration == 0 ? 0.0 : _progress / (_duration * 1.0);
 
-	// === serverTick (line 222) - verbatim ===================================
-	// `virtual` so CleanroomLogic (and any future custom recipe-logic) can
-	// replace the cycle. Mirrors upstream where CleanroomLogic.serverTick
-	// shadows RecipeLogic.serverTick via subclass override.
 	public virtual void ServerTick()
 	{
-		// Gate the per-tick recipe-work clock to upstream's 20 Hz cadence.
-		// Without this, every per-tick site below (_progress++, _runDelay--,
-		// HandleRecipeWorking's EU drain, FindAndHandleRecipe retry) runs at
-		// Terraria's 60 Hz and recipes finish 3x wall-clock too fast - and EU /
-		// steam drain 3x per real second, breaking the upstream steam economy
-		// (one max-temp LP boiler can't keep up with one LP steam macerator at
-		// 60 Hz draw, even though upstream balances it at +40 mB/sec surplus).
-		// FromMcTicks(1) = 3 at SimulationSpeed=1.0; the user's SimulationSpeed
-		// config multiplier scales this naturally.
 		if (Main.GameUpdateCount % (uint)global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(1) != 0) return;
 
 		var machine = GetRLMachine();
-
-		// NOTE: re-attaching _lastRecipe from the persisted LastRecipeId after a
-		// world load is handled once in OnMachineLoad (TryRestoreLastRecipe),
-		// which fires from MetaMachine.EnsureLoaded on the first machine tick -
-		// before this ServerTick can run for any machine (recipe logic only
-		// subscribes after EnsureLoaded). So _lastRecipe is already resolved here
-		// for a machine loaded mid-recipe; no re-resolution needed. This keeps
-		// ServerTick verbatim with upstream RecipeLogic.serverTick.
 
 		if (!IsSuspend())
 		{
@@ -284,33 +215,14 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === matchRecipe (line 265) =============================================
-	// Upstream: `RecipeHelper.matchContents(getRLMachine(), recipe)` =
-	// `matchRecipe(holder, recipe) && matchTickRecipe(holder, recipe)`. Our
-	// adaptation: split per-cap items / fluids on the machine surface, then
-	// AND the three ActionResults. First failing branch wins for
-	// capability+io attribution. The tick branch gates per-tick EU
-	// availability - without it a recipe starts on an empty energy buffer,
-	// runs one tick, immediately drops to WAITING.
-	// Step D (recipe-IO unification): routes through the single
-	// `RecipeHelper.MatchContents` entry (regular-IN match -> regular-OUT room ->
-	// tick-IN feasibility) instead of the old per-capability fan-out. Behaviour
-	// is preserved by the `IRecipeLogicMachine.HandleRecipe` shim, which re-splits
-	// the content map back onto the same TryMatchInputContents / HasOutputRoom
-	// Contents / TryDrainEU / TryHandleTickCwu hooks. Multiblocks override
-	// HandleRecipe to dispatch the whole map at once (Step C).
 	protected virtual ActionResult MatchRecipe(GTRecipe recipe)
 		=> RecipeHelper.MatchContents(GetRLMachine(), recipe);
 
-	// === checkRecipe (line 269) =============================================
 	protected ActionResult CheckRecipe(GTRecipe recipe)
 	{
 		var conditionResult = CheckConditions(recipe);
 		if (!conditionResult.IsSuccess) return conditionResult;
 
-		// Voltage cap - circuit ingredient is matched the standard way (Test()
-		// against IntCircuitItem in any attached input handler, including the
-		// machine's CircuitInventory), mirroring upstream IntCircuitIngredient.
 		long voltageCap = GetRLMachine().RecipeVoltageCap;
 		if (recipe.InputEUt.Voltage > voltageCap)
 			return ActionResult.Fail("gtceu.recipe.eu_too_high", EURecipeCapability.CAP, IO.IN);
@@ -318,13 +230,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		return MatchRecipe(recipe);
 	}
 
-	// Walks recipe.Conditions calling Test(this). Returns first failure.
-	// Mirrors upstream RecipeHelper.checkConditions inline.
-	// Failure reason embeds the condition's tooltip text after a ':' separator,
-	// so RecipeStatusText.Resolve can surface the specific requirement
-	// ("Requires cleanroom: cleanroom") instead of the generic
-	// "Conditions not met". Falls back to bare key when the condition has no
-	// tooltip.
 	protected ActionResult CheckConditions(GTRecipe recipe)
 	{
 		foreach (var condition in recipe.Conditions)
@@ -340,8 +245,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		return ActionResult.SUCCESS;
 	}
 
-	// Strip count wrappers (SizedIngredient / IntProviderIngredient) down to
-	// the matching ingredient - used by ChanceKey.
 	private static Ingredient PeelToInner(Ingredient ing) => ing switch
 	{
 		SizedIngredient sized          => PeelToInner(sized.Inner),
@@ -350,8 +253,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		_                              => ing,
 	};
 
-
-	// === checkMatchedRecipeAvailable (line 276) =============================
 	public virtual bool CheckMatchedRecipeAvailable(GTRecipe match)
 	{
 		// Deviation from upstream: pre-screen the raw recipe against the
@@ -360,15 +261,7 @@ public class RecipeLogic : MachineTrait, IWorkable
 		// / wrong_machine_type - see GTRecipeModifiers) record their reason
 		// for every too-high-V candidate while the input bus is empty, and an
 		// idle multi surfaces "Voltage Tier Too Low" on hover even though the
-		// player hasn't put anything in. Upstream displays this noise via JEI
-		// recipe lookup so it's less visible; our world-hover failure list is
-		// the only surfacing, so the noise is loud.
-		//
-		// The raw shape is a close-enough proxy for "could this recipe ever
-		// run": modifier may rescale inputs (parallel), but if the player has
-		// none of the ingredient, no scale of it will match either. A recipe
-		// that survives the raw match goes through the full modifier path as
-		// before, so genuine modifier-side failures still surface.
+		// player hasn't put anything in
 		var rawMatch = MatchRecipe(match);
 		if (!rawMatch.IsSuccess)
 		{
@@ -397,24 +290,14 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 		else
 		{
-			// Modifier-side cancellation (`ModifierFunction.Cancel(reason)` or
-			// `ModifierFunction.NULL`) - capture the reason key so the player
-			// sees a useful waiting reason ("No rotor installed", "Out of
-			// lubricant") instead of the recipe silently dropping. Falls back
-			// to the modifier's DEFAULT_FAILURE key when the modifier didn't
-			// specify one (= legacy `ModifierFunction.NULL` callers).
-			var reason = GetRLMachine().GetLastModifierFailReason()
-				?? ModifierFunction.DEFAULT_FAILURE;
+			var reason = GetRLMachine().GetLastModifierFailReason() ?? ModifierFunction.DEFAULT_FAILURE;
 			PutFailureReason(this, match, reason);
 		}
 		return false;
 	}
 
-	// === handleRecipeWorking (line 294) - verbatim ==========================
 	public void HandleRecipeWorking()
 	{
-		// upstream: `assert lastRecipe != null;` - we'd NRE on null deref
-		// below anyway, so the assert is implicit.
 		var conditionResult = CheckConditions(_lastRecipe!);
 		if (conditionResult.IsSuccess)
 		{
@@ -434,17 +317,12 @@ public class RecipeLogic : MachineTrait, IWorkable
 			{
 				SetWaiting(handleTick.ReasonText());
 
-				// Machine isn't getting enough power - suspend after 5 attempts.
 				if (handleTick.Io == IO.IN && ReferenceEquals(handleTick.Capability, EURecipeCapability.CAP))
 				{
 					_runAttempt++;
 					_runAttempt = Math.Clamp(_runAttempt, 0, 5);
 					if (_runAttempt == 5)
 					{
-						// Upstream walks `getMachine().getCoverContainer().getCovers()` for
-						// MachineControllerCover with preventPowerFail(). Collapsed to
-						// IRecipeLogicMachine.PreventPowerFail - WorkableTieredMachine backs
-						// it with exactly that cover walk.
 						bool preventPowerFail = GetRLMachine().PreventPowerFail();
 						if (GetRLMachine().IsMultiblockController() && !preventPowerFail)
 						{
@@ -466,8 +344,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === regressRecipe (line 344) - verbatim ================================
-	// Gate is INSIDE the method (upstream).
 	protected void RegressRecipe()
 	{
 		if (_progress > 0 && GetRLMachine().RegressWhenWaiting())
@@ -476,18 +352,15 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === searchRecipe (line 350) - verbatim =================================
 	public IEnumerator<GTRecipe> SearchRecipe()
 	{
 		return GetRLMachine().GetRecipeType().SearchRecipe(GetRLMachine(), _ => true).GetEnumerator();
 	}
 
-	// === findAndHandleRecipe (line 354) - verbatim ==========================
 	public void FindAndHandleRecipe()
 	{
 		lastFailedMatches = null;
 
-		// Try to execute last recipe if possible.
 		if (!_recipeDirty && _lastRecipe != null && CheckRecipe(_lastRecipe).IsSuccess)
 		{
 			GTRecipe recipe = _lastRecipe;
@@ -497,7 +370,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 		else
 		{
-			// Try to find and handle a new recipe.
 			_failureReasonMap.Clear();
 			_lastRecipe = null;
 			_lastOriginRecipe = null;
@@ -506,14 +378,12 @@ public class RecipeLogic : MachineTrait, IWorkable
 		_recipeDirty = false;
 	}
 
-	// === handleSearchingRecipes (line 373) - verbatim =======================
 	protected void HandleSearchingRecipes(IEnumerator<GTRecipe> matches)
 	{
 		while (matches.MoveNext())
 		{
 			GTRecipe match = matches.Current;
 
-			// If a new recipe was found, cache found recipe.
 			if (CheckMatchedRecipeAvailable(match))
 				return;
 
@@ -522,13 +392,11 @@ public class RecipeLogic : MachineTrait, IWorkable
 				continue;
 			}
 
-			// Cache matching recipes.
 			lastFailedMatches ??= new List<GTRecipe>();
 			lastFailedMatches.Add(match);
 		}
 	}
 
-	// === handleTickRecipe (line 393) - verbatim =============================
 	public ActionResult HandleTickRecipe(GTRecipe recipe)
 	{
 		if (!recipe.HasTick()) return ActionResult.SUCCESS;
@@ -543,25 +411,12 @@ public class RecipeLogic : MachineTrait, IWorkable
 		return result;
 	}
 
-	// matchTickRecipe - adaptation of RecipeHelper.matchTickRecipe. Splits
-	// into EU drain (via TryDrainEU on machine) + per-cap match.
-	// Step D: the tick-IN feasibility check (EU-available gate + tick item/fluid
-	// match + CWU/t simulate), now via the unified HandleRecipe(IN, tick, sim).
-	// Through the shim this is identical to the old inline split. Still called
-	// separately from HandleTickRecipe (the per-tick working path).
 	protected ActionResult MatchTickRecipe(GTRecipe recipe)
 		=> RecipeHelper.HandleRecipe(GetRLMachine(), recipe, IO.IN, isTick: true, simulate: true);
 
-	// handleTickRecipeIO - adaptation of RecipeHelper.handleTickRecipeIO.
-	// Step D: per-tick IO (consume tick inputs + EU drain + CWU on IN; deposit
-	// tick outputs + emit OutputEUt on OUT), via the unified HandleRecipe(io,
-	// tick, consume). Shim-equivalent to the old inline split.
 	protected virtual ActionResult HandleTickRecipeIO(GTRecipe recipe, IO io)
 		=> RecipeHelper.HandleRecipe(GetRLMachine(), recipe, io, isTick: true, simulate: false);
 
-	// === setupRecipe (line 406) - verbatim ==================================
-	// virtual: upstream's method is non-final; LargeBoilerRecipeLogic overrides
-	// it to rescale `_duration` by current throttle after the base setup.
 	public virtual void SetupRecipe(GTRecipe recipe)
 	{
 		if (!GetRLMachine().BeforeWorking(recipe))
@@ -585,10 +440,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 			_lastRecipe = recipe;
 			SetStatus(Status.WORKING);
 			_progress = 0;
-			// Verbatim upstream: `duration = recipe.duration`. The recipe
-			// reaching setupRecipe is already overclocked / paralleled -
-			// IRecipeLogicMachine.FullModifyRecipe ran the RecipeModifier
-			// (overclock chain) in checkMatchedRecipeAvailable.
 			_duration = recipe.Duration;
 			// Adaptation: ActiveEut is a machine-side display value (the UI
 			// EU/t label). Upstream has no equivalent - per-tick EU is read
@@ -596,20 +447,13 @@ public class RecipeLogic : MachineTrait, IWorkable
 			// real EU/t so the UI matches actual consumption.
 			GetRLMachine().ActiveEut = RecipeHelper.GetRealEUt(recipe).GetTotalEU();
 			_isActive = true;
-			// Adaptation: persist recipe id for post-load rebind (upstream
-			// serializes the full GTRecipe object).
 			GetRLMachine().LastRecipeId = recipe.Id;
 		}
 	}
 
-	// === handleRecipeIO (line 569) - Step D unified path ====================
-	// Regular (non-tick) IO: consume regular inputs on IN, deposit regular
-	// outputs on OUT, via the unified HandleRecipe(io, regular, consume).
-	// Shim-equivalent to the old per-cap split.
 	protected virtual ActionResult HandleRecipeIO(GTRecipe recipe, IO io)
 		=> RecipeHelper.HandleRecipe(GetRLMachine(), recipe, io, isTick: false, simulate: false);
 
-	// === setStatus (line 430) - verbatim ====================================
 	public void SetStatus(Status status)
 	{
 		if (_status != status)
@@ -634,7 +478,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === setWaiting (line 450) - verbatim ===================================
 	public void SetWaiting(string? reason)
 	{
 		SetStatus(Status.WAITING);
@@ -642,10 +485,8 @@ public class RecipeLogic : MachineTrait, IWorkable
 		GetRLMachine().OnWaiting();
 	}
 
-	// === markLastRecipeDirty (line 460) - verbatim ==========================
 	public void MarkLastRecipeDirty() => _recipeDirty = true;
 
-	// === Status predicates (lines 464-484) - verbatim =======================
 	public bool IsWorking() => _status == Status.WORKING;
 	public bool IsIdle()    => _status == Status.IDLE;
 	public bool IsWaiting() => _status == Status.WAITING;
@@ -653,7 +494,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 
 	public bool IsWorkingEnabled() => !IsSuspend() && !IsSuspendAfterFinish();
 
-	// === setWorkingEnabled (line 485) - verbatim ============================
 	public void SetWorkingEnabled(bool isWorkingAllowed)
 	{
 		if (!isWorkingAllowed && GetStatus() == Status.IDLE)
@@ -677,17 +517,13 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === getMaxProgress (line 501) - verbatim ===============================
 	public int GetMaxProgress() => _duration;
 
-	// === isActive (line 505) - verbatim =====================================
 	public bool IsActive() => IsWorking() || IsWaiting() || (IsSuspend() && _isActive);
 
-	// === hasCustomProgressLine + getCustomProgressLine (lines 509-522) ======
 	public virtual bool HasCustomProgressLine() => false;
 	public virtual string? GetCustomProgressLine() => null;
 
-	// === onRecipeFinish (line 524) - verbatim ===============================
 	public void OnRecipeFinish()
 	{
 		GetRLMachine().AfterWorking();
@@ -697,12 +533,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 			_runDelay = 0;
 			_consecutiveRecipes++;
 			HandleRecipeIO(_lastRecipe, IO.OUT);
-			// No sound here - verbatim with upstream onRecipeFinish. The machine
-			// loop sound is governed solely by NotifyStatusChanged (WORKING
-			// starts it, any other status stops it); a per-recipe-finish cue was
-			// tried and removed (too noisy on fast machines, and not upstream).
-			// Don't ready the next recipe after finish if suspend is set
-			// so that the modifiers won't be applied until re-starting.
 			if (_suspendAfterFinish)
 			{
 				SetStatus(Status.SUSPEND);
@@ -710,7 +540,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 				_progress = 0;
 				_duration = 0;
 				_isActive = false;
-				// Force a recipe recheck.
 				_lastRecipe = null;
 				GetRLMachine().LastRecipeId = null;
 				return;
@@ -734,7 +563,7 @@ public class RecipeLogic : MachineTrait, IWorkable
 					MarkLastRecipeDirty();
 				}
 			}
-			// Try it again.
+			// Try it again
 			var recipeCheck = CheckRecipe(_lastRecipe!);
 			if (!_recipeDirty && recipeCheck.IsSuccess)
 			{
@@ -751,7 +580,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === interruptRecipe (line 580) - verbatim ==============================
 	public void InterruptRecipe()
 	{
 		GetRLMachine().AfterWorking();
@@ -807,8 +635,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		_                            => $"?:{ing.GetTypeName()}",
 	};
 
-	// === Failure-reason tracking (line 702/708) - verbatim ==================
-
 	public static void PutFailureReason(object machine, GTRecipe recipe, string reason)
 	{
 		if (machine is IRecipeLogicMachine rlm)
@@ -841,9 +667,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 	public static void PutFailureReason(RecipeLogic logic, GTRecipe recipe, string reason)
 	{
 		var map = logic._failureReasonMap;
-		// Upstream's `ModifierFunction.DEFAULT_FAILURE` sentinel - our
-		// string equivalent uses null/empty: non-default reasons always
-		// overwrite, default reasons (null/empty) only fill empty slots.
 		if (map.ContainsKey(recipe))
 		{
 			if (!string.IsNullOrEmpty(reason)) map[recipe] = reason;
@@ -854,26 +677,9 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === Persistence ========================================================
-	// Verbatim subset of upstream's @SaveField list. Adaptation:
-	//   - lastRecipe / lastOriginRecipe -> LastRecipeId on the machine
-	//     (GTRecipe instances aren't NBT-friendly).
-	//   - chanceCaches -> flat string->int map (per-cap collapse documented).
 
 	public override void Save(TagCompound tag) => WriteCore(tag, includeTransient: true);
 
-	// Wire-only snapshot. Omits fields that upstream's `@SyncToClient`
-	// deliberately does NOT mark dirty during a running recipe:
-	//   - progress   : upstream's `progress++` (line 305) skips
-	//                  `markClientSyncFieldDirty`. Client interpolates locally
-	//                  via OnClientTick + a reset on status transition (Load).
-	//   - runAttempt / runDelay : server-internal WAITING bookkeeping.
-	//   - totalContinuousRunningTime : monotonic per-tick, server-only display.
-	//   - chanceCaches : server-side recipe-search memo, never client-visible.
-	// Status / duration / isActive / failureReasons / waitingReason still ride
-	// so the client's progress arrow, hover status line and loop sound react
-	// to transitions; the dirty-skip in MachineStateSyncPacket fires for the
-	// entire running interval between transitions because none of these flip.
 	public override void SaveForSync(TagCompound tag) => WriteCore(tag, includeTransient: false);
 
 	private void WriteCore(TagCompound tag, bool includeTransient)
@@ -881,22 +687,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		tag["status"]                      = (byte)_status;
 		tag["isActive"]                    = _isActive;
 		tag["waitingReason"]               = _waitingReason ?? string.Empty;
-		// _failureReasons is transient (rebuilt each search from
-		// _failureReasonMap) - upstream doesn't @SaveField it, it carries a
-		// separate @SyncToClient. We dropped the per-field sync annotations and
-		// sync the whole Save() blob via MachineStateSyncPacket, so this field
-		// must ride Save() or the idle failure-reason hover detail never
-		// reaches an MP client (the client never runs the recipe search).
-		//
-		// DEVIATION - DEDUPLICATED + capped at 1
-		// distinct entry. Stations like `large_extractor` have 2000+ candidate
-		// recipes, ALL of which fail (e.g. `insufficient_in`) with an idle
-		// machine - saving the raw list produced a 77KB blob that overflowed
-		// Terraria's 65KB packet limit and silently broke state-sync for every
-		// machine iterated after it. Both display consumers
-		// (RecipeStatusText.AppendFailureDetail + MultiblockDisplayText.AddRecipe
-		// FailReasonLine) already dedupe by resolved text and only render the
-		// unique set, so saving one canonical entry is display-equivalent.
 		if (_failureReasons.Count > 0)
 		{
 			string? best = null;
@@ -925,15 +715,13 @@ public class RecipeLogic : MachineTrait, IWorkable
 				foreach (var (k, v) in _chanceCaches) cc[k] = v;
 				tag["chanceCaches"] = cc;
 			}
+			if (_lastRecipe != null)       tag["lastRecipeBlob"]       = GTRecipeNbt.Save(_lastRecipe);
+			if (_lastOriginRecipe != null) tag["lastOriginRecipeBlob"] = GTRecipeNbt.Save(_lastOriginRecipe);
 		}
 	}
 
 	public override void Load(TagCompound tag)
 	{
-		// Capture pre-Load values so a wire-side recipe boundary (where
-		// SaveForSync omitted "progress") can reset the client's interpolated
-		// counter cleanly. Disk load always carries "progress" so this fallback
-		// only matters for MP state-sync.
 		var prevStatus = _status;
 		var prevConsecutive = _consecutiveRecipes;
 
@@ -956,14 +744,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 		else if (prevStatus != _status || _consecutiveRecipes != prevConsecutive)
 		{
-			// Recipe boundary detected over the wire (SaveForSync omitted
-			// "progress"). Two cases:
-			//   1. Status transition (IDLE<->WORKING) - new recipe start or end.
-			//   2. _consecutiveRecipes changed - back-to-back same-recipe run
-			//      where OnRecipeFinish->SetupRecipe stays WORKING and the
-			//      status field doesn't flip. Without this branch the client
-			//      would freeze at progress=_duration across every chained
-			//      cycle until the recipe chain finally breaks.
 			_progress = 0;
 		}
 
@@ -974,19 +754,13 @@ public class RecipeLogic : MachineTrait, IWorkable
 			foreach (var kv in cc)
 				if (kv.Value is int i) _chanceCaches[kv.Key] = i;
 		}
+
+		if (tag.ContainsKey("lastRecipeBlob"))
+			_lastRecipe = GTRecipeNbt.Load(tag.Get<TagCompound>("lastRecipeBlob")) ?? _lastRecipe;
+		if (tag.ContainsKey("lastOriginRecipeBlob"))
+			_lastOriginRecipe = GTRecipeNbt.Load(tag.Get<TagCompound>("lastOriginRecipeBlob")) ?? _lastOriginRecipe;
 	}
 
-	// Client-side progress interpolation. SaveForSync omits `_progress`, so
-	// during a running recipe the server emits no broadcasts (byte-equal
-	// snapshots) and the client must advance progress on its own. Bounded by
-	// `_duration` so we never overshoot before the server's WORKING->IDLE
-	// transition arrives. Mirrors upstream's `progress++` in the server-side
-	// tick loop without going through the dirty-marking setter.
-	//
-	// Gated to the same FromMcTicks(1) cadence as ServerTick (line 199) -
-	// without this the client interpolates at 60 Hz while the server advances
-	// at 20 Hz, so the progress arrow races 3x ahead of the real recipe and
-	// loops back when the WORKING->IDLE sync finally arrives.
 	public override void OnClientTick()
 	{
 		if (Main.GameUpdateCount % (uint)global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(1) != 0) return;

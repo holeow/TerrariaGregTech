@@ -94,8 +94,6 @@ public abstract class AbstractEnderLinkCover<T> : CoverBehavior, IUICover, ICont
 	protected abstract EnderEntryType GetEntryType();
 	protected abstract void Transfer();
 
-	// Verbatim getChannelName: identifier + colorStr. Covers sharing this
-	// string share a VirtualEntry. Public for the contents view + sync.
 	public string ChannelName => Identifier() + _colorStr;
 
 	public EnderEntryType EntryType => GetEntryType();
@@ -107,8 +105,6 @@ public abstract class AbstractEnderLinkCover<T> : CoverBehavior, IUICover, ICont
 		SetEntry(entry);
 	}
 
-	// Verbatim setChannelName: drop old entry if orphaned, switch colorStr,
-	// re-resolve onto new channel.
 	public void SetChannelName(string name)
 	{
 		if (CoverHolder.IsRemote) return;
@@ -119,7 +115,6 @@ public abstract class AbstractEnderLinkCover<T> : CoverBehavior, IUICover, ICont
 		SetVirtualEntry();
 	}
 
-	// Normalize to 8 upper-hex digits - untrusted-client safe.
 	private static string SanitizeColor(string s)
 	{
 		var sb = new System.Text.StringBuilder(8);
@@ -137,22 +132,13 @@ public abstract class AbstractEnderLinkCover<T> : CoverBehavior, IUICover, ICont
 		if (CoverHolder.GetOffsetTimer() % global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(5) != 0) return;
 		if (!_isWorkingEnabled || CoverHolder.IsRemote) return;
 
-		// Re-resolve in case the entry was GC'd and recreated.
 		var entry = VirtualEnderRegistry.Instance.GetOrCreateEntry(GetEntryType(), ChannelName);
 		if (!ReferenceEquals(GetEntry(), entry)) SetEntry(entry);
 		Transfer();
 	}
 
-	// Verbatim coverHolder.getXHandlerCap(side, false) - io-gated, NOT cover-wrapped.
-	protected IItemHandler? GetOwnItemHandler() =>
-		CoverHolder is MetaMachine m
-			? m.GetItemHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false)
-			: null;
-
-	protected IFluidHandler? GetOwnFluidHandler() =>
-		CoverHolder is MetaMachine m
-			? m.GetFluidHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false)
-			: null;
+	protected IItemHandler? GetOwnItemHandler() => CoverHolder.GetItemHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false);
+	protected IFluidHandler? GetOwnFluidHandler() => CoverHolder.GetFluidHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false);
 
 	// === Persistence ========================================================
 

@@ -32,11 +32,6 @@ SRC_VEINS = GEN / "registry" / "veins.json"
 SRC_LANG  = GEN / "assets" / "gtceu" / "lang" / "en_us.json"
 SRC_MODELS = GEN / "assets" / "gtceu" / "models" / "block"
 SRC_BLOCKSTATES = GEN / "assets" / "gtceu" / "blockstates"
-# Some block models are hand-authored in `src/main` rather than emitted by
-# datagen (e.g. `block/hermetic_casing`, `block/computer_casing`, every
-# `block/variant/*` active-state model). The generated-resources tree
-# inherits them at runtime via the resource pack stack; for the script we
-# fall back to src/main/ when the generated tree doesn't have the file.
 SRC_MAIN_MODELS = REPO / "GregTech-Modern-1.20.1" / "src" / "main" / "resources" / "assets" / "gtceu" / "models" / "block"
 SRC_DATA  = GEN / "data"
 OUT       = REPO / "GregTechCEuTerraria" / "Data" / "Registry" / "items.json"
@@ -44,13 +39,6 @@ OUT_TAGS  = REPO / "GregTechCEuTerraria" / "Data" / "Registry" / "tags.json"
 OUT_FLUID_TAGS = REPO / "GregTechCEuTerraria" / "Data" / "Registry" / "fluid_tags.json"
 OUT_MATERIALS = REPO / "GregTechCEuTerraria" / "Data" / "Materials" / "materials.json"
 OUT_VEINS = REPO / "GregTechCEuTerraria" / "Data" / "Veins" / "veins.json"
-
-# Namespaces whose datagen tags we snapshot. gtceu = the mod's own tags
-# (circuits, batteries, ...); forge / minecraft = the cross-mod convention tags
-# (dyes, rods, planks, ...). NB: GregTech's material-prefix tags (forge:ingots/*,
-# forge:dusts/*, ...) are NOT datagen JSON - they are attached at item
-# registration time - so they are reconstructed C#-side from MaterialItemRegistry,
-# not snapshotted here.
 TAG_NAMESPACES = ("gtceu", "forge", "minecraft")
 
 
@@ -67,7 +55,6 @@ def load_lang() -> dict[str, str]:
         return {}
     raw = json.loads(SRC_LANG.read_text(encoding="utf-8"))
     names: dict[str, str] = {}
-    # `block.` first, `item.` second so an item with its own name overrides.
     for prefix in ("block.", "item."):
         for key, value in raw.items():
             if not key.startswith(prefix):
@@ -81,19 +68,6 @@ def load_lang() -> dict[str, str]:
 
 
 # --- Block-model resolution -------------------------------------------------
-#
-# Identify gtceu BlockItems that are "simple full cubes" - those port as a
-# plain CasingTile. Three classes of cube-ish parent are accepted:
-#   * any parent containing "cube" (cube_all, cube_bottom_top, cube_column, ...)
-#   * `block/block` - bare base used by hand-authored full-cube models
-#     made of 0->16 elements (hermetic_casing family)
-#   * `block/orientable*` - full cube with per-face textures (computer_casing,
-#     advanced_computer_casing, ...)
-#
-# Doors / fences / slabs / stairs / saplings / leaves / buttons / pressure
-# plates / trapdoors / fence gates have parents that match NONE of the above
-# and are silently dropped.
-
 _CUBE_PARENT_PREFIXES = ("block/orientable", "minecraft:block/orientable")
 _CUBE_PARENTS_EXACT   = {"block/block", "minecraft:block/block"}
 
@@ -127,8 +101,6 @@ def _load_model(model_ref: str) -> dict | None:
     JSON content. Tries the generated tree first, then src/main (some block
     models are hand-authored and inherited via the resource pack stack)."""
     rel = model_ref[len("gtceu:"):] if model_ref.startswith("gtceu:") else model_ref
-    # rel is "block/<sub>/<id>"; strip the leading "block/" to get path under
-    # SRC_MODELS / SRC_MAIN_MODELS, which already point at .../models/block.
     rel = rel[len("block/"):] if rel.startswith("block/") else rel
     return _load_json(SRC_MODELS / f"{rel}.json") or _load_json(SRC_MAIN_MODELS / f"{rel}.json")
 
@@ -182,7 +154,6 @@ def _resolve_variant_model(bare_id: str, want_active: bool) -> dict | None:
     if bs is None: return None
     variants = bs.get("variants")
     if not isinstance(variants, dict) or not variants: return None
-    # Prefer an explicit active/!active variant when the blockstate has them.
     chosen_ref: str | None = None
     for key, val in variants.items():
         if "active=" not in key: continue
@@ -191,8 +162,7 @@ def _resolve_variant_model(bare_id: str, want_active: bool) -> dict | None:
             if isinstance(v, dict): chosen_ref = v.get("model")
             break
     if chosen_ref is None:
-        if want_active: return None  # blockstate has no active=true -> no active texture
-        # No active toggle in this blockstate - pick the first variant.
+        if want_active: return None
         v = next(iter(variants.values()))
         if isinstance(v, list): v = v[0]
         if isinstance(v, dict): chosen_ref = v.get("model")
@@ -205,10 +175,8 @@ def load_block_render(bare_id: str) -> tuple[str | None, str | None]:
     gtceu-relative paths (namespace stripped, e.g. `block/casings/...`). The
     active texture is non-None only when the blockstate has an `active=true`
     variant (i.e. the block is a controller-driven multiblock part casing)."""
-    # First pass: the model at `models/block/<id>.json`. Most casings live here.
     model = _load_json(SRC_MODELS / f"{bare_id}.json") or _load_json(SRC_MAIN_MODELS / f"{bare_id}.json")
     if model is None or not _model_is_cube(model):
-        # Fall back to the blockstate-driven variant model.
         model = _resolve_variant_model(bare_id, want_active=False)
     if model is None or not _model_is_cube(model):
         return (None, None)
@@ -216,15 +184,9 @@ def load_block_render(bare_id: str) -> tuple[str | None, str | None]:
     inactive = _pick_face_texture(model.get("textures") or {}, prefer_basename=bare_id)
     if inactive is None: return (None, None)
 
-    # Active variant (optional). Only blocks with `active=true` get one. The
-    # distinctive face is the one whose basename matches `<id>_active`.
     active: str | None = None
     active_model = _resolve_variant_model(bare_id, want_active=True)
     if active_model is not None and _model_is_cube(active_model):
-        # Active-state textures use one of three upstream conventions:
-        #   <id>_active   (face-swap models - crushing_wheels, slicing_blades)
-        #   <id>_bloom    (cube_2_layer additive overlay - heat_vent, MoSi2 coil)
-        #   anything ending in _active / _bloom on any other key.
         active = _pick_face_texture(active_model.get("textures") or {},
                                     prefer_basename=f"{bare_id}_active",
                                     prefer_suffix=("_active", "_bloom"))
@@ -278,10 +240,6 @@ def main() -> None:
             it["name"] = n
             named += 1
 
-    # Tag every gtceu cube BlockItem with its block texture, read from the
-    # generated block model. Drives the dump-driven CasingRegistry (one
-    # placeable 2x2 casing tile per entry). Non-cube blocks (doors / fences /
-    # slabs / stairs / ...) get no `render` and are skipped by the registry.
     cube_blocks = 0
     active_blocks = 0
     for it in items:
@@ -312,9 +270,6 @@ def main() -> None:
 
     tags = load_tags("items")
 
-    # Merge GregTech's material-prefix item tags (forge:ingots/iron, ...). These
-    # are attached at item-registration time, never written as datagen JSON, so
-    # the Material Item-Tag DataProvider dumps them off the live registry.
     if SRC_MAT_TAGS.is_file():
         mat_tags = json.loads(SRC_MAT_TAGS.read_text(encoding="utf-8"))
         for tag_id, members in mat_tags.items():
@@ -326,14 +281,6 @@ def main() -> None:
     else:
         print(f"  note: material tag dump not found ({SRC_MAT_TAGS.name})")
 
-    # Circuit-tier fallback. GregTech declares a `gtceu:circuits/<tier>` tag for
-    # every voltage tier (CustomTags.java), but the top tiers (uev, uiv, uxv,
-    # opv, max) have no circuit item - there is no circuit above the uhv-tier
-    # `wetware_processor_mainframe` - so their datagen tag file is never
-    # emitted. Recipes for UEV+ machines still reference those tags (e.g.
-    # `uiv_circuit_assembler` wants `#gtceu:circuits/uxv`). Fill each empty
-    # high tier with the highest populated tier below it so the tag resolves
-    # to "the best circuit available".
     circuit_tiers = ["ulv", "lv", "mv", "hv", "ev", "iv", "luv",
                      "zpm", "uv", "uhv", "uev", "uiv", "uxv", "opv", "max"]
     last_circuits: list[str] = []
@@ -350,6 +297,14 @@ def main() -> None:
         print(f"  filled {filled} empty high-tier circuit tags "
               f"(fallback to highest populated tier)")
 
+    stripped_dropped = 0
+    for tag_id, members in tags.items():
+        kept = [m for m in members if "stripped" not in m.lower()]
+        stripped_dropped += len(members) - len(kept)
+        tags[tag_id] = kept
+    if stripped_dropped:
+        print(f"  dropped {stripped_dropped} stripped-wood tag memberships (no-op in Terraria)")
+
     with OUT_TAGS.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(tags, f, ensure_ascii=False, separators=(",", ":"))
     print(f"snapshotted {len(tags):,} item tags -> {OUT_TAGS.relative_to(REPO)}")
@@ -359,9 +314,6 @@ def main() -> None:
         json.dump(fluid_tags, f, ensure_ascii=False, separators=(",", ":"))
     print(f"snapshotted {len(fluid_tags):,} fluid tags -> {OUT_FLUID_TAGS.relative_to(REPO)}")
 
-    # Material chemistry dump - the materials DataProvider reads the live
-    # registry, so this replaces the regex-extracted Data/Materials/*.json.
-    # Wipe the old themed files; the single materials.json is authoritative.
     if SRC_MATERIALS.is_file():
         materials = json.loads(SRC_MATERIALS.read_text(encoding="utf-8"))
         OUT_MATERIALS.parent.mkdir(parents=True, exist_ok=True)
@@ -374,10 +326,6 @@ def main() -> None:
     else:
         print(f"  note: material dump not found ({SRC_MATERIALS.name}) - materials unchanged")
 
-    # Ore vein dump - the OreVeinDataProvider walks GTRegistries.ORE_VEINS at
-    # runData time so the dump tracks the live registry (no regex parse of
-    # GTOres.java, no MaterialAliasResolver to hand-maintain). Schema matches
-    # what the retired tools/gtceu-extract veins extractor emitted.
     if SRC_VEINS.is_file():
         veins = json.loads(SRC_VEINS.read_text(encoding="utf-8"))
         OUT_VEINS.parent.mkdir(parents=True, exist_ok=True)

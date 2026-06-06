@@ -14,16 +14,13 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items;
 
-// Per-stack research carrier for data_stick / data_orb / data_module. Terraria
-// has no native per-stack NBT, so the upstream `assembly_line_research`
-// CompoundTag rides this GlobalItem (same shape as MachinePortableData).
+// Per-stack research carrier for data_stick / data_orb / data_module
 public sealed class ResearchDataGlobalItem : GlobalItem
 {
 	public override bool InstancePerEntity => true;
 
-	// Null/empty = blank data item.
 	public string? ResearchId;
-	public string? ResearchType;   // recipe-type registry name (e.g. "assembly_line")
+	public string? ResearchType; // e.g. "assembly_line"
 
 	private static int[]? _dataItemTypes;
 
@@ -46,8 +43,6 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 
 	public override bool AppliesToEntity(Item item, bool lateInstantiation) => IsDataItemType(item.type);
 
-	// Per-stack research forces non-stackable (overrides RegistryItem's 999).
-	// GlobalItem.SetDefaults runs after ModItem.SetDefaults, so this wins.
 	public override void SetDefaults(Item item) => item.maxStack = 1;
 
 	public bool HasResearch => !string.IsNullOrEmpty(ResearchId);
@@ -89,12 +84,11 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 	public override bool CanStack(Item destination, Item source) => SameResearch(destination, source);
 	public override bool CanStackInWorld(Item destination, Item source) => SameResearch(destination, source);
 
-	private static bool SameResearch(Item a, Item b)
-	{
-		var ar = a.GetGlobalItem<ResearchDataGlobalItem>();
-		var br = b.GetGlobalItem<ResearchDataGlobalItem>();
-		return string.Equals(ar.ResearchId ?? "", br.ResearchId ?? "", System.StringComparison.Ordinal);
-	}
+	private static bool SameResearch(Item a, Item b) =>
+		string.Equals(ResearchIdOf(a), ResearchIdOf(b), System.StringComparison.Ordinal);
+
+	private static string ResearchIdOf(Item item) =>
+		item.TryGetGlobalItem<ResearchDataGlobalItem>(out var r) ? r.ResearchId ?? "" : "";
 
 	public override GlobalItem Clone(Item? from, Item to)
 	{
@@ -104,8 +98,6 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 		return clone;
 	}
 
-	// research_id -> recipe (via the recipe-type's dataStickEntry) -> primary
-	// output = the item this orb represents. Cached per research_id.
 	private int     _aboutType = -2;   // -2 uncomputed, -1 none, >0 item type
 	private string? _aboutForId;
 
@@ -148,9 +140,7 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 		return i >= 0 ? id[(i + 1)..] : id;
 	}
 
-	// Stamp from recipe-ingredient SNBT
-	// (`{assembly_line_research:{research_id:"...",research_type:"..."}}`)
-	// so the recipe browser shows a researched output orb, not a blank.
+	// Stamp from recipe-ingredient SNBT so the recipe browser shows a researched output orb, not a blank.
 	public static void StampFromSnbt(Item stack, string? snbt)
 	{
 		if (stack is null || stack.IsAir || string.IsNullOrEmpty(snbt)) return;
@@ -175,7 +165,7 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 
 	public override void ModifyTooltips(Item item, List<TooltipLine> tooltips)
 	{
-		if (!HasResearch) return;                  // blank items get no extra line
+		if (!HasResearch) return;
 
 		int about = AboutItemType();
 		string subject = about > 0 ? Lang.GetItemNameValue(about) : ResearchId!;
@@ -186,7 +176,6 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 		{ OverrideColor = new Color(170, 170, 170) });
 	}
 
-	// Preview the researched item small + centred ("this orb contains X").
 	public override void PostDrawInInventory(Item item, SpriteBatch sb, Vector2 position,
 		Rectangle frame, Color drawColor, Color itemColor, Vector2 origin, float scale)
 		=> DrawPreview(sb, position, scale * 0.5f);

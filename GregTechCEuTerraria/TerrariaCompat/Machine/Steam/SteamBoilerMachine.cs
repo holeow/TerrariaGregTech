@@ -14,14 +14,10 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Steam;
 
-// 1:1 port of SteamBoilerMachine. Adds waterTank on top of steamTank.
+// port of SteamBoilerMachine. Adds waterTank on top of steamTank.
 // Per-tick state machine: heating ratchets temp every 12t HP / 24t LP;
 // idle + cooldown lapsed drops by CoolDownRate; every 10t at temp >= 100
 // drains 1 mB water + fills steamTank; water-empty-while-hot = explode.
-//
-// Adaptations: particle effects dropped; subscription always-on + gated
-// inside (vs upstream conditional subscribe - negligible perf drift);
-// bucket interact lives on the UI side.
 public abstract class SteamBoilerMachine : SteamWorkableMachine
 {
 	protected SteamBoilerMachine() : base() { }
@@ -46,25 +42,20 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 	protected virtual NotifiableFluidTank CreateWaterTank() =>
 		new(1, WaterTankCapacity, Api.Capability.Recipe.IO.IN);
 
-	// Verbatim: boiler can't be switched off.
 	public override bool SupportsWorkingEnabledToggle => false;
 
 	public int CurrentTemperature { get; protected set; }
 	protected int TimeBeforeCoolingDown { get; set; }
 	protected bool HasNoWater { get; set; }
 
-	// LP: 500/45t/1deg. HP: 1000/40t/1deg. Upstream ConfigHolder hardcoded here.
 	public virtual int GetMaxTemperature()  => IsHighPressure ? 1000 : 500;
 	protected virtual int GetCooldownInterval() => IsHighPressure ? 40 : 45;
 	protected virtual int GetCoolDownRate() => 1;
 
-	// SteamSolarBoiler overrides with a sunlight check.
 	protected virtual bool IsHeating() => Recipe.IsWorking();
 
-	/// <summary>LP solid: 240 mB / 10t at max temp. HP solid: 480. Override.</summary>
 	protected abstract long GetBaseSteamOutput();
 
-	/// <summary>Current steam output every 10 ticks. Scales linearly with temperature%.</summary>
 	public long GetTotalSteamOutput()
 	{
 		if (CurrentTemperature < 100) return 0;
@@ -74,14 +65,12 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 	public double TemperaturePercent => CurrentTemperature / (GetMaxTemperature() * 1.0);
 	public float  TempProgress01     => (float)TemperaturePercent;
 
-	// Verbatim: HP halves duration, LP is identity.
 	public override Api.Recipe.GTRecipe? FullModifyRecipe(Api.Recipe.GTRecipe recipe)
 	{
 		if (!IsHighPressure) return recipe;
-		return recipe.Copy(Api.Recipe.Content.ContentModifier.Multiplier_(0.5), modifyDuration: true);
+		return Api.Recipe.Modifier.ModifierFunction.Builder().DurationMultiplier(0.5).Build().Apply(recipe);
 	}
 
-	// Kick to >=1 so steam starts immediately on fuel light-up.
 	public override bool OnWorking()
 	{
 		bool value = base.OnWorking();
@@ -98,7 +87,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		TimeBeforeCoolingDown = GetCooldownInterval();
 	}
 
-	// Steam production lives here, not in recipe IO (recipes are fuel-burn timers).
 	protected override void OnTick()
 	{
 		base.OnTick();
@@ -141,7 +129,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 			if (CurrentTemperature >= 100)
 			{
 				int fillAmount = (int)GetTotalSteamOutput();
-				// DrainInternal - water tank is IO.IN, public Drain returns empty.
 				bool hasDrainedWater = !WaterTank.DrainInternal(1, simulate: false).IsEmpty;
 				long filledSteam = 0;
 				if (hasDrainedWater)
@@ -170,11 +157,9 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		}
 	}
 
-	// Verbatim GTUtil.doExplosion(level, pos, 2.0f).
 	protected virtual void DoExplosion() =>
 		EnvironmentalExplosionTrait.DoExplosionAt(this, 2.0f);
 
-	// Upstream parity: bespoke subscription, no AutoOutputTrait.
 	private const int AutoOutputPeriod = 5;
 	private int _autoOutputCooldown;
 
@@ -225,8 +210,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		return SteamTank.Drain(maxAmount, simulate);
 	}
 
-	// Raw per-tank storage; storage's type filter still rejects wrong fluid on
-	// IO-bypassed bucket clicks.
 	public override IFluidHandler GetTankAccess(int tank)
 	{
 		EnsureSteamTraits();
@@ -235,7 +218,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 			: SteamTank.Storages[0];
 	}
 
-	// Verbatim createUI:309/313 - water (true,false) blocks scooping mid-boil.
 	public override (bool AllowFill, bool AllowDrain) GetTankClickCaps(int tank) =>
 		tank == WaterTankAbsoluteIndex ? (true, false) : (false, true);
 	public override FluidStack Drain(FluidStack fluid, bool simulate)
@@ -269,7 +251,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		var steam = GetTank(SteamTankAbsoluteIndex);
 		lines.Add($"Water: {(water.IsEmpty ? 0 : water.Amount):N0}/{WaterTankCapacity:N0} mB");
 		lines.Add($"Steam: {(steam.IsEmpty ? 0 : steam.Amount):N0}/{SteamTankCapacity:N0} mB");
-		// IsHeating-gated so idle boilers read 0 (surfaces brownouts).
 		long perTick = IsHeating() ? GetTotalSteamOutput() / 10 : 0;
 		lines.Add($"Output: {perTick:N0} mB/t");
 	}

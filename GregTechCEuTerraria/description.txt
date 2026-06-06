@@ -1,4 +1,4 @@
-A full port of GregTech Modern (GTCEu).
+A full port of GregTech Modern (GTCEu). Up stands from "Unofficially ported"
 We want to greg everywhere
 
 > Note: This is an unofficial port. Do not request support in original mod

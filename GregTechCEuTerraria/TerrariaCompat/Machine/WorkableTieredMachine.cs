@@ -22,10 +22,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Recipe state machine lives on the attached RecipeLogic trait; this class
-// exposes the I/O surface (TryMatchInputContents / TryConsumeInputContents /
-// HasOutputRoomContents / DepositOutputContents / TryDrainEU) and machine-side
-// hooks. Overclock applied by the RecipeModifier chain via GetRecipeModifier.
 public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHandler, IRecipeLogicMachine, IOverclockMachine, Api.Machine.Feature.IHasCircuitSlot
 {
 	public WorkableTieredMachine() { }
@@ -48,15 +44,11 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	public virtual bool UsesCircuit => Definition?.UsesCircuit ?? false;
 
-	// Upstream BasicFluidTank default = 16 buckets.
 	protected virtual int FluidTankCapacity => Definition?.FluidTankCapacity ?? 16_000;
 
-	// 64-tick buffer (upstream TieredEnergyMachine).
 	public override long EnergyCapacity => VoltageTiers.Voltage(Tier) * 64;
 	public override bool CanAccept => true;
 
-	// importItems uses capabilityIO=BOTH (verbatim upstream) so external pipes
-	// can pull items back out of input slots. exportItems defaults to OUT.
 	private NotifiableItemStackHandler? _importItems;
 	private NotifiableItemStackHandler? _exportItems;
 	private NotifiableItemStackHandler? _circuitInventory;
@@ -65,7 +57,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	public NotifiableItemStackHandler ImportItems { get { EnsureTraits(); return _importItems!; } }
 	public NotifiableItemStackHandler ExportItems { get { EnsureTraits(); return _exportItems!; } }
-	// Single-slot, filter-pinned to IntCircuitItem. Walked by recipe matching.
 	public NotifiableItemStackHandler? CircuitInventory { get { EnsureTraits(); return _circuitInventory; } }
 	public NotifiableFluidTank? ImportFluids      { get { EnsureTraits(); return _importFluids; } }
 	public NotifiableFluidTank? ExportFluids      { get { EnsureTraits(); return _exportFluids; } }
@@ -73,8 +64,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	private static bool IsProgrammedCircuit(Item stack) =>
 		stack != null && stack.ModItem is IntCircuitItem;
 
-	// Read-only concat view. Mutators MUST address via SlotGroup.InventoryInput
-	// / InventoryOutput to land on the trait's actual backing array.
 	public Item[] Slots
 	{
 		get
@@ -129,10 +118,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	private AutoOutputTrait? _autoOutput;
 	public override AutoOutputTrait? AutoOutput { get { EnsureTraits(); return _autoOutput; } }
 
-	// Lazy - Tier + slot-count abstracts only resolve AFTER the Activator ctor.
-	// Main-thread only: worker-thread reachable getters (IControllable.IsWorkingEnabled,
-	// IsActive, IWorkable.*) read the trait field directly with null-tolerant
-	// fallback - they never call EnsureTraits.
 	protected void EnsureTraits()
 	{
 		if (_recipeLogic is not null) return;
@@ -142,20 +127,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		Traits.Attach(_recipeLogic);
 		Traits.RegisterPersistent("RecipeLogic", _recipeLogic);
 
-		// importItems / exportItems - upstream-verbatim with the 3-arg
-		// WorkableTieredMachine constructor (WorkableTieredMachine.java:96-101),
-		// which SimpleTieredMachine (the parent of every electric processing
-		// machine - macerator, furnace, alloy_smelter, ...) extends via
-		// `super(info, tier, tankScalingFunction)`. That ctor uses
-		// `new NotifiableItemStackHandler(..., IO.IN)` (single-arg-after-slots
-		// -> capabilityIO = IO.IN), so external pipes/covers can INSERT into
-		// input slots but NOT extract from them.
-		//
-		// Upstream's OTHER WTM constructor (5-arg with explicit slot counts,
-		// line 74) uses (IO.IN, IO.BOTH) which DOES let pipes drain inputs -
-		// that one is for specialised explicit-slot-count machines. Most of
-		// upstream goes through the 3-arg path. We had the 5-arg config
-		// hardcoded by mistake.
 		_importItems = new NotifiableItemStackHandler(InputSlotCount,  Api.Capability.Recipe.IO.IN);
 		_exportItems = new NotifiableItemStackHandler(OutputSlotCount, Api.Capability.Recipe.IO.OUT);
 		Traits.Attach(_importItems);
@@ -182,27 +153,20 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		Traits.RegisterPersistent("AutoOutput", _autoOutput);
 
 		// WorkableTieredMachine.java:72,94 - both upstream ctors attach a
-		// CleanroomReceiverTrait unconditionally. Without it, CleanroomCondition
-		// can't find a receiver on the machine and any cleanroom-gated recipe
-		// (circuit assembler, etc.) sits in WAITING with "conditions not met"
-		// even when standing inside a formed, active Cleanroom multi.
+		// CleanroomReceiverTrait unconditionally
 		var cleanroomReceiver = new CleanroomReceiverTrait();
 		Traits.Attach(cleanroomReceiver);
 		Traits.RegisterPersistent("CleanroomReceiver", cleanroomReceiver);
 
-		// SimpleTieredMachine.java:85-88 - programmed_circuit slot is a
-		// trait so recipe matching picks up the IntCircuitItem (no ghost int).
 		if (UsesCircuit)
 		{
 			_circuitInventory = new NotifiableItemStackHandler(1, Api.Capability.Recipe.IO.IN, Api.Capability.Recipe.IO.NONE)
 				.SetFilter(IsProgrammedCircuit);
+			_circuitInventory.ShouldDropInventoryInWorld = false;
 			Traits.Attach(_circuitInventory);
 			Traits.RegisterPersistent("CircuitInventory", _circuitInventory);
 		}
 
-		// Verbatim WorkableTieredMachine.java:115-132 - wake RecipeLogic on any
-		// handler content change. Iterating AllTraits keeps new
-		// INotifiableRecipeHandler additions auto-wired.
 		EnsureEnergyContainer();
 		foreach (var t in Traits.AllTraits)
 		{
@@ -213,10 +177,9 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	protected void EnsureRecipeLogic() => EnsureTraits();
 
-	// SimpleGeneratorMachine overrides back to false (upstream parity).
 	protected override bool HasChargerSlot => true;
 
-	// Display-only cache (post-overclock EU/t); read by the UI EU/t label.
+	// Display-only cache (post-overclock EU/t)
 	private long _activeEut;
 	long IRecipeLogicMachine.ActiveEut
 	{
@@ -279,7 +242,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	public virtual void AfterWorking()                 { }
 	public virtual void OnWaiting()                    { }
 	public virtual bool KeepSubscribing()              => false;
-	// Upstream defaults; SimpleGeneratorMachine overrides RegressWhenWaiting -> false.
 	public virtual bool RegressWhenWaiting()    => true;
 	public virtual bool AlwaysTryModifyRecipe() => true;
 	public virtual bool IsMultiblockController()       => false;
@@ -287,8 +249,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	public virtual GTRecipe? FullModifyRecipe(GTRecipe recipe)
 	{
-		// Split GetModifier + Apply to capture FailReason on cancellation
-		// (RecipeLogic reads it for a useful waiting-reason).
 		var fn = GetRecipeModifier().GetModifier(this, recipe);
 		var result = fn.Apply(recipe);
 		_lastModifierFailReason = result == null ? fn.FailReason : null;
@@ -298,8 +258,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	private string? _lastModifierFailReason;
 	public string? GetLastModifierFailReason() => _lastModifierFailReason;
 
-	// Upstream stores on MachineDefinition. SimpleGeneratorMachine overrides
-	// to fast-parallel; electric processing uses x4 EU/t /2 duration non-perfect.
 	public virtual RecipeModifier GetRecipeModifier() => GTRecipeModifiers.OC_NON_PERFECT;
 
 	public override bool IsActive => _recipeLogic?.IsActive() ?? false;
@@ -320,30 +278,14 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	public int  ProgressTicks    => _recipeLogic?.GetProgress() ?? 0;
 	public int  DurationTicks    => _recipeLogic?.GetMaxProgress() ?? 0;
 	public float Progress01      => DurationTicks > 0 ? (float)ProgressTicks / DurationTicks : 0f;
-	public long  ActiveEuPerTick => _recipeLogic?.GetLastRecipe() is null ? 0 : _activeEut;
-
-	// Overclock count of the active recipe - used by the OC label in
-	// MachineUIState. The RecipeModifier stamps GTRecipe.OcLevel directly when
-	// it overclocks (ModifierFunction.FunctionBuilder.addOCs), so the running
-	// (modified) recipe carries the count.
-	public int ActiveOverclock => _recipeLogic?.GetLastRecipe()?.OcLevel ?? 0;
+	public long ActiveEuPerTick  => _recipeLogic?.GetLastRecipe() is null ? 0 : _activeEut;
+	public int ActiveOverclock   => _recipeLogic?.GetLastRecipe()?.OcLevel ?? 0;
 
 	internal void MarkLastRecipeDirty() { EnsureRecipeLogic(); _recipeLogic!.MarkLastRecipeDirty(); }
 
 	// === IWorkable + IControllable (forward to trait) ======================
-	// Explicit interface impl so `IWorkable.IsActive()` (method) doesn't
-	// collide with the inherited `MetaMachine.IsActive` (property - we
-	// override it above to return `_recipeLogic?.IsActive() ?? false`).
-	//
-	// All read-side getters are field-only (no EnsureRecipeLogic call) because
-	// MetaMachine.WorkingEnabled is read from MetaMachineTile.ModifyLight on
-	// FastParallel worker threads (TileLightScanner.ExportTo). Lazy-init from
-	// a worker would race with itself and with main-thread Ensure callers.
-	// Per the project's documented FastParallel gotcha: "make the getter return
-	// a default and have a main-thread Update push the value into a cache" -
-	// here the trait IS the cache (set once on main thread via EnsureTraits,
-	// then field-read forever after). Null = uninit = safe defaults.
-	// Setters mutate, so they DO ensure (main-thread only paths - UI / packets).
+	// read getters are field-only with null->default because ModifyLight reads them
+	// on FastParallel worker threads
 	int IWorkable.GetProgress()    => _recipeLogic?.GetProgress() ?? 0;
 	int IWorkable.GetMaxProgress() => _recipeLogic?.GetMaxProgress() ?? 0;
 	bool IWorkable.IsActive()      => _recipeLogic?.IsActive() ?? false;
@@ -351,10 +293,7 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	void IControllable.SetWorkingEnabled(bool v) { EnsureRecipeLogic(); _recipeLogic!.SetWorkingEnabled(v); }
 
 	// === IItemHandler (routes to trait by slot index) =======================
-	// Slot index 0..InputSlotCount-1 maps to ImportItems[i]; the rest maps
-	// to ExportItems[i - InputSlotCount]. Matches the legacy combined-array
-	// shape so pipe IO + IItemHandler consumers see no change in indexing.
-
+	// Slot index 0..InputSlotCount-1 maps to ImportItems[i] + ExportItems[i - InputSlotCount] for IItemHandler
 	public int SlotCount       { get { EnsureTraits(); return _importItems!.SlotCount + _exportItems!.SlotCount; } }
 	public Item GetSlot(int s) { EnsureTraits(); return s < InputSlotCount ? _importItems!.GetSlot(s) : _exportItems!.GetSlot(s - InputSlotCount); }
 	public Item Insert(int s, Item item, bool simulate)
@@ -375,7 +314,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	public override bool SupportsAutoOutputItems  => OutputSlotCount > 0;
 	public override bool SupportsAutoOutputFluids => OutputFluidTankCount > 0;
 
-	// Automation inserts into INPUT slots only; per-side gate via AutoOutputTrait.
 	public bool IsItemValid(int slot, Item item) => slot < InputSlotCount;
 
 	public override int ResolveFluidTank(Api.Capability.Recipe.IO direction, int localIndex) =>
@@ -392,7 +330,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	public int GetCapacity(int tank) => FluidTankCapacity;
 	public bool IsFluidValid(int tank, FluidStack fluid) => tank < InputFluidTankCount;
 
-	// Raw per-tank storage so bucket/cell transfer bypasses IO direction.
 	public IFluidHandler GetTankAccess(int tank)
 	{
 		EnsureTraits();
@@ -400,10 +337,9 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 			return _importFluids.Storages[tank];
 		if (_exportFluids is not null)
 			return _exportFluids.Storages[tank - InputFluidTankCount];
-		return this;   // unreachable; TankCount guards callers
+		return this;
 	}
 
-	// Verbatim FluidRecipeCapability.applyWidgetInfo defaults.
 	public (bool AllowFill, bool AllowDrain) GetTankClickCaps(int tank) =>
 		tank < InputFluidTankCount ? (true, true) : (false, true);
 
@@ -428,10 +364,8 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		return _exportFluids?.Drain(fluidStack, simulate) ?? FluidStack.Empty;
 	}
 
-	// RecipeLogic + AutoOutputTrait drive themselves via SystemTick.
 	protected override void OnTick() => EnsureTraits();
 
-	// Loaded mid-recipe = no SetStatus transition, NotifyStatusChanged never fires.
 	protected override void OnMachineLoaded()
 	{
 		base.OnMachineLoaded();
@@ -439,7 +373,7 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 			((IRecipeLogicMachine)this).EnsureLoopSound(((IRecipeLogicMachine)this).GetWorldPos());
 	}
 
-	// Upstream has a UI tier selector; we lock OC tier at machine tier.
+	// we dont have OC tier selector button ported yet
 	public int OverclockTier    => (int)Tier;
 	public int MaxOverclockTier => (int)Tier;
 	public int MinOverclockTier => 0;
@@ -452,7 +386,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		IReadOnlyList<Api.Recipe.Content.Content> fluids)
 	{
 		EnsureTraits();
-		// Verbatim RecipeRunner.searchRecipeContents (RecipeRunner.java:90,92).
 		var (itemMatch, _) = Api.Recipe.RecipeContentSplit.Split(
 			ItemRecipeCapability.CAP, items, Api.Capability.Recipe.IO.IN, isTick: false, recipe,
 			chanceCache: null, totalRuns: recipe.GetTotalRuns());
@@ -474,7 +407,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		IReadOnlyList<Api.Recipe.Content.Content> fluids)
 	{
 		EnsureTraits();
-		// CONSUME-shape (chanced rolled) - guaranteed must fit, chanced not reserved.
 		var (_, itemConsume) = Api.Recipe.RecipeContentSplit.Split(
 			ItemRecipeCapability.CAP, items, Api.Capability.Recipe.IO.OUT, isTick: false, recipe,
 			chanceCache: null, totalRuns: recipe.GetTotalRuns());
@@ -496,7 +428,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		IReadOnlyList<Api.Recipe.Content.Content> fluids)
 	{
 		EnsureTraits();
-		// Match-pass simulate first, then commit consume (tools filtered, chanced rolled).
 		var (itemMatch, itemConsume) = Api.Recipe.RecipeContentSplit.Split(
 			ItemRecipeCapability.CAP, items, Api.Capability.Recipe.IO.IN, isTick: false, recipe,
 			chanceCache: null, totalRuns: recipe.GetTotalRuns());
@@ -510,7 +441,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		var simFluids = HandleFluidPayloads(fluidMatch, Api.Capability.Recipe.IO.IN, simulate: true);
 		if (simFluids is not null && simFluids.Count > 0)
 			return ActionResult.Fail("gtceu.recipe.no_fluid", FluidRecipeCapability.CAP, Api.Capability.Recipe.IO.IN);
-		// Commit using the consume list - tools stay, chanced rolled.
 		HandleItemPayloads(itemConsume, Api.Capability.Recipe.IO.IN, simulate: false);
 		HandleFluidPayloads(fluidConsume, Api.Capability.Recipe.IO.IN, simulate: false);
 		return ActionResult.SUCCESS;
@@ -523,8 +453,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		RecipeLogic logic)
 	{
 		EnsureTraits();
-		// Output deposit uses the consume list - guaranteed deterministic +
-		// rolled chanced (via ChanceLogic with tierChanceBoost applied).
 		var (_, itemConsume) = Api.Recipe.RecipeContentSplit.Split(
 			ItemRecipeCapability.CAP, items, Api.Capability.Recipe.IO.OUT, isTick: false, recipe,
 			chanceCache: null, totalRuns: recipe.GetTotalRuns());
@@ -537,7 +465,7 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	}
 
 	// HandleRecipeInner mutates SizedIngredient.Amount on the remainder, so
-	// ingredients are COPIED before passing.
+	// ingredients are copied before passing.
 	private List<Ingredient>? HandleItemPayloads(
 		IReadOnlyList<object> payloads, Api.Capability.Recipe.IO io, bool simulate)
 	{
@@ -548,15 +476,9 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		foreach (var p in payloads)
 		{
 			var ing = (Ingredient)p;
-			var inner = PeelToInner(ing);
-			// Unresolved upstream id -> ItemType==0 -> unsatisfiable as input.
-			if (io == Api.Capability.Recipe.IO.IN && inner.IsEmpty)
-				return new List<Ingredient> { ing };
 			list.Add(CopyIngredient(ing, CountOf(ing)));
 		}
 
-		// IO.IN: importItems then circuitInventory (so circuit ingredients land
-		// in circuitInventory[0] instead of leaking into the regular search).
 		var remaining = primary.HandleRecipeInner(io, _sentinelRecipe, list, simulate);
 		if (io == Api.Capability.Recipe.IO.IN && _circuitInventory is not null
 		    && remaining is { Count: > 0 })
@@ -580,7 +502,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		return handler.HandleRecipeInner(io, _sentinelRecipe, list, simulate);
 	}
 
-	// HandleRecipeInner only reads IngredientActions (KubeJS hook, empty here).
 	private static readonly GTRecipe _sentinelRecipe = new(
 		GTRecipeType.GetOrCreate("__sentinel__"),
 		new Dictionary<object, List<Api.Recipe.Content.Content>>(),
@@ -598,17 +519,15 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		Api.Recipe.Category.GTRecipeCategory.DEFAULT,
 		-1);
 
-	// HandleRecipeInner mutates Amount on the wrapper - inner can be shared.
 	private static Ingredient CopyIngredient(Ingredient ing, int count) => ing switch
 	{
 		SizedIngredient sized      => SizedIngredient.Create(sized.Inner, count),
-		IntProviderIngredient ipi  => ipi,   // sampled count read-only here
+		IntProviderIngredient ipi  => ipi,
 		_                          => count > 1 ? SizedIngredient.Create(ing, count) : ing,
 	};
 
 	private static FluidIngredient CopyFluidIngredient(FluidIngredient ing)
 	{
-		// Fresh instance so the walker doesn't alias the recipe's stored copy.
 		if (ing.ExactType is not null)
 			return new FluidIngredient(ing.ExactType, ing.Amount);
 		if (ing.TagName is not null)
@@ -627,8 +546,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		return ActionResult.SUCCESS;
 	}
 
-	// Verbatim NotifiableEnergyContainer.handleRecipeInner(IO.OUT): buffer-full
-	// = recipe-wait (canVoidRecipeOutputs(EU)=false for generators).
 	ActionResult IRecipeLogicMachine.DepositOutputEU(Api.Recipe.GTRecipe recipe, long voltage)
 	{
 		if (voltage <= 0) return ActionResult.SUCCESS;
@@ -654,10 +571,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		if (style is null) return;
 
 		// Canonical tML pattern: SoundUpdateCallback owns the shutdown decision
-		// (explicit Stop() isn't foolproof for loops per the wiki). The callback
-		// fires synchronously during PlaySound, BEFORE RecipeLogic's _status is
-		// assigned to WORKING - so IsActive would lie. Use the tracker's explicit
-		// ShouldKeepPlaying flag instead.
 		_loopTracker = new MachineAudioTracker(this);
 		var tracker = _loopTracker;
 		_loopSlot = Terraria.Audio.SoundEngine.PlaySound(style.Value, worldPos, tracker.Tick);
@@ -665,7 +578,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	void IRecipeLogicMachine.StopLoopSound()
 	{
-		// Flip the tracker flag FIRST; callback is the safety net.
 		_loopTracker?.MarkStopped();
 		_loopTracker = null;
 		if (Terraria.Audio.SoundEngine.TryGetActiveSound(_loopSlot, out var sound) && sound is not null)
@@ -755,9 +667,6 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	{
 		EnsureTraits();
 		base.LoadData(tag);
-		// Save-compat: legacy MachineIOConfig `io_*` keys at top level (pre-trait).
-		_autoOutput!.LoadLegacyIOConfig(tag);
-		// Save-compat: pre-refactor ghost-int "circuit" key silently dropped.
 		_activeEut       = tag.GetLong("activeEut");
 		_lastRecipeId    = tag.ContainsKey("recipe") ? tag.GetString("recipe") : null;
 	}
@@ -777,17 +686,25 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 		RecipeStatusText.AppendFailureDetail(_recipeLogic, lines);
 	}
 
-	// Returns null for pure-fluid recipes / unresolved ingredients.
+	// Display-only first recipe output for tooltip
 	private static string? ResolvePrimaryOutputName(Api.Recipe.GTRecipe? recipe)
 	{
 		if (recipe == null) return null;
-		if (!recipe.Outputs.TryGetValue(ItemRecipeCapability.CAP, out var contents)) return null;
-		foreach (var content in contents)
+		if (recipe.Outputs.TryGetValue(ItemRecipeCapability.CAP, out var contents))
 		{
-			if (content.Payload is not Api.Recipe.Ingredient.Ingredient ing) continue;
-			int type = ResolveItemType(ing);
-			if (type <= 0) continue;
-			return Terraria.Lang.GetItemName(type).Value;
+			foreach (var content in contents)
+			{
+				if (content.Payload is not Api.Recipe.Ingredient.Ingredient ing) continue;
+				int type = ResolveItemType(ing);
+				if (type <= 0) continue;
+				return Terraria.Lang.GetItemName(type).Value;
+			}
+		}
+		if (recipe.Outputs.TryGetValue(FluidRecipeCapability.CAP, out var fluidContents))
+		{
+			foreach (var content in fluidContents)
+				if (content.Payload is Api.Recipe.Ingredient.FluidIngredient fi && fi.GetFluids().Count > 0)
+					return fi.GetFluids()[0].DisplayName;
 		}
 		return null;
 	}

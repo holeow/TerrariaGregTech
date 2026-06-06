@@ -300,19 +300,4 @@ public sealed class AutoOutputTrait : MachineTrait
 		if (tag.ContainsKey("allowItemIn"))  _allowItemInputFromOutputSide  = tag.GetBool("allowItemIn");
 		if (tag.ContainsKey("allowFluidIn")) _allowFluidInputFromOutputSide = tag.GetBool("allowFluidIn");
 	}
-
-	// Save-compat shim - pull the pre-trait MachineIOConfig `io_*` keys off the
-	// machine's top-level save tag (worlds saved before auto-output became a
-	// trait). Called once from the owning machine's LoadData.
-	public void LoadLegacyIOConfig(TagCompound tag)
-	{
-		if (tag.ContainsKey("io_isi"))  _itemOutputDirection           = (IODirection)tag.GetByte("io_isi");
-		if (tag.ContainsKey("io_fsi"))  _fluidOutputDirection          = (IODirection)tag.GetByte("io_fsi");
-		if (tag.ContainsKey("io_iao"))  _autoOutputItems               = tag.GetBool("io_iao");
-		if (tag.ContainsKey("io_fao"))  _autoOutputFluids              = tag.GetBool("io_fao");
-		if (tag.ContainsKey("io_aifi")) _allowItemInputFromOutputSide  = tag.GetBool("io_aifi");
-		if (tag.ContainsKey("io_afif")) _allowFluidInputFromOutputSide = tag.GetBool("io_afif");
-		UpdateItemOutputSubscription();
-		UpdateFluidOutputSubscription();
-	}
 }

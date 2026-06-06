@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using GregTechCEuTerraria.Api.Capability;
 using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.Api.Cover;
 using GregTechCEuTerraria.Api.Machine;
@@ -32,8 +33,6 @@ public sealed class PipeCoverable : ICoverable
 
 	private readonly PipeSideMode[] _modes = new PipeSideMode[CoverSides.Count];
 
-	// Mode-independent. Default Simple so a fresh side toggled into Passive
-	// auto-installs the Simple filter cover.
 	private readonly PipeFilterType[] _filterTypes = InitFilterTypes();
 	private static PipeFilterType[] InitFilterTypes()
 	{
@@ -50,9 +49,6 @@ public sealed class PipeCoverable : ICoverable
 	internal readonly CoverBehavior?[] _filterCovers = new CoverBehavior?[CoverSides.Count];
 	internal readonly CoverBehavior?[] _robotArms    = new CoverBehavior?[CoverSides.Count];
 
-	// Per-pipe tick state (upstream ItemPipeBlockEntity's transferredItems +
-	// transferred map). TransferredItems is the 20-tick throughput counter
-	// with a LAZY reset (verbatim with upstream updateTransferredState).
 	private int _transferredItems;
 	private long _transferredTimer;
 	public int TransferredItems
@@ -64,7 +60,6 @@ public sealed class PipeCoverable : ICoverable
 
 	private void UpdateTransferredState()
 	{
-		// Upstream window = 20 MC ticks; FromMcTicks scales to SimulationSpeed.
 		int window = Api.TickScale.FromMcTicks(20);
 		long now = Main.GameUpdateCount;
 		long dif = now - _transferredTimer;
@@ -77,8 +72,6 @@ public sealed class PipeCoverable : ICoverable
 
 	public void ResetTransferred() => Transferred.Clear();
 
-	// Lazy ItemNetHandler per side; same instance accumulates per-tick state
-	// across inserts. Reset on network rebuild.
 	internal readonly object?[] CachedItemHandlers = new object?[CoverSides.Count];
 
 	public PipeCoverable(PipeKind layer, int x, int y)
@@ -97,7 +90,6 @@ public sealed class PipeCoverable : ICoverable
 		// Pipes have no per-cell cover render today; hook here if one appears.
 	}
 
-	// Verbatim port of MetaMachine's server-tick subscription pattern.
 	private readonly System.Collections.Generic.List<TickableSubscription> _serverTicks  = new();
 	private readonly System.Collections.Generic.List<TickableSubscription> _waitingToAdd = new();
 
@@ -137,7 +129,6 @@ public sealed class PipeCoverable : ICoverable
 		var oldMode = _modes[i];
 		if (oldMode == mode) return;
 
-		// Lazy-create destination cover BEFORE copy so its filter is available.
 		switch (mode)
 		{
 			case PipeSideMode.Passive: EnsureFilterCover(side); break;
@@ -145,21 +136,12 @@ public sealed class PipeCoverable : ICoverable
 		}
 
 		CopyFilterStateOnModeChange(side, oldMode, mode);
-
 		_modes[i] = mode;
-
-		// Route caches on ItemPipeNet are per-source-pipe and would otherwise
-		// keep delivering through a side the player just turned Off.
 		InvalidateNetRouteCache();
-
-		// Make the UI toggle feel immediate (otherwise ~20-tick lag while
-		// SubscriptionHandler re-polls).
 		GetCoverAtSide(side)?.OnNeighborChanged();
-
 		NotifyBlockUpdate();
 	}
 
-	// Layer-aware so the fluid net can wire in the same way once ported.
 	private void InvalidateNetRouteCache()
 	{
 		if (Layer != PipeKind.Item) return;
@@ -173,9 +155,6 @@ public sealed class PipeCoverable : ICoverable
 		if (from == PipeSideMode.Off || to == PipeSideMode.Off) return;
 
 		int i = (int)side;
-		// Passive + Active both expose UiItemFilter / UiFluidFilter; copy at
-		// that level via SaveFilter / LoadFrom. Simple<->Simple preserves
-		// contents; Tag-filter shape doesn't survive cross-mode copy.
 		if (Layer == PipeKind.Item)
 		{
 			var src = from switch
@@ -216,7 +195,6 @@ public sealed class PipeCoverable : ICoverable
 		}
 	}
 
-	// Single Io source for the renderer + settings panel + any other consumer.
 	internal static Api.Capability.Recipe.IO? ActiveIoAt(ICoverable holder, CoverSide side) => holder.GetCoverAtSide(side) switch
 	{
 		RobotArmCover r        => r.Io,
@@ -227,7 +205,6 @@ public sealed class PipeCoverable : ICoverable
 	// Simple-pipe UI: OFF/INSERT/EXTRACT maps to (mode, cover.Io, filter).
 	// A simple-mode side is just Active + RobotArm/FluidRegulator with a
 	// fixed allow-all filter (Blacklist + no matches).
-
 	public SimpleSideMode GetSimpleMode(CoverSide side)
 	{
 		int i = (int)side;
@@ -250,8 +227,6 @@ public sealed class PipeCoverable : ICoverable
 		}
 
 		SetMode(side, PipeSideMode.Active);
-
-		// Simple filter + blacklist + no matches = allow-all.
 		SetFilterType(side, PipeFilterType.Simple);
 		var cover = GetCoverAtSide(side);
 		if (Layer == PipeKind.Item)
@@ -260,8 +235,8 @@ public sealed class PipeCoverable : ICoverable
 			cover?.UiFluidFilter?.SetBlackList(true);
 
 		var targetIo = mode == SimpleSideMode.Insert
-			? Api.Capability.Recipe.IO.OUT   // push to adjacent
-			: Api.Capability.Recipe.IO.IN;   // pull from adjacent
+			? Api.Capability.Recipe.IO.OUT
+			: Api.Capability.Recipe.IO.IN;
 		switch (cover)
 		{
 			case RobotArmCover ra        when ra.Io != targetIo: ra.SetIo(targetIo); break;
@@ -277,8 +252,34 @@ public sealed class PipeCoverable : ICoverable
 		_                    => null,
 	};
 
-	// Override default - a side with mode != Off but no live cover (Passive +
-	// filterType=None) is still meaningful state; don't let the server evict us.
+	// ===== ICoverable capability =================================
+	public IItemHandler? GetItemHandlerCap(IODirection side, bool useCoverCapability)
+	{
+		if (Layer != PipeKind.Item) return null;
+		var cs = ToCoverSide(side);
+		var raw = ItemPipe.ItemPipeLayerSystem.ResolveRawHandler(this, cs);
+		if (raw is null || !useCoverCapability) return raw;
+		return GetCoverAtSide(cs) is { } cover ? cover.GetItemHandlerCap(raw) : raw;
+	}
+
+	public IFluidHandler? GetFluidHandlerCap(IODirection side, bool useCoverCapability)
+	{
+		if (Layer != PipeKind.Fluid) return null;
+		var cs = ToCoverSide(side);
+		var raw = Fluid.FluidPipeLayerSystem.ResolveRawTanks(this, cs);
+		if (raw is null || !useCoverCapability) return raw;
+		return GetCoverAtSide(cs) is { } cover ? cover.GetFluidHandlerCap(raw) : raw;
+	}
+
+	private static CoverSide ToCoverSide(IODirection dir) => dir switch
+	{
+		IODirection.Up    => CoverSide.Up,
+		IODirection.Down  => CoverSide.Down,
+		IODirection.Left  => CoverSide.Left,
+		IODirection.Right => CoverSide.Right,
+		_                 => CoverSide.Up,
+	};
+
 	bool ICoverable.HasAnyCover()
 	{
 		for (int i = 0; i < CoverSides.Count; i++)
@@ -290,8 +291,6 @@ public sealed class PipeCoverable : ICoverable
 		return false;
 	}
 
-	// ICoverable contract. Mode is NOT set here - LoadCovers reads it itself.
-	// External callers should go through SetMode + Ensure* + cover.ApplySetting.
 	public void SetCoverAtSide(CoverBehavior? cover, CoverSide side)
 	{
 		int i = (int)side;
@@ -314,8 +313,6 @@ public sealed class PipeCoverable : ICoverable
 		NotifyBlockUpdate();
 	}
 
-	// Fresh side starts in empty-whitelist (blocks all). Subsequent mode
-	// toggles preserve player config via Save/Load in CopyFilterStateOnModeChange.
 	private CoverBehavior? EnsureFilterCover(CoverSide side)
 	{
 		int i = (int)side;
@@ -328,8 +325,6 @@ public sealed class PipeCoverable : ICoverable
 	{
 		int i = (int)side;
 		if (_robotArms[i] is not null) return _robotArms[i];
-		// LuV: ConveyorScaling/PumpScaling caps at LuV (1024 items/s, 64 buckets/s),
-		// well above any pipe's per-second cap - the pipe is the bottleneck.
 		string registryId = Layer == PipeKind.Item ? "robot_arm.luv" : "fluid_regulator.luv";
 		var def = CoverRegistry.Get(registryId);
 		if (def is null) return null;
@@ -351,12 +346,10 @@ public sealed class PipeCoverable : ICoverable
 		{
 			case PipeSideMode.Passive: InstallFilterCover(side, type); break;
 			case PipeSideMode.Active:  ApplyActiveFilterItem(side, type); break;
-			// Off keeps the stored type; applied when player next picks a mode.
 		}
 		NotifyBlockUpdate();
 	}
 
-	// Upstream cover-item id used as the fresh cover's AttachItem.
 	private string? FilterCoverItemId(PipeFilterType type) => (Layer, type) switch
 	{
 		(PipeKind.Item , PipeFilterType.Simple) => "gtceu:item_filter",
@@ -385,7 +378,6 @@ public sealed class PipeCoverable : ICoverable
 	}
 
 	// Passive: swap the cover instance. AttachItem dispatches filter type
-	// (verbatim upstream ItemFilter.loadFilter(attachItem)).
 	internal CoverBehavior? InstallFilterCover(CoverSide side, PipeFilterType type)
 	{
 		int i = (int)side;
@@ -396,7 +388,6 @@ public sealed class PipeCoverable : ICoverable
 			_filterCovers[i] = null;
 			return null;
 		}
-		// Same cover def for Simple + Tag; AttachItem disambiguates.
 		string registryId = Layer == PipeKind.Item ? "item_filter" : "fluid_filter";
 		var def = CoverRegistry.Get(registryId);
 		if (def is null) return null;
@@ -410,8 +401,7 @@ public sealed class PipeCoverable : ICoverable
 		return cover;
 	}
 
-	// Active: cover stays in place; install-slot handler swaps filter item.
-	// Empty stack -> EmptyFilter -> "no filtering".
+	// Active: cover stays in place; install-slot handler swaps filter item
 	private void ApplyActiveFilterItem(CoverSide side, PipeFilterType type)
 	{
 		int i = (int)side;
@@ -429,7 +419,6 @@ public sealed class PipeCoverable : ICoverable
 		}
 	}
 
-	// Pipe-side UI controls which covers reach the pipe; this is a safety belt.
 	public bool CanPlaceCoverOnSide(CoverDefinition definition, CoverSide side) => true;
 
 	void ICoverable.SaveCovers(TagCompound tag)
@@ -481,10 +470,6 @@ public sealed class PipeCoverable : ICoverable
 			}
 			else if (_filterCovers[i] is { } prevFilter)
 			{
-				// Same shape as ICoverable.LoadCovers: SaveCovers omits the
-				// key for empty/cleared slots, so a sync after server-side
-				// removal arrives with the key MISSING. Without this clear,
-				// the client keeps rendering the stale filter cover.
 				prevFilter.OnUnload();
 				_filterCovers[i] = null;
 			}

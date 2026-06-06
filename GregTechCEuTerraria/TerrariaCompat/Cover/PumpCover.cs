@@ -17,14 +17,9 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Cover;
 
-// Port of common.cover.PumpCover. Moves fluid host<->adjacent, filter-gated.
-// Same adaptation shape as ConveyorCover (LDLib / tool hooks / copy/paste
-// dropped; WorldCapability replaces Forge-cap lookup; BucketMode is a plain
-// persisted field). transferAny + GTTransferUtils.transferFluidsFiltered +
-// FluidUtil.tryFluidTransfer are reproduced inline.
+// Port of common.cover.PumpCover
 public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 {
-	// Verbatim PUMP_SCALING: .5b 2b 8b ... = 64 x 4^min(tier-1, IV).
 	public static int PumpScaling(int tier) =>
 		64 * (int)Math.Pow(4, Math.Min(tier - 1, (int)VoltageTier.IV));
 
@@ -42,8 +37,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 	protected readonly FluidFilterHandler FilterHandler;
 	protected readonly ConditionalSubscriptionHandler SubscriptionHandler;
 
-	// Exposes the filter handler to the settings popup. Inherited by
-	// FluidVoidingCover / Advanced*.
 	public override FluidFilterHandler? UiFluidFilterHandler => FilterHandler;
 
 	public PumpCover(CoverDefinition definition, ICoverable coverHolder, CoverSide attachedSide,
@@ -65,22 +58,10 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 	public PumpCover(CoverDefinition definition, ICoverable coverHolder, CoverSide attachedSide, int tier)
 		: this(definition, coverHolder, attachedSide, tier, PumpScaling(tier)) { }
 
-	protected virtual bool IsSubscriptionActive() =>
-		IsWorkingEnabled() && GetAdjacentFluidHandler() != null;
+	protected virtual bool IsSubscriptionActive() => IsWorkingEnabled() && GetAdjacentFluidHandler() != null;
 
-	// Fluid sibling of ConveyorCover.GetOwnItemHandler.
-	protected IFluidHandler? GetOwnFluidHandler()
-	{
-		var side = WorldCapability.ToIODirection(AttachedSide);
-		if (CoverHolder is MetaMachine m)
-			return m.GetFluidHandlerCap(side, useCoverCapability: false);
-		if (CoverHolder is TerrariaCompat.Pipelike.PipeCoverable pcv)
-			return WorldCapability.FluidHandlerAt(pcv.X, pcv.Y, side);
-		return null;
-	}
+	protected IFluidHandler? GetOwnFluidHandler() => CoverHolder.GetFluidHandlerCap(WorldCapability.ToIODirection(AttachedSide), useCoverCapability: false);
 
-	// Equivalent of upstream's Forge FLUID_HANDLER capability lookup at
-	// pos.relative(side).
 	protected IFluidHandler? GetAdjacentFluidHandler()
 	{
 		var dir = WorldCapability.ToIODirection(AttachedSide);
@@ -155,8 +136,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 
 	protected void SetManualIOMode(ManualIOMode manualIOMode) => ManualIOMode = manualIOMode;
 
-	// field 1=IO, 2=manual-IO mode, 3=transfer rate (mB/t), 4=bucket mode.
-	// Field 0 (working-enabled) falls through to base.
 	public override void ApplySetting(int field, long value)
 	{
 		switch (field)
@@ -171,7 +150,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 
 	protected virtual void Update()
 	{
-		// Active-cover identity gate - mirrors ConveyorCover.Update.
 		if (!ReferenceEquals(((ICoverable)CoverHolder).GetCoverAtSide(AttachedSide), this))
 			return;
 
@@ -211,7 +189,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 	protected int TransferAny(IFluidHandler source, IFluidHandler destination, int platformTransferLimit) =>
 		TransferFluidsFiltered(source, destination, FilterHandler.GetFilter(), platformTransferLimit);
 
-	// Verbatim GTTransferUtils.transferFluidsFiltered.
 	protected static int TransferFluidsFiltered(IFluidHandler source, IFluidHandler dest,
 		IFluidFilter filter, int transferLimit)
 	{
@@ -228,7 +205,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return transferLimit - toTransfer;
 	}
 
-	// Verbatim Forge FluidUtil.tryFluidTransfer: simulate drain + fill, commit min.
 	private static int TryFluidTransfer(IFluidHandler dest, IFluidHandler source, FluidStack resource)
 	{
 		if (resource.IsEmpty) return 0;
@@ -247,9 +223,6 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 		Extract,
 	}
 
-	// Sum per tank, keyed by normalised amount-1 FluidStack. Upstream gates by
-	// per-tank supportsFill/supportsDrain; our IFluidHandler is whole-handler
-	// IO-gated, so every tank counts for voiding covers.
 	protected Dictionary<FluidStack, long> EnumerateDistinctFluids(IFluidHandler fluidHandler, TransferDirection direction)
 	{
 		_ = direction;
@@ -266,10 +239,7 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 		return summedFluids;
 	}
 
-	// AdvancedFluidVoidingCover overrides to clamp the filter's max stack.
 	protected virtual void ConfigureFilter() { }
-
-	// Capability override - pipe-consulted.
 
 	private CoverableFluidHandlerWrapper? _fluidHandlerWrapper;
 
