@@ -6,7 +6,6 @@
 - Added bigger variations of simple pipes (thanks Flungus)
 - Added warning to empty whitelist on filters for better UX (thanks TrRzeczy)
 - Added questbook wip disclaimer (thanks megacraftbuilder)
-- Added quick stack support for gt containers (thanks hamood)
 - Added extra resin source
 - Changed oil drilling rig to give you more oil per cycle (thanks TrRzeczy)
 - Changed solar boilers and panels sky check so its more convenient to use (thanks TrRzeczy, TheLarvi)
