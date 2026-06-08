@@ -14,9 +14,7 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.ItemPipe;
 
-// Verbatim port of ItemNetWalker. BFS from a source pipe, emits one
-// ItemRoutePath per (pipe -> adjacent item handler) found; accumulates
-// network-wide min transferRate + summed priority + per-side filter chain.
+// BFS from a source pipe, emits one ItemRoutePath per (pipe -> adjacent item handler) found
 public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperties, ItemPipeNet>
 {
 	public static List<ItemRoutePath>? CreateNetData(ItemPipeNet pipeNet, (int x, int y) sourcePipe, CoverSide sourceFacing)
@@ -32,7 +30,6 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 		}
 		catch (System.Exception)
 		{
-			// Cache stays unpopulated; next insertion attempt re-tries.
 			return null;
 		}
 	}
@@ -78,8 +75,6 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 
 	protected override void CheckPipe(ItemPipeCell pipeTile, (int x, int y) pos)
 	{
-		// Flush pending next-side filters; upstream's checkPipe runs after
-		// IsValidPipe seeded them.
 		foreach (var list in _nextFilters.Values)
 			if (list.Count > 0) _filters.AddRange(list);
 		_nextFilters.Clear();
@@ -101,20 +96,16 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 	protected override void CheckNeighbour(
 		ItemPipeCell pipeTile, (int x, int y) pipePos, IODirection faceToNeighbour, object? neighbourTile)
 	{
-		// Skip source side (that's the feeding handler).
 		if (pipePos == _sourcePipe && ToCoverSide(faceToNeighbour) == _facingToHandler) return;
 
-		// Routes emit only through Passive / Active sides; Off = not connected.
 		var modeAtSide = ItemPipeLayerSystem.GetSides(pipePos.x, pipePos.y)
 			?.GetMode(ToCoverSide(faceToNeighbour)) ?? PipeSideMode.Off;
 		if (modeAtSide == PipeSideMode.Off) return;
 
-		var (dx, dy) = OffsetForIODirection(faceToNeighbour);
-		var arrivalSide = IODirectionOpposite(faceToNeighbour);
-		var handler = WorldCapability.ItemHandlerAt(pipePos.x + dx, pipePos.y + dy, arrivalSide);
-		if (handler is null) return;
+		var (kind, handler) = PipeNeighborProbe.ResolveItem(
+			pipePos.x, pipePos.y, ToCoverSide(faceToNeighbour));
+		if (kind != SideNeighbourKind.Inventory || handler is null) return;
 
-		// Snapshot filters - the walker mutates _filters as it advances.
 		var filtersForRoute = new List<Func<Terraria.Item, bool>>(_filters);
 		if (_nextFilters.TryGetValue(faceToNeighbour, out var moreFilters) && moreFilters.Count > 0)
 			filtersForRoute.AddRange(moreFilters);
@@ -131,8 +122,6 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 	protected override bool IsValidPipe(
 		ItemPipeCell currentPipe, ItemPipeCell neighbourPipe, (int x, int y) pipePos, IODirection faceToNeighbour)
 	{
-		// Read covers on BOTH sides of the connection; shutter blocks, filter
-		// covers stack their .Test in the appropriate direction.
 		var thisCover      = ItemPipeLayerSystem.GetSides(pipePos.x, pipePos.y)?
 			.GetCoverAtSide(ToCoverSide(faceToNeighbour));
 		var (nx, ny) = (pipePos.x + OffsetForIODirection(faceToNeighbour).dx,

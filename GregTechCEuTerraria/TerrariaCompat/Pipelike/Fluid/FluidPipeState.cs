@@ -11,13 +11,11 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Fluid;
 
-// Verbatim port of FluidPipeBlockEntity. Owns tanks, the 5-tick distribute
-// loop, destruction checks (burn/leak/corrode/shatter/melt), receivedFrom.
-//
-// Adaptations: Direction (6) -> CoverSide (4 cardinal), so receivedFrom mask
-// is & 15 not & 63; BlockPos -> (int x, int y); per-stack temperature reads
-// FluidType.Temperature (no NBT); destroyPipe collapses to cable-burn-style
-// instant destroy - see DestroyPipe for the DEVIATION rationale.
+// port of FluidPipeBlockEntity
+// Adaptations:
+//  Direction (6) -> CoverSide (4 cardinal),
+//  per-stack temperature reads FluidType.Temperature (no NBT);
+//  destroyPipe collapses to cable-burn-style instant destroy
 public class FluidPipeState : IFluidPipeHost
 {
 	public const int FREQUENCY = 5;
@@ -54,18 +52,9 @@ public class FluidPipeState : IFluidPipeHost
 
 	public bool IsBlocked(CoverSide side)
 	{
-		// Pipe-to-pipe sides are ALWAYS unblocked. Mode is meaningful only on
-		// pipe-to-inventory sides (UI never exposes it on pipe-to-pipe), and
-		// the default Off would WRONGLY block neighbour pipes pushing into us.
 		var (dx, dy) = OffsetFor(side);
-		if (FluidPipeLayerSystem.Pipes.Has(X + dx, Y + dy))
-		{
-			// Different-material pipes don't share a net; treat as blocked.
-			var thisCell = FluidPipeLayerSystem.Pipes.CellAt(X, Y);
-			var nextCell = FluidPipeLayerSystem.Pipes.CellAt(X + dx, Y + dy);
-			return !(thisCell.HasValue && nextCell.HasValue &&
-				thisCell.Value.MaterialId == nextCell.Value.MaterialId);
-		}
+		if (PipeNeighborProbe.IsConnectedPipe(X, Y, X + dx, Y + dy, PipeKind.Fluid))
+			return false;
 		var pcv = FluidPipeLayerSystem.GetSides(X, Y);
 		return pcv is null || pcv.GetMode(side) == PipeSideMode.Off;
 	}
@@ -133,7 +122,6 @@ public class FluidPipeState : IFluidPipeHost
 		if (tag.ContainsKey("olrf")) OldLastReceivedFrom = tag.GetByte("olrf");
 	}
 
-	// channels = 1 / 4 / 9 (denormalised on FluidPipeCell at placement).
 	private void CreateTanksList()
 	{
 		int channels = Math.Max(1, _nodeData.Channels);
@@ -146,13 +134,10 @@ public class FluidPipeState : IFluidPipeHost
 			_tankLists[side] = new PipeTankList(this, side, _fluidTanks);
 	}
 
-	// Verbatim port of FluidPipeBlockEntity.update().
 	public void Update()
 	{
 		_timer++;
 		if (Main.netMode == Terraria.ID.NetmodeID.MultiplayerClient) return;
-		// Upstream MC cadence: distribute every 5 MC ticks (= 0.25 sec at
-		// SimSpeed=1.0). FROM_MC_TICKS scales to SimulationSpeed.
 		if (GetOffsetTimer() % global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(FREQUENCY) != 0) return;
 
 		// 4-side mask (upstream 6-side & 63); sentinel = all-sides-set.
@@ -187,8 +172,6 @@ public class FluidPipeState : IFluidPipeHost
 		OldLastReceivedFrom = LastReceivedFrom;
 	}
 
-	// 6-side walk collapsed to 4. Two-pass shape (simulate to collect
-	// targets, then real-fill by availability) preserved exactly.
 	private sealed class FluidTransaction
 	{
 		public readonly IFluidHandler Target;
@@ -225,14 +208,11 @@ public class FluidPipeState : IFluidPipeHost
 			IFluidHandler pipeTank = tank;
 			var cover = FluidPipeLayerSystem.GetSides(X, Y)?.GetCoverAtSide(facing);
 
-			// Upstream: pipeTank determined only by the cover on the pipe.
 			if (cover is not null)
 			{
 				pipeTank = cover.GetFluidHandlerCap(pipeTank)!;
 				if (pipeTank is null || CheckForPumpCover(cover)) continue;
 			}
-			// Pump-cover-on-neighbour check skipped; needs WorldCapability
-			// to surface the adjacent machine's coverable.
 
 			FluidStack drainable = pipeTank.Drain(maxFluid, simulate: true);
 			if (drainable.IsEmpty || drainable.Amount <= 0)
@@ -262,8 +242,8 @@ public class FluidPipeState : IFluidPipeHost
 			}
 			if (transaction.Amount == 0)
 			{
-				if (tank.FluidAmount <= 0) break; // If there is no more stored fluid, stop transferring to prevent dupes.
-				transaction.Amount = 1; // If the percent is not enough to give at least 1L, try to give 1L.
+				if (tank.FluidAmount <= 0) break;
+				transaction.Amount = 1;
 			}
 			else if (transaction.Amount < 0)
 			{
@@ -281,40 +261,26 @@ public class FluidPipeState : IFluidPipeHost
 		}
 	}
 
-	// Stub - PumpCover not fully ported on the fluid path yet.
 	private bool CheckForPumpCover(CoverBehavior? cover) => false;
 
 	private bool IsConnected(CoverSide facing)
 	{
-		// Pipe-to-pipe is IMPLICIT (never UI-gated); pipe-to-inventory respects
-		// the per-side mode.
-		var (dx, dy) = OffsetFor(facing);
-		int nx = X + dx, ny = Y + dy;
-		if (FluidPipeLayerSystem.Pipes.Has(nx, ny))
-		{
-			var thisCell = FluidPipeLayerSystem.Pipes.CellAt(X, Y);
-			var nextCell = FluidPipeLayerSystem.Pipes.CellAt(nx, ny);
-			return thisCell.HasValue && nextCell.HasValue &&
-				thisCell.Value.MaterialId == nextCell.Value.MaterialId;
-		}
-		if (IsBlocked(facing)) return false;
-		return GetNeighborFluidHandler(facing) is not null;
+		var kind = PipeNeighborProbe.ProbeAt(X, Y, facing, PipeKind.Fluid);
+		if (kind == SideNeighbourKind.Pipe) return true;
+		if (kind != SideNeighbourKind.Inventory) return false;
+		return !IsBlocked(facing);
 	}
 
-	// Pipe-to-pipe: resolve neighbour's per-side PipeTankList directly
-	// (WorldCapability.FluidHandlerAt would mode-gate, wrong for implicit
-	// pipe-to-pipe connectivity). Non-pipe neighbours fall through.
 	protected virtual IFluidHandler? GetNeighborFluidHandler(CoverSide facing)
 	{
-		var (dx, dy) = OffsetFor(facing);
-		int nx = X + dx, ny = Y + dy;
-		if (FluidPipeLayerSystem.Pipes.Has(nx, ny))
+		var (kind, handler) = PipeNeighborProbe.ResolveFluid(X, Y, facing);
+		if (kind == SideNeighbourKind.Pipe)
 		{
-			var neighborState = FluidPipeLayerSystem.EnsureState(nx, ny);
+			var (dx, dy) = OffsetFor(facing);
+			var neighborState = FluidPipeLayerSystem.EnsureState(X + dx, Y + dy);
 			return neighborState.GetTankList(OppositeSide(facing));
 		}
-		var arrival = ArrivalFor(facing);
-		return Capabilities.WorldCapability.FluidHandlerAt(nx, ny, arrival);
+		return handler;
 	}
 
 	private static CoverSide OppositeSide(CoverSide s) => s switch
@@ -324,15 +290,6 @@ public class FluidPipeState : IFluidPipeHost
 		CoverSide.Left  => CoverSide.Right,
 		CoverSide.Right => CoverSide.Left,
 		_               => s,
-	};
-
-	private static IODirection ArrivalFor(CoverSide outward) => outward switch
-	{
-		CoverSide.Up    => IODirection.Down,
-		CoverSide.Down  => IODirection.Up,
-		CoverSide.Left  => IODirection.Right,
-		CoverSide.Right => IODirection.Left,
-		_               => IODirection.None,
 	};
 
 	public void CheckAndDestroy(FluidStack stack)
@@ -354,7 +311,6 @@ public class FluidPipeState : IFluidPipeHost
 			melting = state == FluidState.PLASMA;
 		}
 
-		// carrying plasmas which are too hot when plasma proof does not burn pipes
 		if (burning && state == FluidState.PLASMA && prop.CanContain(FluidState.PLASMA))
 		{
 			burning = false;
@@ -364,7 +320,6 @@ public class FluidPipeState : IFluidPipeHost
 		{
 			if (!prop.CanContain(attribute))
 			{
-				// corrodes if the pipe can't handle the attribute, even if it's not an acid
 				corroding = true;
 			}
 		}
@@ -375,10 +330,6 @@ public class FluidPipeState : IFluidPipeHost
 		}
 	}
 
-	// DEVIATION: cable-burn-style INSTANT destroy
-	// on first contact with an incompatible fluid (vs upstream's gradual void
-	// + 1/10 finaliser). Per-tick voiding, entity damage, FIRE placement and
-	// mini-explosions all dropped - revisit each as a separate ask.
 	public void DestroyPipe(FluidStack stack, bool isBurning, bool isLeaking, bool isCorroding,
 	                        bool isShattering, bool isMelting)
 	{
@@ -409,8 +360,6 @@ public class FluidPipeState : IFluidPipeHost
 		Net.PipePackets.SendRemove(X, Y, PipeKind.Fluid);
 	}
 
-	// Guards against re-entry on multi-fill ticks; persisted so save/load
-	// doesn't re-fire the effect.
 	private bool _destroyed;
 
 	private static (int dx, int dy) OffsetFor(CoverSide side) => side switch

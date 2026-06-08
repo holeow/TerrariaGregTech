@@ -18,6 +18,7 @@
 - Fixed trees dropping rubber wood instead of rubber logs, added acorns (thanks HiKoNe, Natsuki)
 - Fixed EoW and BoC loot droprates (thanks HiKoNe)
 - Fixed wrenches pipe highlight (thanks hamood)
+- Fixed edge case with 2 touching fluid pipes of different type interacting with the same tile (thanks PotatoSagall)
 
 ## 0.0.3
 

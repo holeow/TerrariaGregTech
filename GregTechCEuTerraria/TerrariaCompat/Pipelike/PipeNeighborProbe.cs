@@ -7,8 +7,6 @@ using GregTechCEuTerraria.TerrariaCompat.Pipelike.ItemPipe;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike;
 
-// "From a pipe at (x, y), what's on each cardinal side?" Pipe = a CONNECTED
-// same-net pipe; different-material pipes are two parallel runs, not Pipe.
 public enum SideNeighbourKind : byte { None, Pipe, Inventory }
 
 public static class PipeNeighborProbe
@@ -22,49 +20,55 @@ public static class PipeNeighborProbe
 	}
 
 	public static SideNeighbourKind ProbeAt(int x, int y, CoverSide side, PipeKind layer)
+		=> layer == PipeKind.Fluid
+			? ResolveFluid(x, y, side).kind
+			: ResolveItem (x, y, side).kind;
+
+	public static (SideNeighbourKind kind, IFluidHandler? handler) ResolveFluid(
+		int x, int y, CoverSide side)
 	{
 		var dir = ToIODirection(side);
 		var (dx, dy) = dir.Offset();
 		int nx = x + dx, ny = y + dy;
 
-		if (IsConnectedPipe(x, y, nx, ny, layer)) return SideNeighbourKind.Pipe;
+		if (IsConnectedPipe(x, y, nx, ny, PipeKind.Fluid))
+			return (SideNeighbourKind.Pipe, null);
 
 		var face = dir.Opposite();
 		if (MachineCellResolver.TryFindMachineAt(nx, ny, out var machine))
 		{
-			bool ok = layer == PipeKind.Fluid
-				? machine.GetFluidHandlerCap(face) != null
-				: machine.GetItemHandlerCap (face) != null;
-			return ok ? SideNeighbourKind.Inventory : SideNeighbourKind.None;
+			var h = machine.GetFluidHandlerCap(face);
+			return h != null ? (SideNeighbourKind.Inventory, h) : (SideNeighbourKind.None, null);
 		}
-
-		// Vanilla chest - item pipes only.
-		if (layer != PipeKind.Fluid)
-		{
-			var handler = TerrariaCompat.Capabilities.Handlers.VanillaChestItemHandler.At(nx, ny);
-			if (handler != null) return SideNeighbourKind.Inventory;
-		}
-
-		return SideNeighbourKind.None;
+		// No vanilla fluid-container tiles
+		return (SideNeighbourKind.None, null);
 	}
 
-	// Connected = same-net (items: marks match) / same-material (fluids).
-	public static bool IsConnectedPipe(int x1, int y1, int x2, int y2, PipeKind layer)
+	public static (SideNeighbourKind kind, IItemHandler? handler) ResolveItem(
+		int x, int y, CoverSide side)
 	{
-		if (layer == PipeKind.Fluid)
+		var dir = ToIODirection(side);
+		var (dx, dy) = dir.Offset();
+		int nx = x + dx, ny = y + dy;
+
+		if (IsConnectedPipe(x, y, nx, ny, PipeKind.Item))
+			return (SideNeighbourKind.Pipe, null);
+
+		var face = dir.Opposite();
+		if (MachineCellResolver.TryFindMachineAt(nx, ny, out var machine))
 		{
-			var a = FluidPipeLayerSystem.Pipes.CellAt(x1, y1);
-			var b = FluidPipeLayerSystem.Pipes.CellAt(x2, y2);
-			return a.HasValue && b.HasValue && a.Value.MaterialId == b.Value.MaterialId;
+			var h = machine.GetItemHandlerCap(face);
+			return h != null ? (SideNeighbourKind.Inventory, h) : (SideNeighbourKind.None, null);
 		}
-		if (!ItemPipeLayerSystem.Pipes.Has(x1, y1) || !ItemPipeLayerSystem.Pipes.Has(x2, y2))
-			return false;
-		var netA = ItemPipeNetSystem.Level?.GetNetFromPos((x1, y1));
-		var netB = ItemPipeNetSystem.Level?.GetNetFromPos((x2, y2));
-		return netA != null && ReferenceEquals(netA, netB);
+		var chest = TerrariaCompat.Capabilities.Handlers.VanillaChestItemHandler.At(nx, ny);
+		return chest != null ? (SideNeighbourKind.Inventory, chest) : (SideNeighbourKind.None, null);
 	}
 
-	// Bool probes - true only when neighbour is an actual handler (Inventory).
+	public static bool IsConnectedPipe(int x1, int y1, int x2, int y2, PipeKind layer)
+		=> layer == PipeKind.Fluid
+			? FluidPipeLayerSystem.Pipes.Connects(x1, y1, x2, y2)
+			: ItemPipeLayerSystem.Pipes.Connects(x1, y1, x2, y2);
+
 	public static bool[] ProbeItem(int x, int y)  => ProbeBool(x, y, PipeKind.Item);
 	public static bool[] ProbeFluid(int x, int y) => ProbeBool(x, y, PipeKind.Fluid);
 

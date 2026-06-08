@@ -81,6 +81,9 @@ public class PumpCover : CoverBehavior, IIOCover, IUICover, IControllable
 
 		if (CoverHolder is TerrariaCompat.Pipelike.PipeCoverable pcv)
 		{
+			var kind = TerrariaCompat.Pipelike.PipeNeighborProbe.ProbeAt(
+				pcv.X, pcv.Y, AttachedSide, pcv.Layer);
+			if (kind != TerrariaCompat.Pipelike.SideNeighbourKind.Inventory) return null;
 			var (dx, dy) = dir.Offset();
 			return WorldCapability.FluidHandlerAt(pcv.X + dx, pcv.Y + dy, dir.Opposite());
 		}
