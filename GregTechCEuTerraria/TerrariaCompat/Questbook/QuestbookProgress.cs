@@ -71,10 +71,10 @@ public sealed class QuestbookProgress : ModPlayer
 			return;
 		FireBanner(questId);
 
-		// 50 gold reward - owning-client local (PostUpdate myPlayer-gated,
+		// 5 gold reward - owning-client local (PostUpdate myPlayer-gated,
 		// MarkManual local), grants exactly once and never on dedicated server.
 		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(
-			Player, Player.GetSource_GiftOrReward(), ItemID.GoldCoin, 50);
+			Player, Player.GetSource_GiftOrReward(), ItemID.GoldCoin, 5);
 	}
 
 	/// <summary>Whether the local player has completed the given quest.</summary>
