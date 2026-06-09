@@ -21,6 +21,7 @@ Pipe update! Wires/pipes now have a proper neat render, animated in world and ca
 - Fixed EoW and BoC loot droprates (thanks HiKoNe)
 - Fixed wrenches pipe highlight (thanks hamood)
 - Fixed edge case with 2 touching fluid pipes of different type interacting with the same tile (thanks PotatoSagall)
+- Fixed several obsolete quests from stone and steam age (thanks Flungus)
 
 ## 0.0.3
 

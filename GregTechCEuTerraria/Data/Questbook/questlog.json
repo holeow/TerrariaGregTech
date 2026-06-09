@@ -3655,7 +3655,7 @@
           "count": 1,
           "tag": "forge:tools/files",
           "label": "Any File!"
-        },
+        }
       ],
       "desc": "More GregTech tools are required for progression - here are the ones to lay eyes on.\n\nWrench: A crafting tool, but also the correct tool for GregTech machines... perfect if you think using pickaxes is unethical.\n\nFile: A crafting tool... and that's it. Yay!\n\nSaw: Yet another crafting tool. Also makes trees drop rubber wood.\n\nThere is also an item of legend that can be made if you gather all the GT tools in one place...\n\nNote: Any Quest with GregTech tools can be completed with the tool crafted from any material, not just the one displayed."
     },
@@ -3735,7 +3735,7 @@
         {
           "type": "item",
           "items": [
-            "minecraft:copper_ingot",
+            "minecraft:copper_ingot"
           ],
           "count": 32,
           "label": "32 Copper"
