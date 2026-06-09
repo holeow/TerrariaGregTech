@@ -9,14 +9,9 @@ namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Laser;
 
 // Verbatim port of com.gregtechceu.gtceu.common.pipelike.laser.LaserNetWalker.
 //
-// Walks a laser pipe net STRICTLY along ONE axis (= matches upstream's
-// `getSurroundingPipeSides` returning only the two facings in the source
-// axis). Stops at the FIRST ILaserContainer it finds adjacent to a pipe in
-// the line; the resulting `LaserRoutePath` is the unique point-to-point
-// destination from that source side.
+// Walks a laser pipe net along ONE axis, stops at the FIRST ILaserContainer it finds adjacent to a pipe
 //
-// === Documented adaptations =================================================
-//
+// adaptations:
 //   - `Direction.Axis` (X/Y/Z) -> 2D enum-equivalent: horizontal axis
 //     (Left/Right) vs vertical axis (Up/Down).
 //   - `LaserPipeBlockEntity` base class -> `LaserPipeCell` struct payload.
@@ -28,30 +23,19 @@ namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Laser;
 //     energy is pushed.
 public sealed class LaserNetWalker : PipeNetWalker<LaserPipeCell, LaserPipeProperties, LaserPipeNet>
 {
-	// Sentinel that means "walker tried, failed catastrophically; don't cache,
-	// retry next call". Mirrors upstream's `FAILED_MARKER`.
 	public static readonly LaserRoutePath FAILED_MARKER = new((0, 0), IODirection.None, 0);
 
-	// Set on the ROOT walker when the first endpoint is found. Sub-walkers
-	// read/write `Root.RoutePath` (same shape as upstream).
 	public LaserRoutePath? RoutePath { get; private set; }
 
-	// The source pipe + the face we initially looked at - these constrain the
-	// axis-aligned traversal and prevent the walker from immediately re-visiting
-	// the handler we started from. Verbatim with upstream.
 	private (int x, int y) _sourcePipe;
 	private IODirection    _facingToHandler;
 	private Axis           _axis;
 
-	// 2D axis enum - replaces upstream's `Direction.Axis` (which has X/Y/Z).
 	private enum Axis { Horizontal, Vertical }
 
 	private LaserNetWalker(LaserPipeNet net, (int x, int y) sourcePipe, int distance)
 		: base(net, sourcePipe, distance) { }
 
-	// Entry point - constructs the root walker, primes its axis from the source
-	// facing, runs the walk, returns the RoutePath (or null if no endpoint, or
-	// FAILED_MARKER if the walk threw). Mirrors upstream `createNetData`.
 	public static LaserRoutePath? CreateNetData(LaserPipeNet world, (int x, int y) sourcePipe, IODirection faceToSourceHandler)
 	{
 		try
@@ -76,9 +60,6 @@ public sealed class LaserNetWalker : PipeNetWalker<LaserPipeCell, LaserPipePrope
 		_                                     => Axis.Horizontal,
 	};
 
-	// Single-axis side iteration - mirrors upstream's X/Y/Z arrays. We expose
-	// only the two facings on the source axis so a perpendicular branch never
-	// gets walked into.
 	private static readonly IReadOnlyList<(IODirection side, int dx, int dy)> HorizontalSides =
 		new (IODirection, int, int)[] { (IODirection.Left, -1, 0), (IODirection.Right, 1, 0) };
 	private static readonly IReadOnlyList<(IODirection side, int dx, int dy)> VerticalSides =
@@ -86,6 +67,14 @@ public sealed class LaserNetWalker : PipeNetWalker<LaserPipeCell, LaserPipePrope
 
 	protected override IReadOnlyList<(IODirection side, int dx, int dy)> GetSurroundingPipeSides() =>
 		_axis switch { Axis.Horizontal => HorizontalSides, _ => VerticalSides };
+
+	protected override bool IsValidPipe(LaserPipeCell currentPipe, LaserPipeCell otherPipe,
+		(int x, int y) currentPos, IODirection side)
+	{
+		int bitHere  = LaserConn.Bit(side);
+		int bitThere = LaserConn.Bit(side.Opposite());
+		return (currentPipe.Open & bitHere) != 0 && (otherPipe.Open & bitThere) != 0;
+	}
 
 	protected override PipeNetWalker<LaserPipeCell, LaserPipeProperties, LaserPipeNet> CreateSubWalker(
 		LaserPipeNet pipeNet, IODirection facingToNextPos, (int x, int y) nextPos, int walkedBlocks)
@@ -105,19 +94,11 @@ public sealed class LaserNetWalker : PipeNetWalker<LaserPipeCell, LaserPipePrope
 		return true;
 	}
 
-	// No per-pipe stats to collect - mirrors upstream's empty `checkPipe`.
 	protected override void CheckPipe(LaserPipeCell pipeTile, (int x, int y) pos) { }
 
-	// At each pipe, look at each cardinal side ON THE WALK AXIS. If the
-	// adjacent cell carries an ILaserContainer, we found the endpoint -
-	// record the route and stop the walk. Mirrors upstream `checkNeighbour`.
 	protected override void CheckNeighbour(
 		LaserPipeCell pipeNode, (int x, int y) pipePos, IODirection faceToNeighbour, object? neighbourTile)
 	{
-		// Same guard upstream uses: skip the side we initially looked from on
-		// the source pipe (= the side that holds the SOURCE handler, not the
-		// destination). Without this, a one-pipe straight line into a hatch
-		// would land back on the source endpoint instead of walking through.
 		if (pipePos.x == _sourcePipe.x && pipePos.y == _sourcePipe.y && faceToNeighbour == _facingToHandler)
 			return;
 

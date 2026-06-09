@@ -6,10 +6,6 @@ using GregTechCEuTerraria.TerrariaCompat.Machine;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Cable;
 
-// LOCKED - port of EnergyNetWalker. Wire-to-endpoint connection is
-// SAME-CELL only ("wire behind machine") so upstream's cardinal-neighbour
-// checkNeighbour is replaced by CheckSelfPos; wire-to-wire walking stays
-// cardinal (4-dir).
 internal sealed class EnergyNetWalker : PipeNetWalker<CableCell, CableCell, CableLayer>
 {
 	public delegate bool TryGetEndpoint((int x, int y) pos, out IEnergyContainer ep);
@@ -79,6 +75,10 @@ internal sealed class EnergyNetWalker : PipeNetWalker<CableCell, CableCell, Cabl
 			distance:       WalkedBlocks,
 			loss:           _loss));
 	}
+
+	protected override bool IsValidPipe(CableCell currentPipe, CableCell otherPipe,
+		(int x, int y) pipePos, IODirection faceToNeighbour)
+		=> currentPipe.Voltage == otherPipe.Voltage;
 
 	protected override bool TryGetCellAt((int x, int y) pos, out CableCell cell)
 	{
