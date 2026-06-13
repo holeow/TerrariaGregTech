@@ -9,17 +9,12 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Primitive;
 
-// Adapted port of PrimitivePumpMachine. Biome-keyed passive water generator;
-// per 20t: biomeModifier x hatchModifier (x1.5 in rain). PumpBiomeModifier
-// uses vanilla SceneMetrics.Scan. Underworld collapses to no-precipitation
-// (only non-rain Terraria biome). hatchModifier=1 today (only pump_hatch 1B);
-// 8B/larger cases unlock with multi-slot fluid hatches.
 public class PrimitivePumpMachine : MultiblockControllerMachine
 {
 	protected override string Label => "Primitive Water Pump";
 
-	private int _biomeModifier; // 0 = uncomputed, -1 = Underworld (no water), >0 mB/cycle
-	private int _hatchModifier; // 0 = unbound; 1/2/4 from tank capacity
+	private int _biomeModifier;
+	private int _hatchModifier;
 	private NotifiableFluidTank? _fluidTank;
 
 	public PrimitivePumpMachine() : base() { }
@@ -46,7 +41,6 @@ public class PrimitivePumpMachine : MultiblockControllerMachine
 	{
 		_hatchModifier = 0;
 		_fluidTank = null;
-		// _biomeModifier preserved - biome doesn't change on hatch swap.
 	}
 
 	private void InitializeTank()
@@ -73,13 +67,8 @@ public class PrimitivePumpMachine : MultiblockControllerMachine
 		if (!IsServer) return;
 		if (!IsFormed) return;
 		if (GetMultiblockState().HasError()) return;
-		// MC-tick-aligned timer - GetOffsetTimer() % FromMcTicks(20) is
-		// unreachable for ~2/3 of positions inside the 20 Hz OnTick gate (see
-		// MetaMachine.GetMcOffsetTimer).
 		if ((GetMcOffsetTimer() % 20) != 0) return;
 
-		// Defer until first production tick - avoid scanning during structure
-		// formation.
 		if (_biomeModifier == 0)
 		{
 			_biomeModifier = PumpBiomeModifier.GetForTile(Position.X, Position.Y);
@@ -102,12 +91,8 @@ public class PrimitivePumpMachine : MultiblockControllerMachine
 		return value;
 	}
 
-	// Underworld already short-circuits via biomeModifier == -1, so the
-	// precipitation gate collapses to Main.raining.
-	private static bool IsRainingHere() => Main.raining;
+	private bool IsRainingHere() => Main.raining && Position.Y <= Main.UnderworldLayer;
 
-	// Must persist - layout polls these every frame; without persistence MP
-	// clients show "Biome scan pending..." forever (state-sync round-trips Save).
 	public override void SaveData(Terraria.ModLoader.IO.TagCompound tag)
 	{
 		base.SaveData(tag);
@@ -120,6 +105,5 @@ public class PrimitivePumpMachine : MultiblockControllerMachine
 		base.LoadData(tag);
 		_biomeModifier = tag.GetInt("pp_biomeMod");
 		_hatchModifier = tag.GetInt("pp_hatchMod");
-		// _fluidTank re-resolves on next form; _hatchModifier carries the readout.
 	}
 }

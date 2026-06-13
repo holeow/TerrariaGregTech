@@ -192,8 +192,10 @@ public sealed class EnergyNetSystem : ModSystem
 		{
 			using (Profiler.Profiler.TimeAlloc("tick", "energy_net_simulate"))
 			{
+				CableHeatStore.BeginTick();
 				foreach (var net in _networks)
 					net.Tick();
+				CableHeatStore.UpdateTick();
 			}
 		}
 

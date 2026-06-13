@@ -9,14 +9,13 @@ using GregTechCEuTerraria.TerrariaCompat.UI.Profiler;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 
-// Loop-sound housekeeping (per-tick Sweep, ClearWorld silence) + profiler-
-// gated text gizmo. Inactive sources draw red (ghost suspects).
 public sealed class MachineSoundDebugSystem : ModSystem
 {
 	public override void PostUpdateEverything()
 	{
 		if (Main.dedServ) return;
 		MachineLoopSoundRegistry.Sweep();
+		MachineLoopVoiceArbiter.Update();
 	}
 
 	// Runs on world load AND unload.
@@ -24,6 +23,7 @@ public sealed class MachineSoundDebugSystem : ModSystem
 	{
 		if (Main.dedServ) return;
 		MachineLoopSoundRegistry.ClearAll();
+		MachineLoopVoiceArbiter.ClearAll();
 	}
 
 	public override void PostDrawTiles()
@@ -47,7 +47,6 @@ public sealed class MachineSoundDebugSystem : ModSystem
 			bool working = m.IsActive;
 			Color color = working ? Color.Lime : Color.OrangeRed;
 
-			// Anchor over footprint centre, lifted above the tile.
 			float wx = m.Position.X * 16f + m.Size.Width * 8f;
 			float wy = m.Position.Y * 16f;
 			var screen = new Vector2(wx, wy) - Main.screenPosition;

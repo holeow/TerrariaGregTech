@@ -15,7 +15,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items;
 
-// One ModItem per material x prefix item via MaterialItemRegistry
 public sealed class MaterialItem : ModItem, ITextureWarmUp
 {
 	private readonly string? _id;
@@ -68,7 +67,7 @@ public sealed class MaterialItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32;
 		Item.height = 32;
 		Item.value = 0;

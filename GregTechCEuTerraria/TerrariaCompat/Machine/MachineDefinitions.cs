@@ -460,7 +460,7 @@ public static class MachineDefinitions
 			Id = "primitive_pump", Label = "Primitive Water Pump",
 			Family = MachineFamily.MultiblockPrimitivePump,
 			Tiered = false, Tiers = OneTier,
-			RecipeType = GTRecipeTypes.DUMMY,
+			RecipeType = GTRecipeTypes.PRIMITIVE_PUMP,
 			Casing          = MachineCasing.PumpDeck,
 			OverlayDir      = "block/multiblock/primitive_pump",
 			OverlayBasename = "overlay_front",
@@ -529,6 +529,8 @@ public static class MachineDefinitions
 			OverlayDirByTier = t =>
 				$"block/machines/parallel_hatch_mk{(int)t - (int)VoltageTier.IV + 1}",
 			OverlayBasename = "overlay_front",
+			EmissiveOverlayBasename = "overlay_front_emissive",
+			AnimateIdleOverlay = true,
 			LayoutKey = "parallel_hatch",
 		});
 

@@ -11,19 +11,15 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
-// Material-keyed placeable pipe - counterpart of WireItem. One instance per
-// (Material x pipe prefix) via PipeItemRegistry from MaterialPipeBlockItem dump.
 public sealed class PipeItem : ModItem, ITextureWarmUp
 {
-	private readonly string? _id;          // exact upstream registry id
+	private readonly string? _id;
 	private readonly string? _label;
 	[CloneByReference] private readonly Material? _material;
 	private readonly string _sizeWord = "normal"; // tiny/small/normal/large/huge/quadruple/nonuple
 	private readonly PipeKind _kind = PipeKind.Item;
-	// Item-pipe only - last-resort routing priority; rides through to ItemPipeCell.
 	private readonly bool _restrictive;
 
-	// Read by layer systems' PostDrawTiles hooks to gate the foreground overlay.
 	public PipeKind Kind => _kind;
 
 	public PipeItem() { }
@@ -39,10 +35,7 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 
 	public override string Name => _id ?? nameof(PipeItem);
 
-	// Raw upstream pipe-end (16x16, untinted); ItemIconBaker installs the
-	// material-tinted 2x upscale into TextureAssets.Item at runtime.
-	public override string Texture =>
-		$"GregTechCEuTerraria/Content/Textures/block/pipe/pipe_{_sizeWord}_in";
+	public override string Texture => $"GregTechCEuTerraria/Content/Textures/block/pipe/pipe_{_sizeWord}_in";
 	protected override bool CloneNewInstances => true;
 	public override bool IsLoadingEnabled(Mod mod) => _material != null;
 
@@ -56,14 +49,14 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32;
 		Item.height = 32;
 		Item.useTime = 2;
 		Item.useAnimation = 6;
 		Item.useStyle = ItemUseStyleID.Swing;
 		Item.autoReuse = true;
-		Item.consumable = false; // manual stack management
+		Item.consumable = false;
 		Item.rare = ItemRarityID.White;
 		Item.UseSound = null;
 	}
@@ -75,7 +68,6 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "PipeKind",
 			$"{Capitalize(_sizeWord)} {KindWord(_kind, _restrictive)}"));
 
-		// Format mirrors upstream FluidPipeBlock / ItemPipeBlock.appendHoverText.
 		if (_kind == Pipelike.PipeKind.Fluid)
 		{
 			var c = BuildFluidCell();
@@ -97,19 +89,13 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 		}
 		else
 		{
-			// Verbatim ItemPipeBlock.appendHoverText: int -> "N stacks/s",
-			// fractional -> "(Nx64) items/s".
 			var i = BuildItemCell();
 			float rate = i.TransferRate;
-			string rateLine = (rate % 1 != 0f)
-				? $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64) + 0.5f)} items/s"
-				: $"[c/55FFFF:Transfer Rate:] {(int)rate} stacks/s";
+			string rateLine = $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64) + 0.5f)} items/s";
 			tooltips.Add(new TooltipLine(Mod, "PipeTransferRate", rateLine));
 		}
 	}
 
-	// Has/CutAt share signature across all three layers; placement doesn't
-	// (per-cell args differ), so UseItem still branches on _kind once.
 	private Api.Pipenet.IGridLayerHandle Layer => _kind == Pipelike.PipeKind.Fluid
 		? Pipelike.Fluid.FluidPipeLayerHandle.Instance
 		: (Api.Pipenet.IGridLayerHandle)Pipelike.ItemPipe.ItemPipeLayerHandle.Instance;
@@ -129,7 +115,7 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 		if (_kind == Pipelike.PipeKind.Fluid)
 		{
 			var cell = BuildFluidCell();
-			if (cell is null) return false; // material can't form a fluid pipe
+			if (cell is null) return false;
 			placed = Pipelike.Fluid.FluidPipeLayerHandle.Instance.TryPlace(cell.Value, x, y, player);
 		}
 		else

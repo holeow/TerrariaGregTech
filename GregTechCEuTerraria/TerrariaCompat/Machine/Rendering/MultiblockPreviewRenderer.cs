@@ -11,30 +11,18 @@ using ReLogic.Content;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 
-// 2D analogue of MultiblockInWorldPreviewRenderer. Draws ghost icons over
-// every unformed multi's shape cells. RepeatableBlockPattern previews the
-// max-N shape via GetPreviewPattern.
-// Item icons replace upstream's BlockState tessellation (no Terraria
-// equivalent for arbitrary tiles). Always-on (user requirement); flat 50%
-// alpha; skips IsAny/IsAir/IsController cells.
 public static class MultiblockPreviewRenderer
 {
 	private static readonly Color GhostTint = new Color(255, 255, 255, 128) * 0.5f;
 
-	// Pulsing red for the resolved error cell ("Wrong block at (X, Y)").
 	private static Color ErrorTint()
 	{
 		float pulse = 0.5f + 0.5f * (float)Math.Sin(Main.GameUpdateCount * 0.12f);
 		return new Color(255, 70, 70, 160) * (0.55f + 0.25f * pulse);
 	}
 
-	// 1 shape cell = 2x2 tiles = 32x32 px at native scale.
 	private const int CellPx = 32;
 
-	// Per-Draw scratch (reused). Avoids O(TileEntity.ByPosition) per cell.
-	private static readonly System.Collections.Generic.List<Microsoft.Xna.Framework.Rectangle> _formedFootprints = new();
-
-	// PostDrawTiles - paint above all tiles so later tile-pass writes don't occlude.
 	public static void DrawAll(SpriteBatch sb)
 	{
 		var screenRect = new Microsoft.Xna.Framework.Rectangle(
@@ -59,7 +47,6 @@ public static class MultiblockPreviewRenderer
 		}
 	}
 
-	// GameViewMatrix space: worldPx - screenPosition (matrix handles target offset).
 	public static void Draw(MultiblockControllerMachine controller, SpriteBatch sb)
 	{
 		if (controller.IsFormed) return;
@@ -70,23 +57,12 @@ public static class MultiblockPreviewRenderer
 		int originX = controller.Position.X - preview.ControllerCol * 2;
 		int originY = controller.Position.Y - preview.ControllerRow * 2;
 
-		// Resolved error cell ("Wrong block at (X, Y)") -> red tint.
 		var errorCell = controller.GetUnformedErrorCell();
 
-		// "Not enough <part>": flag casing cells that could host the missing
-		// part with red highlight (swap-hint).
 		var swapList = controller.GetSwapCandidateTypes();
 		System.Collections.Generic.HashSet<int>? swapTypes = null;
 		if (swapList is { Count: > 0 })
 			swapTypes = new System.Collections.Generic.HashSet<int>(swapList);
-
-		// Gather formed-multi footprints once; per-cell test walks this list
-		// instead of TileEntity.ByPosition. Bounds-filtered.
-		_formedFootprints.Clear();
-		var previewBounds = new Microsoft.Xna.Framework.Rectangle(
-			originX, originY, preview.Width * 2, preview.Height * 2);
-		Multiblock.MultiblockPreviewHover.GatherFormedFootprintsOverlapping(
-			previewBounds, _formedFootprints);
 
 		for (int row = 0; row < preview.Height; row++)
 		{
@@ -104,15 +80,8 @@ public static class MultiblockPreviewRenderer
 				int tileX = originX + col * 2;
 				int tileY = originY + row * 2;
 
-				// Symmetric with MultiblockPreviewHover.TryFind - formed multis claim their footprint.
-				if (IsInsideAnyFootprint(_formedFootprints, tileX, tileY))
-					continue;
-
-				// Skip ghost on already-correct cells (visual optimization).
 				if (Multiblock.MultiblockPreviewHover.PredicateMatchesTileAt(predicate, tileX, tileY))
 				{
-					// ...unless the cell could host a missing part - red box hints
-					// "replace this casing with the part".
 					if (swapTypes is not null
 						&& CellAcceptsAnyType(predicate, swapTypes)
 						&& !swapTypes.Contains(Multiblock.MultiblockPreviewHover.PlacedSiblingItemType(tileX, tileY)))
@@ -130,7 +99,6 @@ public static class MultiblockPreviewRenderer
 		}
 	}
 
-	// Does this predicate accept any of these item types (= could host the part)?
 	private static bool CellAcceptsAnyType(Api.Pattern.TraceabilityPredicate p, System.Collections.Generic.HashSet<int> types)
 	{
 		return Scan(p.Common) || Scan(p.Limited);
@@ -149,19 +117,6 @@ public static class MultiblockPreviewRenderer
 		}
 	}
 
-	private static bool IsInsideAnyFootprint(System.Collections.Generic.List<Microsoft.Xna.Framework.Rectangle> rects, int tileX, int tileY)
-	{
-		for (int i = 0; i < rects.Count; i++)
-		{
-			var r = rects[i];
-			if (tileX >= r.X && tileX < r.X + r.Width && tileY >= r.Y && tileY < r.Y + r.Height)
-				return true;
-		}
-		return false;
-	}
-
-	// Translucent box (NOT the part's icon) so it reads as a highlight, not
-	// a "part already installed" preview.
 	private static void DrawCellHighlight(SpriteBatch sb, Vector2 topLeft, Color color)
 	{
 		var px = TextureAssets.MagicPixel.Value;
@@ -186,7 +141,6 @@ public static class MultiblockPreviewRenderer
 		else
 			src = tex.Frame();
 
-		// Fit to 32x32, preserve aspect.
 		float scale = (float)CellPx / Math.Max(src.Width, src.Height);
 		Vector2 center = topLeft + new Vector2(CellPx * 0.5f, CellPx * 0.5f);
 		Vector2 origin = src.Size() * 0.5f;

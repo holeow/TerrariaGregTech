@@ -63,7 +63,9 @@ public static class PipeNeighborProbe
 			return h != null ? (SideNeighbourKind.Inventory, h) : (SideNeighbourKind.None, null);
 		}
 		var chest = TerrariaCompat.Capabilities.Handlers.VanillaChestItemHandler.At(nx, ny);
-		return chest != null ? (SideNeighbourKind.Inventory, chest) : (SideNeighbourKind.None, null);
+		if (chest != null) return (SideNeighbourKind.Inventory, chest);
+		var extractinator = TerrariaCompat.Capabilities.Handlers.ExtractinatorItemHandler.At(nx, ny);
+		return extractinator != null ? (SideNeighbourKind.Inventory, extractinator) : (SideNeighbourKind.None, null);
 	}
 
 	public static bool IsConnectedPipe(int x1, int y1, int x2, int y2, PipeKind layer)

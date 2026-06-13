@@ -37,8 +37,8 @@ public sealed class TerminalItem : ModItem, ITextureWarmUp
 		if (tex.Width > 0 && tex.Height > tex.Width && tex.Height % tex.Width == 0)
 		{
 			int frames = tex.Height / tex.Width;
-			var (frameTime, _) = McMeta.Read(Mod, "Content/Textures/item/terminal.png.mcmeta");
-			Main.RegisterItemAnimation(Type, new DrawAnimationVertical(frameTime * 3, frames));
+			Main.RegisterItemAnimation(Type, new DrawAnimationVertical(
+				Machine.Rendering.MachineRenderer.AnimationTicksPerFrame, frames));
 		}
 	}
 

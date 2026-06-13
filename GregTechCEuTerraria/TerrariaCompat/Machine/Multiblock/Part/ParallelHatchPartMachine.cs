@@ -18,10 +18,6 @@ public class ParallelHatchPartMachine : TieredPartMachine
 	public int MaxParallel     { get; private set; } = 1;
 	public int CurrentParallel { get; private set; } = 1;
 
-	// Always-on overlay animation - the hatch has no recipe logic; without
-	// this the cosmetic pulse only plays while the bound multi is running.
-	public override bool IsActive => true;
-
 	public ParallelHatchPartMachine() : base() { }
 
 	public void Configure(int tier)
@@ -44,7 +40,6 @@ public class ParallelHatchPartMachine : TieredPartMachine
 		if (CurrentParallel == next) return;
 		CurrentParallel = next;
 		if (IsServer) MachineStateSyncPacket.Broadcast(this);
-		// Re-search recipes - parallel ceiling changed.
 		foreach (var controller in GetControllers())
 		{
 			if (controller is IRecipeLogicMachine rlm)

@@ -15,20 +15,13 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Tiles.Machines;
 
-// 1:1 port of com.gregtechceu.gtceu.common.machine.electric.ItemCollectorMachine.
-// Per-tier (LV..EV) auto item-puller: scans dropped items in range, filters,
-// inserts into its output cache. Drains EU per active tick.
+// port of com.gregtechceu.gtceu.common.machine.electric.ItemCollectorMachine.
 //
-// DEVIATIONS:
-//   - Filter lives on the machine (Terraria items have no per-instance NBT),
-//     same shape as MagnetItem; matcher/tag math shared via ItemFilterEdit.
-//   - Range bbox is a 2D square around the machine centre (upstream 3D).
-//   - Direct consume-in-place instead of upstream's velocity-nudge magnet -
-//     see CollectItemsInRange for the MP-race rationale.
-//   - Work gate runs inline at OnTick top (upstream uses TickableSubscription).
-public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachine
+// adaptations:
+//   - Filter lives on the machine
+//   - Direct consume-in-place instead of magnet
+public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachine, IItemHandler
 {
-	// Upstream INVENTORY_SIZES indexed by VoltageTier (ULV unused, LV..EV registered).
 	private static readonly int[] InventorySizes = { 4, 9, 16, 25, 25 };
 	private const double MotionMultiplier = 0.04;
 	private const int    BaseEuConsumption = 6;
@@ -38,11 +31,9 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 
 	protected override string Label => Definition?.Label ?? "Item Collector";
 
-	// Receiver-mode container; capacity V[tier]*64.
 	public override bool CanAccept => true;
 	public override long EnergyCapacity => VoltageTiers.Voltage(Tier) * 64L;
 
-	// BASE_EU_CONSUMPTION * (1 << (tier-1)) - LV 6 / MV 12 / HV 24 / EV 48.
 	private long EnergyPerTick
 	{
 		get
@@ -52,7 +43,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 		}
 	}
 
-	// Output cache (HandlerIO=BOTH so the pull can write, CapabilityIO=OUT).
 	private int InventorySize
 	{
 		get
@@ -80,12 +70,10 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 		Traits.Attach(_output);
 		Traits.RegisterPersistent("Output", _output);
 
-		// AutoOutputTrait.ofItems(output) - handler-ref form.
 		_autoOutput = AutoOutputTrait.OfItems(_output);
 		Traits.Attach(_autoOutput);
 		Traits.RegisterPersistent("AutoOutput", _autoOutput);
 
-		// Mirror upstream setEnableEnvironmentalExplosions(false).
 		var explosion = Traits.GetTrait<EnvironmentalExplosionTrait>(EnvironmentalExplosionTrait.TYPE);
 		explosion?.SetEnableEnvironmentalExplosions(false);
 	}
@@ -104,9 +92,14 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 
 	public override bool SupportsAutoOutputItems => true;
 
-	// Per-machine filter (MagnetItem storage shape); edits route through the
-	// server-authoritative MachineFilterAction.
-	private int _filterOrdinal;                  // 0 = simple/items, 1 = tag
+	public int SlotCount                                        => Output.SlotCount;
+	public Item GetSlot(int slot)                               => Output.GetSlot(slot);
+	public Item Insert(int slot, Item item, bool simulate)      => Output.Insert(slot, item, simulate);
+	public Item Extract(int slot, int maxAmount, bool simulate) => Output.Extract(slot, maxAmount, simulate);
+	public int GetSlotLimit(int slot)                           => Output.GetSlotLimit(slot);
+	public bool IsItemValid(int slot, Item item)               => Output.IsItemValid(slot, item);
+
+	private int _filterOrdinal;
 	private SimpleItemFilter _simpleFilter = new();
 	private TagItemFilter    _tagFilter    = new();
 
@@ -120,7 +113,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 
 	private IItemFilter ActiveFilter() => _filterOrdinal == 1 ? (IItemFilter)_tagFilter : _simpleFilter;
 
-	// MaxRange = 2^(tier+2) - LV 8 / MV 16 / HV 32 / EV 64. Player-adjustable down to 1.
 	public int MaxRange
 	{
 		get
@@ -144,7 +136,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 	private bool _active;
 	public override bool IsActive => _active;
 
-	// Drain gate (upstream drainEnergy(true) && isWorkingEnabled).
 	protected override void OnTick()
 	{
 		EnsureTraits();
@@ -157,28 +148,20 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 
 		_active = true;
 
-		// Pay the per-tick EU (upstream pays once per `update()` tick).
 		DrainEnergy(simulate: false);
 
 		CollectItemsInRange();
 	}
 
-	// DEVIATION: server-authoritative direct consume-in-place,
-	// replacing upstream's velocity-nudge magnet. The magnet races each client's
-	// local player-magnet pickup in MP (items snatched mid-flight / pingpong on
-	// sync). Here OnTick is server-only, scan + filter + insert + SyncItem; items
-	// never move, no magnet race.
 	private void CollectItemsInRange()
 	{
 		var filter = ActiveFilter();
 
-		// Machine centre in pixels (footprint visual centre).
 		float cx = (Position.X + Size.Width  * 0.5f) * 16f;
 		float cy = (Position.Y + Size.Height * 0.5f) * 16f;
 
 		float rangePixels = Range * 16f;
 
-		// Consumed-tile coords for the sparkle effect, batched into one packet/tick.
 		List<Microsoft.Xna.Framework.Point>? collectedAt = null;
 
 		for (int i = 0; i < Main.maxItems; i++)
@@ -186,14 +169,12 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 			Item it = Main.item[i];
 			if (it is null || !it.active || it.IsAir) continue;
 
-			// Square-bbox range gate (cheap reject; upstream's bbox is also a box).
 			float dx = cx - it.Center.X;
 			float dy = cy - it.Center.Y;
 			if (Math.Abs(dx) > rangePixels || Math.Abs(dy) > rangePixels) continue;
 
 			if (!filter.Test(it)) continue;
 
-			// Insert what fits; leave the rest in place.
 			int before = it.stack;
 			var effectAt = new Microsoft.Xna.Framework.Point(
 				(int)(it.Center.X / 16f), (int)(it.Center.Y / 16f));
@@ -208,7 +189,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 			}
 			else
 			{
-				// No room - skip without broadcasting.
 				continue;
 			}
 			(collectedAt ??= new()).Add(effectAt);
@@ -216,8 +196,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 				Terraria.NetMessage.SendData(Terraria.ID.MessageID.SyncItem, -1, -1, null, i);
 		}
 
-		// Sparkle: PlayLocal for SP/host, Send for remote clients (Dust no-ops
-		// on a dedicated server). Same convention as BlockExplosionEffectPacket.
 		if (collectedAt is { Count: > 0 })
 		{
 			foreach (var pt in collectedAt)
@@ -227,7 +205,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 		}
 	}
 
-	// Insert into the first accepting slot; returns the remainder.
 	private Item TryFillOutput(Item stack)
 	{
 		var s = Output.Storage;
@@ -240,7 +217,6 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 		return remainder;
 	}
 
-	// simulate-first drain
 	private bool DrainEnergy(bool simulate)
 	{
 		long want = EnergyPerTick;
@@ -257,7 +233,7 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 	public override void SaveData(TagCompound tag)
 	{
 		EnsureTraits();
-		base.SaveData(tag);   // energy + charger via TieredEnergyMachine
+		base.SaveData(tag);
 		tag["range"]            = Range;
 		tag["active"]           = _active;
 		tag["isWorkingEnabled"] = _isWorkingEnabled;

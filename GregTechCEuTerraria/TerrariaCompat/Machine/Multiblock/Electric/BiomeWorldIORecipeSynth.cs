@@ -10,6 +10,7 @@ using GregTechCEuTerraria.Api.Recipe.Content;
 using GregTechCEuTerraria.Api.Recipe.Ingredient;
 using GregTechCEuTerraria.Common.Energy;
 using GregTechCEuTerraria.Common.Recipe;
+using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Primitive;
 using GregTechCEuTerraria.TerrariaCompat.Items;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
 using Terraria.ModLoader;
@@ -17,21 +18,18 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Synthetic GTRecipes for the world-I/O multis so the recipe browser shows
-// one row per biome per station. NEVER executed - LargeMiner / FluidDrillingRig
-// override IsRecipeLogicAvailable() to false. Pure browser discoverability.
-// Called from Mod.Load AFTER RecipeJsonLoader.Load.
 public static class BiomeWorldIORecipeSynth
 {
 	public static void Register(Mod mod)
 	{
 		var per = new Dictionary<string, List<GTRecipe>>();
-		int miner = 0, rig = 0;
+		int miner = 0, rig = 0, pump = 0;
 
 		var minerList = new List<GTRecipe>();
-		foreach (var (biome, pool) in BiomeWorldIOTables.Ores)
+		foreach (BiomeWorldIOTables.MinerBucket bucket in
+			System.Enum.GetValues(typeof(BiomeWorldIOTables.MinerBucket)))
 		{
-			var recipe = BuildMinerRecipe(biome, pool);
+			var recipe = BuildMinerRecipe(bucket);
 			if (recipe is null) continue;
 			minerList.Add(recipe);
 			miner++;
@@ -48,29 +46,56 @@ public static class BiomeWorldIORecipeSynth
 		}
 		if (rigList.Count > 0) per[GTRecipeTypes.FLUID_DRILLING_RIG.RegistryName] = rigList;
 
+		var pumpList = new List<GTRecipe>();
+		foreach (BiomeProbe.Biome biome in System.Enum.GetValues(typeof(BiomeProbe.Biome)))
+		{
+			var recipe = BuildPumpRecipe(biome);
+			if (recipe is null) continue;
+			pumpList.Add(recipe);
+			pump++;
+		}
+		if (pumpList.Count > 0) per[GTRecipeTypes.PRIMITIVE_PUMP.RegistryName] = pumpList;
+
 		RecipeRegistry.AppendAll(per);
 		mod.Logger.Info(
-			$"BiomeWorldIORecipeSynth: synthesized {miner} large_miner + {rig} fluid_drilling_rig browser recipes.");
+			$"BiomeWorldIORecipeSynth: synthesized {miner} large_miner + {rig} fluid_drilling_rig + {pump} primitive_pump browser recipes.");
 	}
 
-	private static GTRecipe? BuildMinerRecipe(BiomeProbe.Biome biome, BiomeWorldIOTables.OreDrop[] pool)
+	private static GTRecipe? BuildPumpRecipe(BiomeProbe.Biome biome)
 	{
-		// Shared resolver matches in-world drops (raw_ore -> vanilla -> gem -> dust).
-		var resolved = new List<(int ItemType, int Weight)>();
-		int totalWeight = 0;
-		foreach (var entry in pool)
+		if (biome == BiomeProbe.Biome.Cavern) return null;
+		int mb = PumpBiomeModifier.ForBiome(biome);
+		if (mb <= 0) return null;
+		var outputs = new Dictionary<object, List<Content>>();
+		outputs[FluidRecipeCapability.CAP] = new List<Content>
 		{
-			int type = BiomeWorldIOTables.ResolveOreItem(entry.MaterialId);
-			if (type <= 0) continue;
-			resolved.Add((type, entry.Weight));
-			totalWeight += entry.Weight;
-		}
-		if (resolved.Count == 0 || totalWeight == 0) return null;
+			new(new FluidIngredient(FluidRegistry.Water, mb),
+				ChanceLogic.GetMaxChancedValue(), ChanceLogic.GetMaxChancedValue(), 0),
+		};
+
+		return BuildRecipe(
+			GTRecipeTypes.PRIMITIVE_PUMP,
+			id:             $"primitive_pump/{biome.ToString().ToLowerInvariant()}",
+			inputs:         new Dictionary<object, List<Content>>(),
+			outputs:        outputs,
+			eutInput:       0,
+			duration:       20,
+			conditionLabel: biome == BiomeProbe.Biome.Underworld
+				? biome.ToString()
+				: $"{biome} (+50% in rain)");
+	}
+
+	private static GTRecipe? BuildMinerRecipe(BiomeWorldIOTables.MinerBucket bucket)
+	{
+		var pool = BiomeWorldIOTables.GetPool(bucket);
+		int totalWeight = 0;
+		foreach (var e in pool) totalWeight += e.Weight;
+		if (pool.Count == 0 || totalWeight == 0) return null;
 
 		var outputs = new Dictionary<object, List<Content>>();
-		var outList = new List<Content>(resolved.Count);
-		foreach (var (itemType, weight) in resolved)
-			outList.Add(new Content(new ItemStackIngredient(itemType), weight, totalWeight, 0));
+		var outList = new List<Content>(pool.Count);
+		foreach (var e in pool)
+			outList.Add(new Content(new ItemStackIngredient(e.ItemType), e.Weight, totalWeight, 0));
 		outputs[ItemRecipeCapability.CAP] = outList;
 
 		var inputs = new Dictionary<object, List<Content>>();
@@ -86,12 +111,12 @@ public static class BiomeWorldIORecipeSynth
 
 		return BuildRecipe(
 			GTRecipeTypes.LARGE_MINER,
-			id:         $"large_miner/{biome.ToString().ToLowerInvariant()}",
-			inputs:     inputs,
-			outputs:    outputs,
-			eutInput:   VoltageTiers.V((int)VoltageTier.EV),
-			duration:   200,
-			biome:      biome);
+			id:             $"large_miner/{bucket.ToString().ToLowerInvariant()}",
+			inputs:         inputs,
+			outputs:        outputs,
+			eutInput:       VoltageTiers.V((int)VoltageTier.EV),
+			duration:       200,
+			conditionLabel: BiomeWorldIOTables.Label(bucket));
 	}
 
 	private static GTRecipe? BuildRigRecipe(BiomeProbe.Biome biome)
@@ -99,10 +124,13 @@ public static class BiomeWorldIORecipeSynth
 		var fluid = BiomeWorldIOTables.GetFluid(biome);
 		if (fluid is null) return null;
 
+		const int baseProductionMb = 100;
+		const int cycleTicks = 20;
+
 		var outputs = new Dictionary<object, List<Content>>();
 		outputs[FluidRecipeCapability.CAP] = new List<Content>
 		{
-			new(new FluidIngredient(fluid, 1),
+			new(new FluidIngredient(fluid, baseProductionMb),
 				ChanceLogic.GetMaxChancedValue(), ChanceLogic.GetMaxChancedValue(), 0),
 		};
 
@@ -111,25 +139,23 @@ public static class BiomeWorldIORecipeSynth
 			id:         $"fluid_drilling_rig/{biome.ToString().ToLowerInvariant()}",
 			inputs:     new Dictionary<object, List<Content>>(),
 			outputs:    outputs,
-			eutInput:   VoltageTiers.V((int)VoltageTier.MV),
-			duration:   20,
-			biome:      biome);
+			eutInput:       VoltageTiers.V((int)VoltageTier.MV),
+			duration:       cycleTicks,
+			conditionLabel: biome.ToString());
 	}
 
-	// Mirrors NativeRecipeProxy.BuildSynthetic shape; local because of different
-	// defaults (no category, browser-only).
 	private static GTRecipe BuildRecipe(GTRecipeType type, string id,
 		Dictionary<object, List<Content>> inputs,
 		Dictionary<object, List<Content>> outputs,
-		long eutInput, int duration, BiomeProbe.Biome biome)
+		long eutInput, int duration, string conditionLabel)
 	{
 		var tickInputs = new Dictionary<object, List<Content>>();
-		EURecipeCapability.PutEUContent(tickInputs, new EnergyStack(eutInput, 1));
+		if (eutInput > 0)
+			EURecipeCapability.PutEUContent(tickInputs, new EnergyStack(eutInput, 1));
 
-		// Label-only - controller's OnTick runs its own scan; Test() never reached.
 		var conditions = new List<RecipeCondition>
 		{
-			new BiomeCondition(biome.ToString()),
+			new BiomeCondition(conditionLabel),
 		};
 
 		return new GTRecipe(

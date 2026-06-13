@@ -17,10 +17,6 @@ using Microsoft.Xna.Framework;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock;
 
-// Port of WorkableMultiblockMachine. MultiblockControllerMachine + RecipeLogic
-// with per-IO CapabilitiesProxy + CapabilitiesFlat aggregated on form.
-// Dropped: IMufflableMachine (only state), activeBlocks BlockState toggling,
-// muffler sound, MachineRenderState
 public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, IWorkableMultiController, IVoidable
 {
 	private RecipeLogic? _recipeLogic;
@@ -211,7 +207,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 	protected virtual GTRecipe? GetRealRecipe(GTRecipe recipe)
 	{
 		var modifier = GetRecipeModifier();
-		// Split mirrors RecipeModifier.applyModifier (read FailReason on cancel).
 		var fn = modifier.GetModifier(this, recipe);
 		var result = fn.Apply(recipe);
 		_lastModifierFailReason = result == null ? fn.FailReason : null;
@@ -222,8 +217,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 
 	public bool IsMultiblockController() => true;
 	public bool KeepSubscribing() => false;
-	// LargeMiner / FluidDrillingRig return false (keep RecipeLogic dormant
-	// while the def's RecipeType still shows synth browser rows).
 	public virtual bool IsRecipeLogicAvailable() => IsFormed && !GetMultiblockState().HasError();
 
 	public void AfterWorking()
@@ -240,7 +233,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return true;
 	}
 
-	// Generator multis override (LargeCombustionEngine: lubricant + oxygen-boost).
 	public virtual bool OnWorking()
 	{
 		foreach (var part in GetParts())
@@ -250,7 +242,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return true;
 	}
 
-	// Generators flip to false.
 	public virtual bool RegressWhenWaiting() => true;
 
 	public void OnWaiting()
@@ -258,7 +249,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		foreach (var part in GetParts()) part.OnWaiting(this);
 	}
 
-	// Pause -> each part's OnPaused (parallel hatches free cached state).
 	public virtual void SetWorkingEnabled(bool isWorkingAllowed)
 	{
 		if (!isWorkingAllowed)
@@ -283,15 +273,11 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 	{
 		base.SaveData(tag);
 		tag["activeRecipeType"] = ActiveRecipeType;
-		// NOT "recipe" - that key is the RecipeLogic trait's persistent sub-tag.
-		// Colliding corrupts the trait blob and crashes load with NBT type mismatch.
 		if (LastRecipeId is not null) tag["lastRecipeId"] = LastRecipeId;
 	}
 
 	public override void LoadData(Terraria.ModLoader.IO.TagCompound tag)
 	{
-		// Ensure trait BEFORE base.LoadData runs Traits.Load, else the "recipe"
-		// sub-tag is never loaded into it (the "multi recipe resets on reload" bug).
 		EnsureRecipeLogic();
 		base.LoadData(tag);
 		if (tag.ContainsKey("activeRecipeType"))
@@ -301,10 +287,57 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 
 	public long OffsetTimer => Math.Abs(HashCode.Combine(Position.X, Position.Y));
 
-	// Electric subclass caps to V[tier].
+	protected virtual bool SupportsRecipeLookupCore => true;
+	bool IRecipeLogicMachine.SupportsRecipeLookup => SupportsRecipeLookupCore;
+
+	IReadOnlyList<Terraria.Item> IRecipeLogicMachine.LookupInputItems
+	{
+		get
+		{
+			var result = new List<Terraria.Item>();
+			foreach (var handler in InputHandlersFor(ItemRecipeCapability.CAP))
+			{
+				if (handler is not IItemHandler ih) continue;
+				for (int i = 0; i < ih.SlotCount; i++)
+				{
+					var stack = ih.GetSlot(i);
+					if (!stack.IsAir) result.Add(stack);
+				}
+			}
+			return result;
+		}
+	}
+
+	IReadOnlyList<FluidStack> IRecipeLogicMachine.LookupInputFluids
+	{
+		get
+		{
+			var result = new List<FluidStack>();
+			foreach (var handler in InputHandlersFor(FluidRecipeCapability.CAP))
+			{
+				if (handler is not IFluidHandler fh) continue;
+				for (int i = 0; i < fh.TankCount; i++)
+				{
+					var stack = fh.GetTank(i);
+					if (!stack.IsEmpty) result.Add(stack);
+				}
+			}
+			return result;
+		}
+	}
+
+	private IEnumerable<object> InputHandlersFor(object cap)
+	{
+		if (CapabilitiesFlat.TryGetValue(IO.IN, out var inMap) &&
+			inMap.TryGetValue(cap, out var inList))
+			foreach (var h in inList) yield return h;
+		if (CapabilitiesFlat.TryGetValue(IO.BOTH, out var bothMap) &&
+			bothMap.TryGetValue(cap, out var bothList))
+			foreach (var h in bothList) yield return h;
+	}
+
 	public long RecipeVoltageCap => long.MaxValue;
 
-	// Electric subclass forwards to EnergyContainerList; 0 for non-EU multis.
 	public virtual long EnergyStored { get; set; }
 
 	public long ActiveEut   { get; set; }
@@ -321,7 +354,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		var style = StationSounds.TryGetLoop(GetRecipeType().RegistryName);
 		if (style is null) return;
 
-		// Tracker uses explicit flag; see WorkableTieredMachine.
 		_loopTracker = new MachineAudioTracker(this);
 		var tracker = _loopTracker;
 		_loopSlot = Terraria.Audio.SoundEngine.PlaySound(style.Value, worldPos, tracker.Tick);
@@ -346,24 +378,19 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 
 	public virtual void NotifyStatusChanged(RecipeLogicStatus oldStatus, RecipeLogicStatus newStatus)
 	{
-		if (newStatus == RecipeLogicStatus.WORKING)
-			EnsureLoopSound(GetWorldPos());
-		else
-			StopLoopSound();
+		if (newStatus == RecipeLogicStatus.WORKING) MachineLoopVoiceArbiter.SetWant(this);
+		else                                        MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
-	// Without this MP clients are silent (SetStatus only fires server-side).
 	internal override void OnClientSync()
 	{
 		base.OnClientSync();
-		if (Recipe.IsWorking()) EnsureLoopSound(GetWorldPos());
-		else                    StopLoopSound();
+		if (Recipe.IsWorking()) MachineLoopVoiceArbiter.SetWant(this);
+		else                    MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
 	public RecipeLogic GetRecipeLogic() => Recipe;
 
-	// Port of RecipeRunner.handleContents collapsed onto our flat hooks.
-	// BUS_DISTINCT / BYPASS_DISTINCT / color bucketing preserved (see DispatchContents).
 	public virtual ActionResult TryMatchInputContents(
 		Api.Recipe.GTRecipe recipe,
 		IReadOnlyList<Api.Recipe.Content.Content> items,
@@ -395,10 +422,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 	public ActionResult DepositOutputEU(Api.Recipe.GTRecipe recipe, long voltage)
 		=> HandleEUThroughCapProxy(recipe, voltage, IO.OUT);
 
-	// CWU tick dispatch - upstream RecipeRunner handles every tick cap generically;
-	// we route EU/item/fluid via dedicated hooks, so CWU lands here. Dispatched
-	// through the same group-aware DispatchContents -> NotifiableComputationContainer.
-	// No-op when the recipe has no CWU tick content (every non-research machine).
 	public virtual ActionResult TryHandleTickCwu(Api.Recipe.GTRecipe recipe, IO io, bool simulate)
 	{
 		var cwu = io == IO.IN
@@ -412,15 +435,12 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return DispatchContents(recipe, io, contents, simulate);
 	}
 
-	// Port of RecipeRunner.handleContents.
 	private ActionResult HandleContentsThroughCapProxy(
 		Api.Recipe.GTRecipe recipe,
 		IReadOnlyList<Api.Recipe.Content.Content> items,
 		IReadOnlyList<Api.Recipe.Content.Content> fluids,
 		IO io, bool simulate)
 	{
-		// RecipeRunner.fillContentMatchList: MATCH (everything) vs CONSUME (no
-		// tools, chanced rolled). simulate=true -> MATCH, false -> CONSUME.
 		var contents = new Dictionary<object, List<object>>();
 		if (items.Count > 0)
 		{
@@ -442,10 +462,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return DispatchContents(recipe, io, contents, simulate);
 	}
 
-	// Same group-aware dispatcher as items/fluids (upstream RecipeRunner is
-	// capability-agnostic). Energy hatches are UNDYED today, so the bucket path
-	// collapses to one group - future colored/bypass EU cap picks up routing
-	// for free.
 	private ActionResult HandleEUThroughCapProxy(
 		Api.Recipe.GTRecipe recipe, long voltage, IO io)
 	{
@@ -460,14 +476,10 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		Api.Recipe.GTRecipe recipe, IO io,
 		Dictionary<object, List<object>> contents, bool simulate)
 	{
-		// Upstream early-out `PASS_NO_CONTENTS`.
 		if (contents.Count == 0) return ActionResult.PASS_NO_CONTENTS;
 
 		if (!CapabilitiesProxy.TryGetValue(io, out var handlerLists) || handlerLists.Count == 0)
 		{
-			// Deviation from upstream FAIL_NO_CAPABILITIES: attribute to the
-			// first content capability so the player sees "No fluid input hatch"
-			// instead of generic "Machine has no Capabilities".
 			object? firstCap = null;
 			foreach (var c in contents.Keys) { firstCap = c; break; }
 			string capSuffix =
@@ -479,30 +491,24 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 			return ActionResult.Fail($"gtceu.recipe.no_capabilities_{capSuffix}_{ioSuffix}", firstCap, io);
 		}
 
-		// Sort OUT by reversed COMPARATOR so empty buses fill first.
 		List<RecipeHandlerList> handlers = handlerLists;
 		if (io == IO.OUT)
 		{
 			handlers = new List<RecipeHandlerList>(handlerLists);
-			handlers.Sort((a, b) => RecipeHandlerList.COMPARATOR.Compare(b, a)); // reversed
+			handlers.Sort((a, b) => RecipeHandlerList.COMPARATOR.Compare(b, a));
 		}
 
-		// Bucket by RecipeHandlerGroup (verbatim RecipeHelper.addToRecipeHandlerMap).
 		var handlerGroups = new Dictionary<RecipeHandlerGroup, List<RecipeHandlerList>>();
 		foreach (var h in handlers)
 			AddToRecipeHandlerMap(h.Group, h, handlerGroups);
 
-		// IN-simulated colored match writes groupColor back to recipe.GroupColor
-		// so subsequent phases lock to that color. Mirrors RecipeRunner.getGroupColor.
 		int groupColor = recipe.GroupColor;
 		bool lockIn = io == IO.IN && simulate;
 
-		// Pass 1: BUS_DISTINCT - each handler tries the whole map + bypass.
 		if (handlerGroups.TryGetValue(RecipeHandlerGroupDistinctness.BUS_DISTINCT, out var distinctList))
 		{
 			foreach (var handler in distinctList)
 			{
-				// Simulate against this distinct handler + bypass.
 				var res = handler.HandleRecipe(io, recipe, contents, true);
 				if (res.Count > 0 && handlerGroups.TryGetValue(
 						RecipeHandlerGroupDistinctness.BYPASS_DISTINCT, out var bypass1))
@@ -542,13 +548,10 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 			}
 		}
 
-		// Pass 2: UNDYED + colored groups as pools; bypass chains after each.
-		// Colored groups filter by groupColor (IN-simulated match locks it).
 		foreach (var entry in handlerGroups)
 		{
 			if (entry.Key.Equals(RecipeHandlerGroupDistinctness.BUS_DISTINCT)) continue;
 
-			// lockIn (IN && simulate) replaces upstream's simulated && !isTick.
 			if (entry.Key is RecipeHandlerGroupColor coloredGroup)
 			{
 				if (lockIn)
@@ -592,7 +595,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 				return ActionResult.SUCCESS;
 			}
 
-			// Real consumption - repeat the same walk, this time mutating state.
 			foreach (var handler in entry.Value)
 			{
 				contents = handler.HandleRecipe(io, recipe, contents, false);
@@ -617,8 +619,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 			}
 		}
 
-		// Tail - verbatim RecipeRunner.handleContents end: void what can be
-		// voided (OUT real), fail with the offending capability, else PASS.
 		foreach (var kv in contents)
 		{
 			if (!simulate && io == IO.OUT && CanVoidRecipeOutputs(kv.Key))
@@ -633,7 +633,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 			}
 		}
 
-		// Post-voiding nothing remains.
 		recipe.GroupColor = groupColor;
 		bool containsStuff = false;
 		foreach (var kv in contents)
@@ -641,10 +640,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return containsStuff ? ActionResult.FAIL_NO_REASON : ActionResult.PASS_NO_CONTENTS;
 	}
 
-	// Verbatim RecipeHelper.addToRecipeHandlerMap.
-	// BYPASS_DISTINCT -> bypass bucket only.
-	// UNDYED -> undyed bucket + every existing colored bucket.
-	// Color / BUS_DISTINCT -> own bucket seeded with current UNDYED.
 	private static void AddToRecipeHandlerMap(
 		RecipeHandlerGroup key, RecipeHandlerList handler,
 		Dictionary<RecipeHandlerGroup, List<RecipeHandlerList>> map)
@@ -680,7 +675,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		bucket.Add(handler);
 	}
 
-	// Verbatim RecipeRunner.hasAnyNonVoidingContents. Default VoidNone = dormant.
 	private bool HasAnyNonVoidingContents(Dictionary<object, List<object>> contents)
 	{
 		foreach (var entry in contents)
@@ -691,9 +685,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		return false;
 	}
 
-	// IWorkable.IsActive() (method) is explicit to avoid collision with
-	// MetaMachine.IsActive (property). Field-only reads here - ModifyLight runs
-	// on FastParallel worker threads; lazy-init would race.
 	public override bool IsActive => _recipeLogic?.IsActive() ?? false;
 
 	int  IWorkable.GetProgress()    => _recipeLogic?.GetProgress() ?? 0;
@@ -703,8 +694,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 	bool IControllable.IsWorkingEnabled()      => _recipeLogic?.IsWorkingEnabled() ?? true;
 	void IControllable.SetWorkingEnabled(bool isWorkingAllowed) => SetWorkingEnabled(isWorkingAllowed);
 
-	// Mirrors WorkableTieredMachine.AppendTooltip - multi-aware status + live
-	// state (active output, EU/t, energy buffer across hatches).
 	public override void AppendTooltip(System.Collections.Generic.List<string> lines)
 	{
 		base.AppendTooltip(lines);
@@ -715,19 +704,21 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 			string? primaryOutput = ResolveActiveOutputName(rl.GetLastRecipe());
 			if (primaryOutput != null)
 				lines.Add($"-> {primaryOutput}");
-			if (ActiveEut > 0)
-				lines.Add($"Drawing: {ActiveEut:N0} EU/t");
+			AppendDrawingLine(lines);
 		}
 		RecipeStatusText.AppendFailureDetail(_recipeLogic, lines);
 	}
 
-	// StatusLineForMulti already prints the unformed line; suppress duplicate.
+	protected virtual void AppendDrawingLine(List<string> lines)
+	{
+		if (ActiveEut > 0)
+			lines.Add($"Drawing: {ActiveEut:N0} EU/t");
+	}
+
 	protected override void AppendUnformedStatusIfNeeded(List<string> lines) { }
 
-	// Electric subclass overrides to read its EnergyContainerList sum.
 	protected virtual void AppendEnergyLine(List<string> lines) { }
 
-	// Mirrors WorkableTieredMachine.ResolvePrimaryOutputName.
 	private static string? ResolveActiveOutputName(Api.Recipe.GTRecipe? recipe)
 	{
 		if (recipe == null) return null;

@@ -59,7 +59,10 @@ public sealed class FluidPipeLayerHandle : IGridLayerHandle
 		int type;
 		if (cell.IsSimple)
 		{
-			if (!ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>("simple_fluid_pipe", out var mi))
+			string simpleId = cell.Size == PipeSize.Normal
+				? "simple_fluid_pipe"
+				: "simple_fluid_pipe_" + PipeSizes.Word(cell.Size);
+			if (!ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(simpleId, out var mi))
 				return;
 			type = mi.Type;
 		}

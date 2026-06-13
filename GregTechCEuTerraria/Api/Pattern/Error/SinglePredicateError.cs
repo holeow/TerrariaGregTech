@@ -6,16 +6,6 @@ using Terraria.Localization;
 
 namespace GregTechCEuTerraria.Api.Pattern.Error;
 
-// LOCKED - verbatim port of
-// com.gregtechceu.gtceu.api.pattern.error.SinglePredicateError.
-//
-// Emitted when a SimplePredicate's count/layer-count constraint fails (too
-// few / too many of this kind of block in the structure). `type` selects
-// which of the four constraint forms the player is told about:
-//   0 -> too many globally   (predicate.maxCount)
-//   1 -> too few globally    (predicate.minCount)
-//   2 -> too many per layer  (predicate.maxLayerCount)
-//   3 -> too few per layer   (predicate.minLayerCount)
 public class SinglePredicateError : PatternError
 {
 	public SimplePredicate Predicate { get; }
@@ -33,9 +23,6 @@ public class SinglePredicateError : PatternError
 	{
 		get
 		{
-			// Type -> what failed + required count + actual count (best-effort:
-			// the global count is populated in MultiblockState; the per-layer
-			// count is wiped between layers so we can't always recover it).
 			int required = -1;
 			int actual   = -1;
 			string what  = "";
@@ -61,11 +48,6 @@ public class SinglePredicateError : PatternError
 					break;
 			}
 
-			// Name(s) of the block(s) this predicate would have accepted.
-			// max=1 keeps the line short - ability predicates can have 15+
-			// tier variants (ULV Output Hatch / LV Output Hatch / ...) which
-			// blow the tooltip width. `JoinCandidateNames` appends "+N more"
-			// suffix when truncated.
 			string names = JoinCandidateNames(Predicate.GetCandidates(), max: 1);
 
 			string actualPart = actual >= 0 ? $" (have {actual})" : "";
@@ -74,8 +56,6 @@ public class SinglePredicateError : PatternError
 		}
 	}
 
-	// Same content as ErrorInfo - the count message is already short, no need
-	// to split. One yielded line.
 	public override System.Collections.Generic.IEnumerable<string> ErrorDetailLines()
 	{
 		yield return ErrorInfo;
@@ -89,7 +69,7 @@ public class SinglePredicateError : PatternError
 		for (int i = 0; i < n; i++)
 		{
 			if (i > 0) sb.Append(i == n - 1 && candidates.Count <= max ? " or " : ", ");
-			sb.Append(Lang.GetItemName(candidates[i].type).Value);
+			sb.Append(global::GregTechCEuTerraria.Api.Util.TerrariaText.ItemName(candidates[i].type));
 		}
 		if (candidates.Count > max) sb.Append($" +{candidates.Count - max} more");
 		return sb.ToString();

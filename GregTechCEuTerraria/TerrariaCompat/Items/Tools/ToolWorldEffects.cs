@@ -30,6 +30,12 @@ public sealed class ToolWorldEffects : GlobalTile
 		TileID.ClayBlock, TileID.Cloud, TileID.RainCloud, TileID.Ash,
 	};
 
+	private static readonly HashSet<int> GrassTiles = new()
+	{
+		TileID.Grass, TileID.CorruptGrass, TileID.CrimsonGrass, TileID.HallowedGrass,
+		TileID.JungleGrass, TileID.MushroomGrass, TileID.AshGrass, TileID.GolfGrass,
+	};
+
 	public override bool CanKillTile(int i, int j, int type, ref bool blockDamaged)
 	{
 		if (Main.netMode == NetmodeID.Server) return true;
@@ -45,7 +51,6 @@ public sealed class ToolWorldEffects : GlobalTile
 		return true;
 	}
 
-	// TileLoader.Drop early-returns before Drop hooks when CanDrop is false
 	public override bool CanDrop(int i, int j, int type)
 	{
 		var holder = NearestToolHolder(i, j);
@@ -85,9 +90,18 @@ public sealed class ToolWorldEffects : GlobalTile
 
 	public override void Drop(int i, int j, int type)
 	{
-		if (type != TileID.MatureHerbs && type != TileID.BloomingHerbs) return;
 		var holder = NearestToolHolder(i, j);
-		if (holder?.HeldItem?.ModItem is not ToolItem tool || !tool.IsHoe) return;
+		if (holder?.HeldItem?.ModItem is not ToolItem tool) return;
+
+		if (tool.IsShovel && GrassTiles.Contains(type))
+		{
+			float chance = 0.10f + System.Math.Clamp(tool.Tier / 9f, 0f, 1f) * 0.90f;
+			if (Main.rand.NextFloat() < chance)
+				SpawnItem(i, j, ItemID.Worm, 1);
+		}
+
+		if (type != TileID.MatureHerbs && type != TileID.BloomingHerbs) return;
+		if (!tool.IsHoe) return;
 
 		// Verbatim WorldGen.KillTile_GetItemDrops math.
 		int num = Main.tile[i, j].TileFrameX / 18;

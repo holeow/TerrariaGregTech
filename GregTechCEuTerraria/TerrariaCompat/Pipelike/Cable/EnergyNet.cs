@@ -20,6 +20,7 @@ public sealed class EnergyNet
 	public IReadOnlyDictionary<(int x, int y), CableCell> Cells { get; }
 	public VoltageTier EffectiveTier { get; }
 	public int EffectiveAmperage { get; }
+	public int MaxAmperage { get; }
 	public int MaxLossPerAmp { get; }
 
 	public List<(int x, int y, IEnergyContainer ep)> ProducerLinks { get; } = new();
@@ -28,7 +29,6 @@ public sealed class EnergyNet
 	public List<IEnergyContainer> Consumers { get; } = new();
 
 	private readonly Dictionary<(int x, int y), List<EnergyRoutePath>> _routesByCable = new();
-	private readonly Dictionary<(int x, int y), long> _cableAmpsThisTick = new();
 
 	public long LastTickExtracted { get; private set; }
 	public long LastTickDelivered { get; private set; }
@@ -41,6 +41,7 @@ public sealed class EnergyNet
 		Cells = component.Cells;
 		EffectiveTier = component.EffectiveTier;
 		EffectiveAmperage = component.EffectiveAmperage;
+		MaxAmperage = component.MaxAmperage;
 		MaxLossPerAmp = component.MaxLossPerAmp;
 
 		var anchor = (x: int.MaxValue, y: int.MaxValue);
@@ -51,7 +52,7 @@ public sealed class EnergyNet
 		AnchorCell = anchor;
 	}
 
-	public long PerTickCapacity => VoltageTiers.Voltage(EffectiveTier) * EffectiveAmperage;
+	public long PerTickCapacity => VoltageTiers.Voltage(EffectiveTier) * MaxAmperage;
 
 	public float SmoothedLoad { get; private set; }
 
@@ -75,28 +76,6 @@ public sealed class EnergyNet
 	{
 		LastTickExtracted = 0;
 		LastTickDelivered = 0;
-		_cableAmpsThisTick.Clear();
-
-		foreach (var p in Producers)
-		{
-			long pushV = p.OutputVoltage;
-			if (pushV <= 0) continue;
-			var pushTier = VoltageTiers.MaxTierForVoltage(pushV);
-			if ((int)pushTier > (int)EffectiveTier)
-			{
-				BurnUndertierCables(pushTier);
-				return;
-			}
-		}
-
-		foreach (var c in Consumers)
-		{
-			long inV = c.InputVoltage;
-			if (inV <= 0) continue;
-			var inputTier = VoltageTiers.MaxTierForVoltage(inV);
-			if ((int)EffectiveTier > (int)inputTier)
-				ExplodeConsumer(c);
-		}
 
 		if (ProducerLinks.Count == 0 || ConsumerLinks.Count == 0) return;
 
@@ -137,15 +116,13 @@ public sealed class EnergyNet
 			foreach (var cablePos in path.Cables)
 			{
 				var cell = Cells.TryGetValue(cablePos, out var c) ? (CableCell?)c : null;
-				if (cell is null) { cableBroken = true; break; }
+				if (cell is null) { cableBroken = true; break; }   // melted last tick, pre-rebuild
 				long cableMaxV = VoltageTiers.Voltage(cell.Value.Voltage);
 				if (cableMaxV < voltage)
 				{
-					BurnCable(cablePos);
-					cableBroken = true;
-					break;
+					CableHeatStore.OverVoltage(cablePos, voltage, cableMaxV);
+					pathVoltage = System.Math.Min(cableMaxV, pathVoltage);
 				}
-				pathVoltage = System.Math.Min(cableMaxV, pathVoltage);
 			}
 			if (cableBroken) continue;
 
@@ -156,13 +133,8 @@ public sealed class EnergyNet
 
 			foreach (var cablePos in path.Cables)
 			{
-				_cableAmpsThisTick.TryGetValue(cablePos, out long used);
-				used += amps;
-				_cableAmpsThisTick[cablePos] = used;
-				if (Cells.TryGetValue(cablePos, out var cc) && used > cc.TotalAmperage)
-				{
-					BurnCable(cablePos);
-				}
+				if (Cells.TryGetValue(cablePos, out var cc))
+					CableHeatStore.IncrementAmperage(cablePos, amps, cc.TotalAmperage);
 			}
 
 			LastTickDelivered += amps * pathVoltage;
@@ -186,40 +158,6 @@ public sealed class EnergyNet
 		var routes = EnergyNetWalker.CreateNetData(CableLayerSystem.Cables, sourceCable, del);
 		_routesByCable[sourceCable] = routes;
 		return routes;
-	}
-
-	private void BurnCable((int x, int y) pos)
-	{
-		var cell = CableLayerSystem.Cables.CellAt(pos.x, pos.y);
-
-		TerrariaCompat.Net.BlockExplosionEffectPacket.PlayLocal(pos.x, pos.y, 1, 1);
-		if (Main.netMode == NetmodeID.Server)
-			TerrariaCompat.Net.BlockExplosionEffectPacket.Send(pos.x, pos.y, 1, 1);
-
-		if (cell is { } c && Main.netMode != NetmodeID.MultiplayerClient)
-		{
-			int? itemType = WireItemRegistry.Get(c.MaterialId, c.WireSize, c.Insulated);
-			if (itemType is not null)
-			{
-				int worldX = pos.x * 16;
-				int worldY = pos.y * 16;
-				Item.NewItem(new EntitySource_TileBreak(pos.x, pos.y),
-					worldX, worldY, 16, 16, itemType.Value);
-			}
-		}
-
-		CableLayerSystem.Cables.Remove(pos.x, pos.y);
-		TerrariaCompat.Net.CablePackets.SendRemoveBroadcast(pos.x, pos.y);
-		_routesByCable.Clear();
-	}
-
-	private void BurnUndertierCables(VoltageTier producerTier)
-	{
-		var toRemove = new List<(int x, int y)>();
-		foreach (var kv in Cells)
-			if ((int)kv.Value.Voltage < (int)producerTier)
-				toRemove.Add(kv.Key);
-		foreach (var pos in toRemove) BurnCable(pos);
 	}
 
 	private const float LossDangerFraction = 0.5f;
@@ -279,18 +217,4 @@ public sealed class EnergyNet
 
 	private static readonly (int dx, int dy)[] s_dirs =
 		{ (0, -1), (0, 1), (-1, 0), (1, 0) };
-
-	private static void ExplodeConsumer(IEnergyContainer consumer)
-	{
-		if (consumer is not TerrariaCompat.Machine.MetaMachine machine) return;
-		Terraria.ModLoader.ModContent.GetInstance<GregTechCEuTerraria>()
-			?.Logger?.Warn(
-				$"[wire-net overtier] consumer {machine.GetType().Name} at " +
-				$"({machine.Position.X},{machine.Position.Y}) " +
-				$"InputVoltage={(consumer is IEnergyContainer ec1 ? ec1.InputVoltage : 0)} V " +
-				$"- EXPLODING");
-		Common.Machine.Trait.EnvironmentalExplosionTrait.DoExplosionAt(machine,
-			Common.Machine.Trait.EnvironmentalExplosionTrait.GetExplosionPower(
-				machine is IEnergyContainer ec ? ec.InputVoltage : 0));
-	}
 }

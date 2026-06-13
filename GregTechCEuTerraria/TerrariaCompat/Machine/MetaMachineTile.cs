@@ -20,34 +20,25 @@ public interface IMachineTextureSpec
 	Rendering.MachineRenderer.Casing CasingKind { get; }
 	string OverlayDir { get; }
 	string OverlayBasename { get; }
-	// Back->front: pipe / tinted / emissive over directional. "" = skip layer.
 	string PipeOverlayBasename     { get => ""; }
 	string TintedOverlayBasename   { get => ""; }
 	string EmissiveOverlayBasename { get => ""; }
-	// Multi-controller appearance casing (heatproof / watertight / etc.);
-	// mirrors upstream workableCasingModel(appearance, overlay). null = tier default.
 	string? CustomCasingTexturePath { get => null; }
 	string? CustomFaceAssetPath { get => null; }
+	bool AnimateIdleOverlay { get => false; }
 }
 
-// Non-generic surface for MachinePlacedPacket (server only has the tile type).
 public interface IMetaMachineTile
 {
 	int PlaceEntity(int i, int j);
 }
 
-// Abstract base for machine ModTiles. Tile exposes MachineDefinition;
-// entity resolved via MachineFamilyEntity. Concrete subclasses registered
-// by TieredMachineFactory per (definition x tier).
-// Deliberately NOT a port of MetaMachineBlock - rotation / facing / paint
-// are meaningless in 2D same-cell-wiring.
 public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachineTile, Rendering.ITextureWarmUp
 {
 	public abstract MachineDefinition Definition { get; }
 
 	private MetaMachine ResolveEntity() => MachineFamilyEntity.For(Definition.Family);
 
-	// Placing client only; MP routes entity creation via MachinePlacedPacket.
 	public override void PlaceInWorld(int i, int j, Item item)
 	{
 		TagCompound? portable = ExtractPortable(item);
@@ -56,8 +47,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		{
 			var td = TileObjectData.GetTileData(Type, 0);
 			int w = td?.Width ?? 1, h = td?.Height ?? 1;
-			// Tile MUST reach server before entity request or
-			// IsTileValidForEntity culls the freshly-created entity.
 			NetMessage.SendTileSquare(Main.myPlayer, i, j, w, h);
 			MachinePlacedPacket.SendRequest(i, j, Type, portable);
 			return;
@@ -69,11 +58,8 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 			placed.ReadPortableData(portable);
 	}
 
-	// SP + MP server. Identity stamped here so the first save captures it.
 	public int PlaceEntity(int i, int j)
 	{
-		// PlaceInWorld is called with the CURSOR cell (= bottom-right for
-		// Origin(1,1) Style2x2). Walk TileFrame back to the top-left origin.
 		Tile cell = Main.tile[i, j];
 		int originX = i - (cell.TileFrameX / 18);
 		int originY = j - (cell.TileFrameY / 18);
@@ -83,8 +69,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		if (TileEntity.ByID.TryGetValue(id, out var te) && te is MetaMachine placed)
 			placed.OverrideIdentity(Definition.Id, TileTier);
 
-		// MP server bypasses GlobalTile.PlaceInWorld; remote-placed machines
-		// would otherwise leave adjacent pipes permanently unsubscribed.
 		Pipelike.PipeNeighborWatcher.NotifyAround(originX, originY);
 		return id;
 	}
@@ -93,9 +77,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		item.TryGetGlobalItem<MachinePortableData>(out var g) && g.Data is { Count: > 0 }
 			? g.Data : null;
 
-	// KillMultiTile fires ONCE per multi after GetItemDrops + the per-cell
-	// KillTile loop. Kill by position - ModTileEntity.Kill's type compare is
-	// byte-truncated and broken for Type >= 256.
 	public override void KillMultiTile(int i, int j, int frameX, int frameY)
 	{
 		var pos = new Point16(i, j);
@@ -106,7 +87,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		TileEntity.ByPosition.Remove(pos);
 	}
 
-	// Runs before KillMultiTile - entity still alive for portable data.
 	public override IEnumerable<Item> GetItemDrops(int i, int j)
 	{
 		if (!Mod.TryFind<ModItem>(Name, out var modItem))
@@ -125,7 +105,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		yield return drop;
 	}
 
-	// Call from SetStaticDefaults BEFORE TileObjectData.addTile.
 	protected void ApplyDefaults()
 	{
 		Main.tileFrameImportant[Type] = true;
@@ -137,7 +116,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 
 		TileObjectData.newTile.CopyFrom(TileObjectData.Style2x2);
 		TileObjectData.newTile.LavaDeath    = false;
-		// Origin(1,1) + CenteredPlacementPlayer snaps 2x2 visual centre to cursor.
 		TileObjectData.newTile.Origin       = new Point16(1, 1);
 		TileObjectData.newTile.AnchorBottom = default(AnchorData);
 
@@ -155,6 +133,7 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 	public virtual string EmissiveOverlayBasename => "";
 	public virtual string? CustomCasingTexturePath => null;
 	public virtual string? CustomFaceAssetPath => null;
+	public virtual bool   AnimateIdleOverlay => false;
 	protected virtual Common.Energy.VoltageTier TileTier => Common.Energy.VoltageTier.LV;
 
 	public override bool PreDraw(int i, int j, SpriteBatch spriteBatch)
@@ -163,7 +142,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		return true;
 	}
 
-	// Eager install so placement ghost / minimap don't flash the placeholder.
 	public virtual void WarmUpTexture() =>
 		Rendering.MachineRenderer.EnsureTileTexture(Type, this, TileTier);
 
@@ -171,8 +149,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 	{
 		MachineCellResolver.TryFindMachineAt(i, j, out var machine);
 
-		// Bound parts reskin to the controller's appearance casing (drawn
-		// BEFORE the active overlay so arrows stay on top).
 		if (machine is Multiblock.Part.MultiblockPartMachine part && part.IsFormed())
 		{
 			foreach (var ctrl in part.GetControllers())
@@ -190,23 +166,22 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 			}
 		}
 
+		if (AnimateIdleOverlay)
+			Rendering.MachineRenderer.DrawAnimatedIdleOverlay(
+				spriteBatch, i, j, OverlayDir, OverlayBasename, EmissiveOverlayBasename);
+
 		if (machine != null && machine.WorkingEnabled && machine.IsActive)
 			Rendering.MachineRenderer.DrawActiveOverlay(spriteBatch, i, j, OverlayDir, OverlayBasename);
 
 		machine?.DrawCustomOverlay(spriteBatch, i, j);
 
-		// Anchor-cell only - PostDraw per cell would 4x over-spawn.
 		if (machine != null && i == machine.Position.X && j == machine.Position.Y)
 			machine.OnClientFrame();
 
 		DrawSmartInteractHighlight(i, j, spriteBatch);
 
-		// Multi ghost preview is drawn from MultiblockPreviewSystem.PostDrawTiles
-		// (in-pass draw would be occluded by later tile writes).
 	}
 
-	// Runtime-composited tiles have no per-tile HighlightMask; cells draw
-	// their own perimeter edges to compose one outline.
 	private static void DrawSmartInteractHighlight(int i, int j, SpriteBatch sb)
 	{
 		if (!Main.InSmartCursorHighlightArea(i, j, out bool selected)) return;
@@ -242,7 +217,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		b += c.Z;
 	}
 
-	// HitWire fires per cell; TryConsumeWirePulse dedups to one pulse.
 	public override void HitWire(int i, int j)
 	{
 		if (!MachineCellResolver.TryFindMachineAt(i, j, out var machine)) return;
@@ -252,8 +226,6 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 				receiver.OnWirePulse();
 	}
 
-	// Smart cursor would otherwise redirect RMB to nearby vanilla interactables.
-	// Skipped for GUI-less machines (LayoutKey == "none").
 	public override bool HasSmartInteract(int i, int j,
 		Terraria.GameContent.ObjectInteractions.SmartInteractScanSettings settings)
 		=> Definition.LayoutKey != "none";

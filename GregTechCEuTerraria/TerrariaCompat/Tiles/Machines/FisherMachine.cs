@@ -14,35 +14,22 @@ using Terraria.ModLoader.IO;  // TagCompound
 
 namespace GregTechCEuTerraria.TerrariaCompat.Tiles.Machines;
 
-// 1:1 port of com.gregtechceu.gtceu.common.machine.electric.FisherMachine.
-// Per-tier (LV..LuV) auto-fisher: sits over water, drains EU, consumes bait,
-// produces loot every maxProgress ticks into its output cache.
+// port of com.gregtechceu.gtceu.common.machine.electric.FisherMachine.
 //
-// DEVIATIONS:
-//   - Loot: upstream rolls MC's BuiltInLootTables.FISHING / FISHING_FISH; we
-//     hand-roll biome+Y-aware loot via FishingLootRoller (junk gate mirrors the
-//     FISHING vs FISHING_FISH split).
-//   - Bait: upstream filters strictly on Items.STRING; we accept gtceu:string
-//     OR any Terraria Item.bait > 0 (worm / master bait / ...).
-//   - Water check: 5x5 row below, adapted to Terraria liquids.
-//   - Work gate runs inline at OnTick top (upstream uses TickableSubscription) -
-//     same behavior, no subscription drift.
-//
-// Energy: receiver-mode container; capacity = V[tier]*64; per-tick draw =
-// V[tier-1] (LV draws ULV 8 EU/t, LuV draws IV 8192 EU/t). Charger slot lives
-// here (Fisher extends TieredEnergyMachine directly - upstream parity).
-public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllable
+// adaptations:
+//   - Loot: FishingLootRoller
+//   - Bait: gtceu:string or any Terraria Item.bait > 0
+//   - Water check: 2 tiles below
+public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllable, IItemHandler
 {
 	public FisherMachine() { }
 	public FisherMachine(VoltageTier tier) : base(tier) { }
 
 	protected override string Label => Definition?.Label ?? "Fisher";
 
-	// Receiver-mode container (input only).
 	public override bool CanAccept => true;
 	public override long EnergyCapacity => VoltageTiers.Voltage(Tier) * 64L;
 
-	// energyPerTick = V[tier-1] (java:113).
 	private long EnergyPerTick
 	{
 		get
@@ -52,10 +39,8 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		}
 	}
 
-	// (tier+1)^2 output cache (HandlerIO=BOTH, CapabilityIO=OUT = pipe-extract-only).
 	private int InventorySize { get { int t = (int)Tier; return (t + 1) * (t + 1); } }
 
-	// upstream calcMaxProgress(tier)
 	private static int CalcMaxProgress(int tier) =>
 		(int)(800.0 - 170 * ((double)tier - 1.0) + (Math.Max(0, tier - 4) / 0.012));
 
@@ -72,7 +57,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 
 	protected override bool HasChargerSlot => true;
 
-	// gtceu:string item type, resolved once. 0 = not registered.
 	private static int _stringItemType = -1;
 	private static int StringItemType
 	{
@@ -84,8 +68,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		}
 	}
 
-	// Bait filter: accept gtceu:string (upstream-verbatim) OR any Terraria
-	// vanilla bait (`Item.bait > 0` - worms / master bait / fireflies / ...).
 	private static bool IsBait(Item item)
 	{
 		if (item is null || item.IsAir) return false;
@@ -101,18 +83,14 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		Traits.Attach(_cache);
 		Traits.RegisterPersistent("Cache", _cache);
 
-		// 1-slot filtered bait handler (java:116-117).
 		_baitHandler = new NotifiableItemStackHandler(1, IO.BOTH, IO.IN).SetFilter(IsBait);
 		Traits.Attach(_baitHandler);
 		Traits.RegisterPersistent("Bait", _baitHandler);
 
-		// AutoOutputTrait.ofItems(cache) - handler-ref form, no IItemHandler projection.
 		_autoOutput = AutoOutputTrait.OfItems(_cache);
 		Traits.Attach(_autoOutput);
 		Traits.RegisterPersistent("AutoOutput", _autoOutput);
 
-		// Mirror upstream setEnableEnvironmentalExplosions(false) (no-op for us -
-		// CheckEnvironment is a stub - but kept for parity).
 		var explosion = Traits.GetTrait<EnvironmentalExplosionTrait>(EnvironmentalExplosionTrait.TYPE);
 		explosion?.SetEnableEnvironmentalExplosions(false);
 	}
@@ -123,7 +101,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		EnsureTraits();
 	}
 
-	// Cache -> InventoryOutput, Bait -> InventoryInput; charger via base.
 	public override Item[]? GetSlotGroup(SlotGroup group) => group switch
 	{
 		SlotGroup.InventoryOutput => Cache.Storage.Stacks,
@@ -132,6 +109,19 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 	};
 
 	public override bool SupportsAutoOutputItems => true;
+
+	private int BaitCount => BaitHandler.SlotCount;
+	public int SlotCount  => BaitHandler.SlotCount + Cache.SlotCount;
+	public Item GetSlot(int slot) =>
+		slot < BaitCount ? BaitHandler.GetSlot(slot) : Cache.GetSlot(slot - BaitCount);
+	public Item Insert(int slot, Item item, bool simulate) =>
+		slot < BaitCount ? BaitHandler.Insert(slot, item, simulate) : Cache.Insert(slot - BaitCount, item, simulate);
+	public Item Extract(int slot, int maxAmount, bool simulate) =>
+		slot < BaitCount ? BaitHandler.Extract(slot, maxAmount, simulate) : Cache.Extract(slot - BaitCount, maxAmount, simulate);
+	public int GetSlotLimit(int slot) =>
+		slot < BaitCount ? BaitHandler.GetSlotLimit(slot) : Cache.GetSlotLimit(slot - BaitCount);
+	public bool IsItemValid(int slot, Item item) =>
+		slot < BaitCount ? BaitHandler.IsItemValid(slot, item) : Cache.IsItemValid(slot - BaitCount, item);
 
 	private bool _isWorkingEnabled = true;
 	public bool IsWorkingEnabled() => _isWorkingEnabled;
@@ -152,7 +142,7 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 	bool IWorkable.IsActive()      => _active;
 	public override bool IsActive  => _active;
 
-	public const int WaterCheckSize = 5;  // upstream WATER_CHECK_SIZE
+	public const int WaterCheckSize = 5;
 	private bool _hasWater;
 
 	protected override void OnTick()
@@ -162,8 +152,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		if (!_hasWater || GetMcOffsetTimer() % MaxProgress == 0L)
 			UpdateHasWater();
 
-		// updateFishingUpdateSubscription gate (java:179) - energy + bait + enabled.
-		// Bait filter runs on Insert, so any non-air bait stack is valid.
 		bool canFish = DrainEnergy(simulate: true)
 		            && !BaitHandler.Storage.GetStackInSlot(0).IsAir
 		            && _isWorkingEnabled;
@@ -185,18 +173,16 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 
 		_active = true;
 
-		// Pay the per-tick EU.
 		DrainEnergy(simulate: false);
 
 		if (_progress >= MaxProgress)
 		{
 			DoFishingRoll();
-			_progress = -1;       // upstream: -1 then increment -> 0
+			_progress = -1;
 		}
 		_progress++;
 	}
 
-	// DEVIATION from upstream's 5x5-plane all-water requirement (java:191): we just check water below the fisher
 	private void UpdateHasWater()
 	{
 		int left  = Position.X;
@@ -221,13 +207,11 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		_hasWater = false;
 	}
 
-	// roll loot, deposit into cache, consume bait (java:204-246).
 	private void DoFishingRoll()
 	{
 		int waterCenterX = Position.X + 1;
 		int waterY       = Position.Y + Size.Height;
 
-		// One roll per tick; any deposit consumes bait (upstream useBait |= tryFillCache).
 		var rolled = FishingLootRoller.Roll(Tier, waterCenterX, waterY, _junkEnabled);
 		bool useBait = false;
 		if (!rolled.IsAir)
@@ -235,7 +219,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 
 		if (useBait)
 		{
-			// junk-enabled = 1 bait per yield, fish-only = 2.
 			int consume = _junkEnabled ? 1 : 2;
 			var slot = BaitHandler.Storage.GetStackInSlot(0);
 			if (!slot.IsAir)
@@ -248,7 +231,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		}
 	}
 
-	// upstream tryFillCache - walk slots, any leftover reduction = success.
 	private bool TryFillCache(Item stack)
 	{
 		var storage = Cache.Storage;
@@ -260,7 +242,6 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		return false;
 	}
 
-	// simulate-first energy drain (java:257-265)
 	private bool DrainEnergy(bool simulate)
 	{
 		long resultEnergy = EnergyContainer.EnergyStored - EnergyPerTick;
@@ -272,11 +253,10 @@ public sealed class FisherMachine : TieredEnergyMachine, IWorkable, IControllabl
 		return false;
 	}
 
-	// Cache/bait/charger save via Traits; persist the machine-owned state.
 	public override void SaveData(TagCompound tag)
 	{
 		EnsureTraits();
-		base.SaveData(tag);   // Energy trait + ChargerSlot via TieredEnergyMachine
+		base.SaveData(tag);
 		tag["progress"]          = _progress;
 		tag["active"]            = _active;
 		tag["hasWater"]          = _hasWater;

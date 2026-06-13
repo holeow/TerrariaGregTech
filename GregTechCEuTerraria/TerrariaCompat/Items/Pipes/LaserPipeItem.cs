@@ -11,12 +11,9 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
-// Single upstream variant - LaserPipeType.NORMAL. No tiers, no paint, no
-// material discriminator. Axis-aligned straight runs only (walker traverses
-// one axis from each source side).
+// Single variant - LaserPipeType.NORMAL, no paint
 public sealed class LaserPipeItem : ModItem, ITextureWarmUp
 {
-	// Upstream id `<type>_laser_pipe` convention.
 	public override string Name    => "normal_laser_pipe";
 	public override string Texture => "GregTechCEuTerraria/Content/Textures/block/pipe/pipe_laser_in";
 	protected override bool CloneNewInstances => true;
@@ -30,7 +27,7 @@ public sealed class LaserPipeItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32; Item.height = 32;
 		Item.useTime = 2; Item.useAnimation = 6;
 		Item.useStyle = ItemUseStyleID.Swing;

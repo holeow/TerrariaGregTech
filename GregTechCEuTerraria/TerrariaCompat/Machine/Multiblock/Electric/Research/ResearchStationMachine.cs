@@ -11,11 +11,6 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric.Research;
 
-// Port of ResearchStationMachine (+ nested ResearchStationRecipeLogic). Locks
-// an Object Holder, draws EU + CWU/t over a duration_is_total_cwu recipe, then
-// stamps the holder's blank orb with the recipe's research_id - the stamped
-// orb unlocks assembly_line recipes via the Data Access Hatch.
-// frontFacing holder-orientation check dropped (no 2D facing).
 public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOpticalComputationReceiver
 {
 	public IOpticalComputationProvider? ComputationProvider { get; private set; }
@@ -25,7 +20,9 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 
 	protected override RecipeLogic CreateRecipeLogic() => new ResearchStationRecipeLogic();
 
-	public override bool RegressWhenWaiting() => false;   // verbatim upstream
+	public override bool RegressWhenWaiting() => false;
+
+	protected override bool SupportsRecipeLookupCore => false;
 
 	public IOpticalComputationProvider? GetComputationProvider() => ComputationProvider;
 
@@ -43,7 +40,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			else if (part is IOpticalComputationReceiver recv)
 				ComputationProvider ??= recv.GetComputationProvider();
 		}
-		// Persist actionable reason - bailing after matcher ok=true clears state.Error.
 		if (ObjectHolder == null)
 		{
 			SetUnformedReason("No Object Holder",
@@ -66,10 +62,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 		base.OnStructureInvalid();
 	}
 
-	// DEVIATION: upstream's addDisplayText has the
-	// `addComputationUsageExactLine(getMaxCWUt())` line commented out (TODO);
-	// we surface capacity vs required so an under-powered station is visible.
-	// Both are side-effect-free reads; server-resolved, synced via SaveData.
 	private int _displayCapacityCwu;
 	private int _displayReqCwu;
 	public int DisplayCapacityCwu => _displayCapacityCwu;
@@ -79,9 +71,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 	{
 		base.OnTick();
 		if (!IsServer || !IsFormed) return;
-		// Read via the hatch's container, NOT GetMaxCWUt: the interface entry
-		// adds the hatch to the seen set first; on bridged net topologies the
-		// cycle guard short-circuits to 0 ("Available: 0" trap).
 		_displayCapacityCwu = (ComputationProvider as OpticalComputationHatchMachine)?.GetAvailableCwu()
 			?? ComputationProvider?.GetMaxCWUt() ?? 0;
 		_displayReqCwu      = ResolveRequiredCwu();
@@ -89,8 +78,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 
 	private int ResolveRequiredCwu()
 	{
-		// Active recipe if running; else the station recipe whose items the holder
-		// satisfies (simulate/non-mutating; no RequestCWUt switch-saturation effect).
 		var cand = Recipe.GetLastRecipe();
 		if (cand == null)
 		{
@@ -123,7 +110,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 		_displayReqCwu      = tag.GetInt("rsReqCwu");
 	}
 
-	// Port of ResearchStationRecipeLogic.
 	public sealed class ResearchStationRecipeLogic : RecipeLogic
 	{
 		protected override IReadOnlyList<Type> ValidMachineClasses() =>
@@ -131,12 +117,8 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 
 		private ResearchStationMachine M => (ResearchStationMachine)Machine;
 
-		// Send full _progress: research cycle advances by CWU DRAWN per tick (not 1),
-		// so the client's flat _progress++ interpolation diverges. Same fix as
-		// CleanroomLogic.
 		public override void SaveForSync(Terraria.ModLoader.IO.TagCompound tag) => Save(tag);
 
-		// Skip output-room check (output replaces the holder's slot - always fits).
 		protected override ActionResult MatchRecipe(GTRecipe recipe)
 		{
 			var machine = GetRLMachine();
@@ -147,30 +129,17 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			return MatchTickRecipe(recipe);
 		}
 
-		// Port of ResearchStationRecipeLogic.checkMatchedRecipeAvailable (140-162).
-		// Required so the station picks up CWU becoming available without an
-		// item-change event: base impl leaves status IDLE on rejection, and
-		// IDLE + no lastFailedMatches unsubscribes the tick (RecipeLogic.cs:272).
-		// Upstream calls setWaiting(reason) -> WAITING -> IsIdle()=false -> stays
-		// subscribed until CWU recovers.
 		public override bool CheckMatchedRecipeAvailable(GTRecipe match)
 		{
 			var modified = GetRLMachine().FullModifyRecipe(match);
 			if (modified != null)
 			{
-				// "What is the point of this" - verbatim upstream.
 				if (modified.GetInputContents(CWURecipeCapability.CAP).Count == 0 &&
 				    modified.GetTickInputContents(CWURecipeCapability.CAP).Count == 0)
 				{
 					return true;
 				}
 
-				// ADAPTATION (parity outcome, not literal): upstream reaches this
-				// only for candidates its input-indexed lookup pre-matched against
-				// the holder. We scan all recipes (SupportsRecipeLookup=false), so
-				// without this gate setWaiting runs on every research recipe and the
-				// station shows WAITING while idle. Gate setWaiting on items actually
-				// matching the holder = the set upstream's lookup pre-filters to.
 				var itemIn  = modified.GetInputContents(ItemRecipeCapability.CAP);
 				var fluidIn = modified.GetInputContents(FluidRecipeCapability.CAP);
 				if (!M.TryMatchInputContents(modified, itemIn, fluidIn).IsSuccess)
@@ -196,8 +165,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			return false;
 		}
 
-		// IN: lock holder (inputs not consumed - "replaced" on OUT).
-		// OUT: clear item, stamp researched orb into data slot, unlock.
 		protected override ActionResult HandleRecipeIO(GTRecipe recipe, IO io)
 		{
 			var holder = M.ObjectHolder;
@@ -209,7 +176,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 				return ActionResult.SUCCESS;
 			}
 
-			// OUT - "replace" the holder contents with the research output.
 			if (_lastRecipe == null)
 			{
 				holder.SetLocked(false);
@@ -224,7 +190,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			return ActionResult.SUCCESS;
 		}
 
-		// OUT has no tick outputs to emit; IN consumes normally.
 		protected override ActionResult HandleTickRecipeIO(GTRecipe recipe, IO io)
 		{
 			if (io != IO.OUT) return base.HandleTickRecipeIO(recipe, io);
@@ -263,8 +228,6 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			_                          => (0, null),
 		};
 
-		// Extract research_id + research_type from the SNBT
-		// `{assembly_line_research:{research_id:"...",research_type:"..."}}`.
 		private static (string id, string type) ParseResearch(string snbt)
 		{
 			string id   = ExtractQuoted(snbt, "research_id");

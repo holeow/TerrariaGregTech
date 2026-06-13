@@ -8,9 +8,6 @@ using Terraria.Localization;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock;
 
-// TerrariaCompat-side beautification of upstream-locked Api PatternError text.
-// Collapses tier-prefixed candidates so "ULV Output Bus +14 more" becomes
-// "Output Bus (ULV~MAX)" - communicates "any tier works", less misleading.
 public static class MultiblockErrorText
 {
 	private static readonly string[] TierShort =
@@ -22,8 +19,6 @@ public static class MultiblockErrorText
 	public static string Describe(PatternError err) =>
 		err is SinglePredicateError spe ? DescribeCount(spe) : err.ErrorInfo;
 
-	// Count errors -> single line (avoid duplicating status). Wrong-block errors
-	// keep the base PatternError's per-candidate bullet list.
 	public static IEnumerable<string> DescribeLines(PatternError err)
 	{
 		if (err is SinglePredicateError spe)
@@ -37,7 +32,6 @@ public static class MultiblockErrorText
 
 	private static string DescribeCount(SinglePredicateError spe)
 	{
-		// Type: 0 too-many global, 1 not-enough global, 2 too-many/layer, 3 not-enough/layer.
 		bool tooMany  = spe.Type == 0 || spe.Type == 2;
 		bool perLayer = spe.Type == 2 || spe.Type == 3;
 		int required = spe.Type switch
@@ -49,7 +43,6 @@ public static class MultiblockErrorText
 			_ => -1,
 		};
 
-		// Per-layer count is wiped between layers; only global is reliable.
 		int actual = -1;
 		if (!perLayer && spe.WorldState is not null)
 			spe.WorldState.GlobalCount.TryGetValue(spe.Predicate, out actual);
@@ -62,8 +55,6 @@ public static class MultiblockErrorText
 		return $"{verb} {desc}{layer} {needWord} {required}{have}";
 	}
 
-	// "<base> (<low>~<high>)" when every entry shares a tier-prefix; else a
-	// short "/"-joined list.
 	private static string DescribeCandidates(List<Item> candidates)
 	{
 		var bases    = new List<string>();
@@ -73,7 +64,7 @@ public static class MultiblockErrorText
 		foreach (var it in candidates)
 		{
 			if (it is null || it.IsAir) continue;
-			(int tier, string baseName) = SplitTier(Lang.GetItemName(it.type).Value);
+			(int tier, string baseName) = SplitTier(Api.Util.TerrariaText.ItemName(it.type));
 			if (tier >= 0)
 			{
 				if (tier < minTier) minTier = tier;
@@ -104,7 +95,6 @@ public static class MultiblockErrorText
 		return sb.ToString();
 	}
 
-	// tierIndex < 0 when the leading token isn't a voltage short-name.
 	private static (int tier, string baseName) SplitTier(string name)
 	{
 		int sp = name.IndexOf(' ');

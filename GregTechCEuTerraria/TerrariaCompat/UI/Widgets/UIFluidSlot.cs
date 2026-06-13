@@ -123,11 +123,16 @@ public sealed class UIFluidSlot : UIElement
 			    || Items.Fluids.FluidBucketRegistry.Get(stored.Type!.Id) != null;
 		}
 
-		if (held.ModItem is Items.Fluids.FluidCellItem cell)
+		if (held.ModItem is IFluidHandlerItem container)
 		{
-			if (cell.GetFluidStack().IsEmpty)
-				return _allowDrain && !tank.Drain(cell.Capacity, simulate: true).IsEmpty;
-			return _allowFill && tank.Fill(cell.GetFluidStack(), simulate: true) > 0;
+			var contents = container.GetTank(0);
+			if (contents.IsEmpty)
+			{
+				if (!_allowDrain) return false;
+				var pulled = tank.Drain(container.GetCapacity(0), simulate: true);
+				return !pulled.IsEmpty && container.Fill(pulled, simulate: true) > 0;
+			}
+			return _allowFill && tank.Fill(contents, simulate: true) > 0;
 		}
 
 		return false;

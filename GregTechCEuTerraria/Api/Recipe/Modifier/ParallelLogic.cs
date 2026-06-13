@@ -5,27 +5,8 @@ using GregTechCEuTerraria.Api.Recipe.Content;
 
 namespace GregTechCEuTerraria.Api.Recipe.Modifier;
 
-// Port of com.gregtechceu.gtceu.api.recipe.modifier.ParallelLogic.
-//
-// Two parallel-amount finders:
-//   - GetParallelAmount        - full upstream two-step search
-//   - GetParallelAmountFast    - power-of-2 fast finder
-//   - AdjustMultiplier         - verbatim port of upstream adjustMultiplier.
-//
-// adaptations:
-// Upstream dispatches input-check / output-check through
-// `IRecipeCapabilityHolder.getCapabilitiesFlat(IO, cap)` + per-capability
-// `RecipeCapability.getMaxParallelByInput / limitMaxParallelByOutput` (which
-// use inventory aggregation for input ratios and simulated
-// `handler.handleRecipe(IO.OUT, ..., simulate=true)` for output binary-search).
-//
 public static class ParallelLogic
 {
-	// === Public entry points ===================================================
-
-	//   1. parallelLimit <= 1 -> return parallelLimit.
-	//   2. max-by-input - largest N <= parallelLimit where (recipe x N) inputs fit.
-	//   3. limit-by-output-merging from maxByInput.
 	public static int GetParallelAmount(IRecipeLogicMachine machine, GTRecipe recipe, int parallelLimit)
 	{
 		if (parallelLimit <= 1) return parallelLimit;
@@ -60,7 +41,6 @@ public static class ParallelLogic
 		return 1;
 	}
 
-	// binary-search step for the output-merge / parallel finder.
 	public static int[] AdjustMultiplier(bool mergedAll, int minMultiplier, int multiplier, int maxMultiplier)
 	{
 		if (mergedAll)
@@ -108,8 +88,6 @@ public static class ParallelLogic
 		return mid;
 	}
 
-	// === Per-step feasibility predicates =======================================
-	// does (recipe x N) satisfy ALL input capabilities the machine cares about
 	private static bool InputsFitAt(IRecipeLogicMachine machine, GTRecipe recipe, int n, bool skipEu)
 	{
 		if (n <= 0) return false;
@@ -117,7 +95,6 @@ public static class ParallelLogic
 		return MatchRecipeInputs(machine, copied) && MatchTickRecipeInputs(machine, copied, skipEu);
 	}
 
-	// does (recipe x N) deposit cleanly into all non-voided output capabilities?
 	private static bool OutputsFitAt(IRecipeLogicMachine machine, GTRecipe recipe, int n, bool skipEu)
 	{
 		if (n <= 0) return false;
@@ -125,18 +102,18 @@ public static class ParallelLogic
 
 		var itemsOut  = machine.CanVoidRecipeOutputs(ItemRecipeCapability.CAP)
 			? System.Array.Empty<Content.Content>()
-			: copied.GetOutputContents(ItemRecipeCapability.CAP);
+			: ScaleAllOutputs(recipe.GetOutputContents(ItemRecipeCapability.CAP), ItemRecipeCapability.CAP, n);
 		var fluidsOut = machine.CanVoidRecipeOutputs(FluidRecipeCapability.CAP)
 			? System.Array.Empty<Content.Content>()
-			: copied.GetOutputContents(FluidRecipeCapability.CAP);
+			: ScaleAllOutputs(recipe.GetOutputContents(FluidRecipeCapability.CAP), FluidRecipeCapability.CAP, n);
 		if (!machine.HasOutputRoomContents(copied, itemsOut, fluidsOut).IsSuccess) return false;
 
 		var itemsTickOut  = machine.CanVoidRecipeOutputs(ItemRecipeCapability.CAP)
 			? System.Array.Empty<Content.Content>()
-			: copied.GetTickOutputContents(ItemRecipeCapability.CAP);
+			: ScaleAllOutputs(recipe.GetTickOutputContents(ItemRecipeCapability.CAP), ItemRecipeCapability.CAP, n);
 		var fluidsTickOut = machine.CanVoidRecipeOutputs(FluidRecipeCapability.CAP)
 			? System.Array.Empty<Content.Content>()
-			: copied.GetTickOutputContents(FluidRecipeCapability.CAP);
+			: ScaleAllOutputs(recipe.GetTickOutputContents(FluidRecipeCapability.CAP), FluidRecipeCapability.CAP, n);
 		if (itemsTickOut.Count > 0 || fluidsTickOut.Count > 0)
 		{
 			if (!machine.HasOutputRoomContents(copied, itemsTickOut, fluidsTickOut).IsSuccess) return false;
@@ -152,6 +129,15 @@ public static class ParallelLogic
 		}
 
 		return true;
+	}
+
+	private static System.Collections.Generic.IReadOnlyList<Content.Content> ScaleAllOutputs(
+		System.Collections.Generic.IReadOnlyList<Content.Content> contents, object cap, int n)
+	{
+		var mod = ContentModifier.Multiplier_(n);
+		var list = new System.Collections.Generic.List<Content.Content>(contents.Count);
+		foreach (var c in contents) list.Add(c.CopyChanced(cap, mod));
+		return list;
 	}
 
 	private static bool MatchRecipeInputs(IRecipeLogicMachine machine, GTRecipe recipe)

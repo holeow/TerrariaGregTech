@@ -9,10 +9,6 @@ using Terraria.Localization;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
-// Single source of truth for held-item behaviour across PipeItem and
-// SimpleItem/FluidPipeItem - the controls-hint + cell-info hover tooltip and
-// the RMB-held cut. Per-stack `removeCooldown` is owned by the caller so the
-// cadence survives across HoldItem ticks of the same instance.
 public static class PipeHeldItemBehavior
 {
 	public static void Tick(
@@ -28,8 +24,6 @@ public static class PipeHeldItemBehavior
 		HandleRmbCut(player, layer, ref removeCooldown, useTime);
 	}
 
-	// Per-kind: an item-pipe item reads only the item layer, etc. - matches
-	// the PostDrawTiles foreground-overlay gating.
 	private static void Hover(Player player, PipeKind kind, string heldKindLabel)
 	{
 		if (player.mouseInterface || Main.gameMenu) return;
@@ -43,8 +37,6 @@ public static class PipeHeldItemBehavior
 		string? line2 = null;
 		if (kind == PipeKind.Laser)
 		{
-			// Laser pipes have no per-cell payload; surface active/idle only -
-			// the held-item view is "what am I about to do", not full diagnostic.
 			if (!Pipelike.Laser.LaserPipeLayerSystem.Pipes.Has(x, y))
 			{
 				UI.WorldHoverTooltip.Set(controlsLine); return;
@@ -81,9 +73,7 @@ public static class PipeHeldItemBehavior
 				? "Simple Item Pipe"
 				: $"{HumanizeMaterial(i.MaterialId)} {Capitalize(sizeWord)} {kindWord}";
 			float rate = i.TransferRate;
-			line2 = (rate % 1 != 0f)
-				? $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64f) + 0.5f)} items/s"
-				: $"[c/55FFFF:Transfer Rate:] {(int)rate} stacks/s";
+			line2 = $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64f) + 0.5f)} items/s";
 		}
 
 		UI.WorldHoverTooltip.Set(line2 is null
@@ -91,8 +81,6 @@ public static class PipeHeldItemBehavior
 			: string.Join("\n", controlsLine, line1, line2));
 	}
 
-	// Routes strictly through the supplied layer handle so a fluid pipe
-	// can't cut item pipes and vice versa. Cooldown matches useTime.
 	private static void HandleRmbCut(Player player, IGridLayerHandle layer, ref int removeCooldown, int useTime)
 	{
 		if (!Main.mouseRight) { removeCooldown = 0; return; }

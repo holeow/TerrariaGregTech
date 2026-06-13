@@ -58,13 +58,10 @@ public static class NetRouter
 			case PacketType.CreativeEnergySet:MachineActions.HandleIncoming<CreativeEnergySetAction>(reader, whoAmI); break;
 			case PacketType.TransformerToggle:TransformerTogglePacket.Handle(reader, whoAmI); break;
 			case PacketType.LdEndpointToggle: LdEndpointTogglePacket.Handle(reader, whoAmI); break;
-			// 17 (ChestInsert) / 18 (TankInteract) retired - see PacketType.cs.
 			case PacketType.CrateTape:        CrateTapePacket.Handle(reader, whoAmI); break;
 			case PacketType.DrumScrewdriver:  DrumScrewdriverPacket.Handle(reader, whoAmI); break;
 			case PacketType.CursorUpdate:     CursorUpdatePacket.HandleOnClient(reader); break;
 			case PacketType.EnderChannelSync: EnderChannelSyncPacket.HandleOnClient(reader); break;
-			case PacketType.ActiveCasingSet:     ActiveCasingPacket.HandleSet(reader); break;
-			case PacketType.ActiveCasingRequest: ActiveCasingPacket.HandleRequest(reader, whoAmI); break;
 			case PacketType.MultiblockFormed:    MultiblockFormedPacket.HandleSet(reader); break;
 			case PacketType.BlockExplosionEffect: BlockExplosionEffectPacket.HandleOnClient(reader); break;
 			case PacketType.EnergyNetStats:   EnergyNetStatsPacket.HandleOnClient(reader); break;

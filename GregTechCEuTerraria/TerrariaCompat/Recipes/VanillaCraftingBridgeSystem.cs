@@ -4,7 +4,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// Bridges RecipeRegistry into Terraria's vanilla crafting
 public sealed class VanillaCraftingBridgeSystem : ModSystem
 {
 	public override void AddRecipeGroups()
@@ -24,7 +23,6 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		BlockBridgedRecipesFromMagicStorageRecursion();
 	}
 
-	// Magic Storage builds a recursive crafting tree per enabled recipe at load, we block it
 	private void BlockBridgedRecipesFromMagicStorageRecursion()
 	{
 		if (!ModLoader.TryGetMod("MagicStorage", out var ms)) return;
@@ -45,7 +43,6 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		Mod.Logger.Info($"[magicstorage] blocked {n} bridged recipes from recursive crafting (load-time perf)");
 	}
 
-	// Early-game progression fix
 	private void AddCompatHandRecipes()
 	{
 		if (Mod.TryFind<ModItem>("wood_rod", out var rod))
@@ -80,8 +77,13 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		{
 			int? type = Items.MaterialItemRegistry.Get(materialId, prefix);
 			if (type is null || type <= 0) return;
+			// Forward: 1 vanilla ore -> 16 raw_X
 			Terraria.Recipe.Create(type.Value, Tiles.OreTileRegistry.RawOrePerBlock)
 				.AddIngredient(vanillaItemId, 1)
+				.Register();
+			// Backward: 16 raw_X -> 1 vanilla ore
+			Terraria.Recipe.Create(vanillaItemId, 1)
+				.AddIngredient(type.Value, Tiles.OreTileRegistry.RawOrePerBlock)
 				.Register();
 		}
 

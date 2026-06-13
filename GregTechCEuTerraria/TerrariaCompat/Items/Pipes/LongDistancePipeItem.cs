@@ -10,9 +10,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
-// Base for the two long-distance pipe items. Dumb LD conduit (no covers, no
-// contents). Pair endpoints; insert at input -> emerge at output. Subclasses
-// fix Type / id / texture.
 public abstract class LongDistancePipeItem : ModItem, ITextureWarmUp
 {
 	protected abstract LongDistancePipeType PipeType { get; }
@@ -23,7 +20,7 @@ public abstract class LongDistancePipeItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32; Item.height = 32;
 		Item.useTime = 2; Item.useAnimation = 6;
 		Item.useStyle = ItemUseStyleID.Swing;

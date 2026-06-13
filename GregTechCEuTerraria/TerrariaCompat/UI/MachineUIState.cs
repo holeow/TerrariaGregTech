@@ -19,8 +19,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// UIState that hosts a machine's panel + widgets, bound to a specific entity.
-// Rebuilds children whenever Bind is called with a fresh entity/layout.
 public sealed class MachineUIState : UIState
 {
 	private const float SlotGap = 1f;
@@ -61,7 +59,6 @@ public sealed class MachineUIState : UIState
 
 	public void RequestCoverSettings(CoverSide side) => _pendingCoverOpen = side;
 
-	// RMB toggles - opens the popup, or closes if already open
 	private void ToggleCoverSettings(CoverSide side)
 	{
 		if (_entity is null || _layout is null) return;
@@ -196,9 +193,12 @@ public sealed class MachineUIState : UIState
 
 		if (_entity is IRecipeLogicMachine proc)
 			AppendRecipeBrowser(proc);
+		else if (_entity is Machine.Multiblock.MultiblockControllerMachine ctrl
+			&& ctrl.Definition?.RecipeType is { } rt
+			&& rt != Common.Recipe.GTRecipeTypes.DUMMY)
+			AppendRecipeBrowser(() => rt.RegistryName, _ => true, isMultiMode: false);
 	}
 
-	// IO & cover panel pinned above the machine panel, centered
 	private void AppendIOConfigPanel(MetaMachine entity, UITerrariaPanel machinePanel)
 	{
 		bool wantsItem  = entity.SupportsAutoOutputItems;
@@ -332,7 +332,6 @@ public sealed class MachineUIState : UIState
 		Append(ioPanel);
 	}
 
-	// Power toggle panel - left of the machine panel, top of the left stack
 	private void AppendPowerTogglePanel(MetaMachine entity, UITerrariaPanel machinePanel)
 	{
 		float s = _layout!.Scale;
@@ -720,11 +719,17 @@ public sealed class MachineUIState : UIState
 
 	private void AppendRecipeBrowser(IRecipeLogicMachine proc)
 	{
-		string currentStation = proc.GetRecipeType().RegistryName;
-		var allRecipes = RecipeRegistry.ForStation(currentStation)
-			.Where(proc.ShowsInRecipeBrowser).ToList();
 		bool isMultiMode = proc is TerrariaCompat.Machine.Multiblock.WorkableMultiblockMachine wmmMode
 			&& wmmMode.GetRecipeTypes().Length > 1;
+		AppendRecipeBrowser(() => proc.GetRecipeType().RegistryName, proc.ShowsInRecipeBrowser, isMultiMode);
+	}
+
+	private void AppendRecipeBrowser(System.Func<string> stationGetter,
+		System.Func<GTRecipe, bool> filter, bool isMultiMode)
+	{
+		string currentStation = stationGetter();
+		var allRecipes = RecipeRegistry.ForStation(currentStation)
+			.Where(filter).ToList();
 		if (allRecipes.Count == 0 && !isMultiMode) return;
 
 		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
@@ -735,7 +740,7 @@ public sealed class MachineUIState : UIState
 		float browserHalfH = (uiH * 0.78f - 8f) / 2f;
 
 		ModLoader.GetMod("GregTechCEuTerraria").Logger.Info(
-			$"[recipe-browser] open for {proc.GetRecipeType().RegistryName} (recipes={allRecipes.Count}) " +
+			$"[recipe-browser] open for {currentStation} (recipes={allRecipes.Count}) " +
 			$"uiW={uiW:F0} uiH={uiH:F0} panelW={browserW:F0} halfH={browserHalfH:F0}");
 
 		string[] queryTokens = System.Array.Empty<string>();
@@ -775,17 +780,17 @@ public sealed class MachineUIState : UIState
 		}
 		bool RebuildIfStationChanged()
 		{
-			string s = proc.GetRecipeType().RegistryName;
+			string s = stationGetter();
 			if (s == currentStation) return false;
 			currentStation = s;
-			allRecipes = RecipeRegistry.ForStation(s).Where(proc.ShowsInRecipeBrowser).ToList();
+			allRecipes = RecipeRegistry.ForStation(s).Where(filter).ToList();
 			ApplySearchFilter();
 			return true;
 		}
 
 		var allPanel = BuildBrowserPanelWithSearch(
 			browserTop, browserW, browserHalfH,
-			countLabel: () => $"{searchFiltered.Count} / {allRecipes.Count}  *  {proc.GetRecipeType().RegistryName}",
+			countLabel: () => $"{searchFiltered.Count} / {allRecipes.Count}  *  {currentStation}",
 			list: new UIRecipeList(() => { RebuildIfStationChanged(); return searchFiltered; }, emptyHint: "No recipes match this search"),
 			searchPlaceholder: "Search...  *  RMB to clear",
 			onSearchChanged: OnSearchChanged);

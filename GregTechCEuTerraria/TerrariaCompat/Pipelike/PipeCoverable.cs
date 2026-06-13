@@ -12,17 +12,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike;
 
-// Per-pipe-cell ICoverable (analogue of upstream's PipeCoverContainer).
-// Per-side state, three independent fields:
-//   _modes[i]        - Off / Passive / Active : which cover is in effect
-//   _filterTypes[i]  - None / Simple / Tag    : pipe-UI filter choice
-//   _filterCovers[i] - Passive cover (ItemFilterCover / FluidFilterCover)
-//   _robotArms[i]    - Active cover  (RobotArmCover / FluidRegulatorCover)
-//
-// DEVIATION: upstream pipes have no Passive /
-// Active mode; covers are placed individually by item. The two-slot
-// container + mode dispatch is pipe-UI mechanism. The cover BEHAVIOURS
-// themselves stay upstream-verbatim.
 public sealed class PipeCoverable : ICoverable
 {
 	public PipeKind Layer { get; }
@@ -41,11 +30,6 @@ public sealed class PipeCoverable : ICoverable
 		return arr;
 	}
 
-	// Lazy-allocated. SetFilterType(None) clears the Passive slot while
-	// keeping _modes[i] = Passive (side is "configured as transparent").
-	// Mode flip keeps the inactive side's cover so settings survive.
-	//   Item  layer: ItemFilterCover  / RobotArmCover
-	//   Fluid layer: FluidFilterCover / FluidRegulatorCover
 	internal readonly CoverBehavior?[] _filterCovers = new CoverBehavior?[CoverSides.Count];
 	internal readonly CoverBehavior?[] _robotArms    = new CoverBehavior?[CoverSides.Count];
 
@@ -87,7 +71,6 @@ public sealed class PipeCoverable : ICoverable
 
 	public void NotifyBlockUpdate()
 	{
-		// Pipes have no per-cell cover render today; hook here if one appears.
 	}
 
 	private readonly System.Collections.Generic.List<TickableSubscription> _serverTicks  = new();
@@ -202,9 +185,6 @@ public sealed class PipeCoverable : ICoverable
 		_                      => null,
 	};
 
-	// Simple-pipe UI: OFF/INSERT/EXTRACT maps to (mode, cover.Io, filter).
-	// A simple-mode side is just Active + RobotArm/FluidRegulator with a
-	// fixed allow-all filter (Blacklist + no matches).
 	public SimpleSideMode GetSimpleMode(CoverSide side)
 	{
 		int i = (int)side;
@@ -229,10 +209,6 @@ public sealed class PipeCoverable : ICoverable
 		SetMode(side, PipeSideMode.Active);
 		SetFilterType(side, PipeFilterType.Simple);
 		var cover = GetCoverAtSide(side);
-		if (Layer == PipeKind.Item)
-			cover?.UiItemFilter?.SetBlackList(true);
-		else
-			cover?.UiFluidFilter?.SetBlackList(true);
 
 		var targetIo = mode == SimpleSideMode.Insert
 			? Api.Capability.Recipe.IO.OUT
@@ -252,7 +228,6 @@ public sealed class PipeCoverable : ICoverable
 		_                    => null,
 	};
 
-	// ===== ICoverable capability =================================
 	public IItemHandler? GetItemHandlerCap(IODirection side, bool useCoverCapability)
 	{
 		if (Layer != PipeKind.Item) return null;
@@ -377,7 +352,6 @@ public sealed class PipeCoverable : ICoverable
 		return s;
 	}
 
-	// Passive: swap the cover instance. AttachItem dispatches filter type
 	internal CoverBehavior? InstallFilterCover(CoverSide side, PipeFilterType type)
 	{
 		int i = (int)side;
@@ -398,10 +372,16 @@ public sealed class PipeCoverable : ICoverable
 		cover.OnAttached(attachStack);
 		cover.OnLoad();
 		_filterCovers[i] = cover;
+		ApplyDefaultBlacklist(cover);
 		return cover;
 	}
 
-	// Active: cover stays in place; install-slot handler swaps filter item
+	private void ApplyDefaultBlacklist(CoverBehavior cover)
+	{
+		if (Layer == PipeKind.Item) cover.UiItemFilter?.SetBlackList(true);
+		else                        cover.UiFluidFilter?.SetBlackList(true);
+	}
+
 	private void ApplyActiveFilterItem(CoverSide side, PipeFilterType type)
 	{
 		int i = (int)side;
@@ -417,6 +397,7 @@ public sealed class PipeCoverable : ICoverable
 			cover.UiFluidFilterHandler?.SetFilterItem(
 				type == PipeFilterType.None ? new Item() : MakeFilterStack(type));
 		}
+		if (type != PipeFilterType.None) ApplyDefaultBlacklist(cover);
 	}
 
 	public bool CanPlaceCoverOnSide(CoverDefinition definition, CoverSide side) => true;

@@ -19,8 +19,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Tools;
 
-// One (Material x GTToolType) pair, mirroring upstream's GTToolItem
-// Electric tools store EU per-stack - same BatteryItem charge
 public sealed class ToolItem : ModItem, IElectricItem
 {
 	private readonly string? _id;
@@ -57,9 +55,9 @@ public sealed class ToolItem : ModItem, IElectricItem
 			: tp.AttackDamage + def.BaseDamage;
 		_harvestLevel = tp.HarvestLevel + def.BaseQuality;
 
-		bool isPick = type.ToolClassNames.Contains("pickaxe") || type.Name.Contains("drill");
-		bool isAxe = type.ToolClassNames.Contains("axe") || type.Name.Contains("chainsaw");
 		bool isHammer = ReferenceEquals(type, GTToolType.HARD_HAMMER);
+		bool isPick = !isHammer && (type.ToolClassNames.Contains("pickaxe") || type.Name.Contains("drill"));
+		bool isAxe = type.ToolClassNames.Contains("axe") || type.Name.Contains("chainsaw");
 
 		int upPick    = isPick   ? Math.Min(250, 28 + _harvestLevel * 20) : 0;
 		int upAxe     = isAxe    ? Math.Max(5, 7 + _harvestLevel * 4)     : 0;
@@ -110,8 +108,6 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 		if (type.IsElectric)
 		{
-			// x4/tier from LV=100k. Upstream reads this off the assembly
-			// recipe's .get(maxCharge) - placeholder until tool recipes carry it.
 			_maxCharge = 100_000L * (long)Math.Pow(4, type.ElectricTier - 1);
 			_euPerUse = Math.Max(1, _maxCharge / 4000);
 		}
@@ -187,6 +183,7 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 	public int Tier => _tier;
 	public bool IsSoftDigger => _type != null && (_type.Name == "shovel" || _type.Name == "spade");
+	public bool IsShovel => _type != null && _type.Name == "shovel";
 	public bool IsSawLike => _type != null && (_type.Name == "saw" || _type.Name == "buzzsaw");
 	public bool IsMortar => _type != null && _type.Name == "mortar";
 	public bool IsHoe => _type != null && _type.Name == "hoe";
@@ -434,8 +431,7 @@ public sealed class ToolItem : ModItem, IElectricItem
 	public override void HoldItem(Player player)
 	{
 		EnsureTextureBaked();
-		// Scythe: Guide-To-Plant-Fiber-Cordage parity (50% Vine drop).
-		if (IsScythe) player.cordage = true;
+		if (IsScythe) player.cordage = true; // 50% Vine drop
 	}
 
 	public void EnsureTextureBaked()
@@ -483,7 +479,11 @@ public sealed class ToolItem : ModItem, IElectricItem
 
 		switch (n)
 		{
-			case "shovel":         return "Quickly digs soft ground (~3x pickaxe speed). Cannot break stone.";
+			case "shovel":
+			{
+				int wormPct = (int)System.Math.Round((0.10f + System.Math.Clamp(_tier / 9f, 0f, 1f) * 0.90f) * 100f);
+				return $"Quickly digs soft ground (~3x pickaxe speed). Cannot break stone. {wormPct}% chance get a Worm when digging grass.";
+			}
 			case "spade":          return $"Digs a {aoeLen}-tile line of soft ground (~2x pickaxe speed). Cannot break stone.";
 			case "pickaxe":        return "Mines blocks and ore.";
 			case "mining_hammer":  return $"Mines a {aoeLen}-tile line of blocks.";

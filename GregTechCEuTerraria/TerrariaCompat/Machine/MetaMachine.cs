@@ -24,7 +24,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Base for any in-world machine. Mirrors upstream MetaMachine + TieredMachine flattened
 public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable, IFancyTooltip, ISidedCapabilityProvider
 {
 	private Common.Energy.VoltageTier? _persistedTier;
@@ -35,7 +34,6 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 
 	public MachineDefinition? Definition => _definition;
 
-	// safe to call from any Ensure* hook
 	public void BindDefinition()
 	{
 		if (_definition != null) return;
@@ -75,7 +73,6 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 			: MachineId)
 		: GetType().Name;
 
-	// Activator-ctor fallback; real tier is _persistedTier via Tier
 	protected readonly Common.Energy.VoltageTier _tier;
 
 	protected MetaMachine()
@@ -123,10 +120,7 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 		}
 	}
 
-	private static readonly System.Text.RegularExpressions.Regex _colorTagRe =
-		new(@"\[c/[0-9A-Fa-f]+:(.*?)\]", System.Text.RegularExpressions.RegexOptions.Compiled);
-
-	internal static string StripColorTags(string s) => _colorTagRe.Replace(s, "$1");
+	internal static string StripColorTags(string s) => Api.Util.TerrariaText.StripColorTags(s);
 
 	protected virtual int OwnerTileType => Mod.TryFind<ModTile>(MachineKey, out var t) ? t.Type : 0;
 
@@ -227,7 +221,6 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 
 	public void Unsubscribe(TickableSubscription? current) => current?.Unsubscribe();
 
-	// Driven by EnergyNetSystem.PostUpdateWorld. Server-only - clients receive snapshots via MachineStateSyncPacket
 	internal virtual void SystemTick()
 	{
 		if (IsClient) return;
@@ -303,7 +296,6 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 	public virtual bool SupportsAutoOutputFluids => false;
 	public virtual AutoOutputTrait? AutoOutput => null;
 
-	// Per-side capability resolver - pipe / adjacent-transfer entry point, player interaction bypasses it
 	public virtual IItemHandler? GetItemHandlerCap(IODirection side, bool useCoverCapability = true)
 	{
 		if (this is not IItemHandler handler) return null;
@@ -384,7 +376,6 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 
 	public Point16 GetBlockPos() => Position;
 
-	// Per-position offset so covers on different machines don't sync up
 	public long GetOffsetTimer() => (long)Main.GameUpdateCount + ((Position.X * 13L + Position.Y * 7L) & 0x3FF);
 
 	public long GetMcOffsetTimer() =>

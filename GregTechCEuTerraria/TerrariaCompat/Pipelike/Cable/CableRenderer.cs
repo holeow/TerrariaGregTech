@@ -31,14 +31,57 @@ public static class CableRenderer
 
 	public static void DrawForegroundOverlay()
 	{
-		var cables = CableLayerSystem.Cables;
-		if (cables.Count == 0) return;
-
 		var sb = Main.spriteBatch;
 		sb.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp,
 			DepthStencilState.None, RasterizerState.CullCounterClockwise, null, Main.GameViewMatrix.TransformationMatrix);
-		try { DrawAll(sb, foreground: true); }
+		try
+		{
+			if (CableLayerSystem.Cables.Count > 0) DrawAll(sb, foreground: true);
+			DrawFaceHints(sb);
+		}
 		finally { sb.End(); }
+	}
+
+	private static readonly Color OutputHint = Color.Orange;
+	private static readonly Color InputHint  = new Color(60, 140, 255);
+
+	private static void DrawFaceHints(SpriteBatch sb)
+	{
+		var px = Terraria.GameContent.TextureAssets.MagicPixel?.Value;
+		if (px is null) return;
+
+		int firstX = (int)(Main.screenPosition.X / 16) - 2;
+		int lastX  = (int)((Main.screenPosition.X + Main.screenWidth) / 16) + 2;
+		int firstY = (int)(Main.screenPosition.Y / 16) - 2;
+		int lastY  = (int)((Main.screenPosition.Y + Main.screenHeight) / 16) + 2;
+
+		foreach (var te in Terraria.DataStructures.TileEntity.ByID.Values)
+		{
+			if (te is not TerrariaCompat.Machine.MetaMachine machine) continue;
+			if (machine is not Api.Capability.IEnergyContainer container) continue;
+
+			foreach (var (cx, cy) in machine.Cells())
+			{
+				if (cx < firstX || cx > lastX || cy < firstY || cy > lastY) continue;
+
+				var face = container.EnergyFaceForCell(cx, cy);
+				if (face == Api.Capability.IODirection.None) continue;
+
+				Color c;
+				if (container.OutputsEnergy(face))     c = OutputHint;
+				else if (container.InputsEnergy(face)) c = InputHint;
+				else continue;
+
+				int sx = cx * 16 - (int)Main.screenPosition.X;
+				int sy = cy * 16 - (int)Main.screenPosition.Y;
+				sb.Draw(px, new Rectangle(sx, sy, 16, 16), c * 0.38f);
+				Color edge = c * 0.85f;
+				sb.Draw(px, new Rectangle(sx,      sy,      16, 2), edge);
+				sb.Draw(px, new Rectangle(sx,      sy + 14, 16, 2), edge);
+				sb.Draw(px, new Rectangle(sx,      sy,      2, 16), edge);
+				sb.Draw(px, new Rectangle(sx + 14, sy,      2, 16), edge);
+			}
+		}
 	}
 
 	private static void DrawAll(SpriteBatch sb, bool foreground)
@@ -117,7 +160,7 @@ public static class CableRenderer
 		}
 	}
 
-	private static Color JacketColor(Color c) =>
+	public static Color JacketColor(Color c) =>
 		new Color((byte)(c.R * 0.35f), (byte)(c.G * 0.35f), (byte)(c.B * 0.35f), c.A);
 
 	public static Color DarkenForInsulation(Color c) =>

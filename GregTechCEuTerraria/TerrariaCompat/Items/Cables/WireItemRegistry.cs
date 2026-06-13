@@ -3,13 +3,11 @@ using System;
 using System.Collections.Generic;
 using GregTechCEuTerraria.Common.Materials;
 using GregTechCEuTerraria.TerrariaCompat.Items.Registry;
+using GregTechCEuTerraria.TerrariaCompat.Pipelike.Cable;
 using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Cables;
 
-// Registers one WireItem per MaterialPipeBlockItem dump entry with a
-// `wireGt*` (uninsulated) or `cableGt*` (insulated) prefix. Name = upstream id
-// verbatim. MaterialItemRegistry skips these so they aren't double-registered.
 public static class WireItemRegistry
 {
 	// Key = (materialId, wireSize, insulated)
@@ -20,10 +18,12 @@ public static class WireItemRegistry
 	public static int? Get(string materialId, byte wireSize, bool insulated) =>
 		_items.TryGetValue((materialId, wireSize, insulated), out var it) ? it.Type : null;
 
+	public static CableCell? BuildCell(string materialId, byte wireSize, bool insulated) =>
+		_items.TryGetValue((materialId, wireSize, insulated), out var it)
+			? it.BuildCell() : (CableCell?)null;
+
 	private const string PipeItemClass = "com.gregtechceu.gtceu.api.item.MaterialPipeBlockItem";
 
-	// Upstream pipe TagPrefix -> wire-size byte. Kind derived from prefix
-	// (StartsWith "cable") at registration time.
 	private static readonly Dictionary<string, byte> PrefixToSize = new()
 	{
 		["wireGtSingle"]     = 1,
@@ -51,8 +51,6 @@ public static class WireItemRegistry
 
 			var material = MaterialRegistry.Get(e.Material);
 			if (material is null) { missingMaterial++; continue; }
-			// Missing CableTier = extractor gap; dump is authoritative, register
-			// anyway (BuildCell falls back to ULV). Log so the gap is visible.
 			if (material.CableTier is null) missingCableTier++;
 
 			bool insulated = e.Prefix.StartsWith("cable", StringComparison.Ordinal);

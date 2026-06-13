@@ -1,3 +1,50 @@
+## 0.0.5
+
+Bugfix update! I want to get core gregtech logic to a full stability until introducing new mechanics and overhauls
+
+Important:
+- Added sulfur and redstone trades to EBF chan until we figure out the better early game source
+- Added extractinator item piping support (thanks Three)
+- Changed Large Miner outputs (thanks HiKoNe)
+- Changed primitive water pump to give a bit more water to avoid extreme pump spam (thanks Three)
+- Changed battery buffer to support directional in/out (thanks TrRzeczy, TheLarvi)
+- Fixed non-normal simple pipes drop item (thanks HiKoNe)
+- Fixed fisher, item collector, miner pipes interactions (thanks PotatoSagall)
+- Fixed hammer having pickaxe abilities (thanks Leha44581)
+- Fixed Shift+click logic in storages (thanks Three)
+- Fixed wires overamperage logic and battery buffers energy dupe (thanks TheLarvi, TrRzeczy)
+- Fixed super tank capacity (thanks HiKoNe)
+- Fixed parallel recipes output for byproducts
+- Removed gt default harderRods because Lathe should be better (thanks Flungus)
+
+QOL:
+- Added fluid drum RMB onto fluid slots (thanks Three)
+- Added terraria coins packing recipe
+- Added more safe ore substitutions
+- Added gt ores to vanilla ores recipe
+- Added medium oil source (thanks HiKoNe)
+- Added shovel chance to get bait from grass (thanks Flareguy)
+- Added FAQ to EBF Chan until proper questbook chapter
+- Fixed auto-output into bus lag (thanks TheLarvi)
+- Fixed recipe browser space tokenization logic
+- Removed whitelist by default
+- Removed 999 stack size limit, was inconvenient (thanks Three)
+
+Visuals:
+- Added drums fluid render in inventory
+- Changed ore block render to fit terraria style
+- Changed cables render in inventory (thanks PotatoSagall)
+- Fixed fluid drilling rig recipe browser tooltip (thanks TrRzeczy)
+- Fixed solar boiler tooltips (thanks Leha44581)
+- Fixed multiblock ghosts render near formed multiblocks
+- Fixed warning tooltips color render (thanks TheLarvi)
+- Fixed steam machines energy consumption tooltip (thanks TheLarvi)
+- Fixed terraria paint onto hatches (thanks TrRzeczy)
+- Fixed EBF coils active state of world rejoin
+- Fixed parallel hatches texture
+- Fixed sound collision when lots of machines are running
+- Removed stack size tooltip conversion (thanks TheLarvi)
+
 ## 0.0.4
 
 Pipe update! Wires/pipes now have a proper neat render, animated in world and can intersect (check Pipe Intersection item)

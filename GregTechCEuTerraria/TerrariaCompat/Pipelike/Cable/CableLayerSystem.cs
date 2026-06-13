@@ -22,6 +22,7 @@ public sealed class CableLayerSystem : ModSystem
 	{
 		On_Main.DoDraw_WallsAndBlacks -= DrawCablesAfterWalls;
 		Cables.Clear();
+		CableHeatStore.Clear();
 	}
 
 	private static void DrawCablesAfterWalls(On_Main.orig_DoDraw_WallsAndBlacks orig, Main self)
@@ -30,14 +31,17 @@ public sealed class CableLayerSystem : ModSystem
 		CableRenderer.DrawVisible();
 	}
 
-	public override void ClearWorld() => Cables.Clear();
+	public override void ClearWorld()
+	{
+		Cables.Clear();
+		CableHeatStore.Clear();
+	}
 
 	public override void OnWorldLoad()
 	{
 		TerrariaCompat.Net.CablePackets.SendLayerRequest();
 	}
 
-	// Re-render layer above tiles while holding a wire or wire cutter.
 	public override void PostDrawTiles()
 	{
 		var held = Main.LocalPlayer?.HeldItem;
@@ -77,12 +81,13 @@ public sealed class CableLayerSystem : ModSystem
 		tag["cables.volts"] = volts;
 		tag["cables.amps"]  = amps;
 		tag["cables.losses"]= losses;
+		CableHeatStore.Save(tag);
 	}
 
 	public override void LoadWorldData(TagCompound tag)
 	{
 		Cables.Clear();
-		// v1 (cables.tiers byte format) no longer supported.
+		CableHeatStore.Load(tag);
 		if (!tag.ContainsKey("cables.xs") || !tag.ContainsKey("cables.mats")) return;
 		var xs    = tag.GetList<int>("cables.xs");
 		var ys    = tag.GetList<int>("cables.ys");

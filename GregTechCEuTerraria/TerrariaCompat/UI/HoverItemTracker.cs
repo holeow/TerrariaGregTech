@@ -7,9 +7,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Last-hovered item or fluid for the machine UI's "relevant recipes" panel.
-// Items come from Main.HoverItem (covers vanilla + our UISlot). Fluids come
-// from UIFluidSlot.SetFluid. Last-write-wins.
 public sealed class HoverItemTracker : ModSystem
 {
 	public enum Kind { None, Item, Fluid }
@@ -18,8 +15,6 @@ public sealed class HoverItemTracker : ModSystem
 	public static int LastHoveredItemType { get; private set; }
 	public static string? LastHoveredFluidId { get; private set; }
 
-	// Browser arms this while the cursor is on its panels - hovering recipe
-	// rows otherwise loops the filter back into itself. Click pushes bypass.
 	private static bool _suppressNextHoverPick;
 
 	public static void SuppressNextHoverPick() => _suppressNextHoverPick = true;
@@ -34,19 +29,15 @@ public sealed class HoverItemTracker : ModSystem
 
 		if (Main.HoverItem is { } h && !h.IsAir)
 		{
-			// Filled cells/buckets -> fluid filter (recipes consume them as fluid).
 			var vanilla = VanillaFluidBridge.StackFor(h.type);
 			if (!vanilla.IsEmpty)
 			{
 				SetFluid(vanilla.Type!.Id);
 			}
-			else if (h.ModItem is FluidCellItem cell && cell.GetFluidStack() is { IsEmpty: false } stack)
+			else if (h.ModItem is Api.Capability.IFluidHandlerItem container
+				&& container.GetTank(0) is { IsEmpty: false } stack)
 			{
 				SetFluid(stack.Type!.Id);
-			}
-			else if (h.ModItem is FluidBucketItem bucket && bucket.Fluid is { } fluid)
-			{
-				SetFluid(fluid.Id);
 			}
 			else
 			{
@@ -56,7 +47,6 @@ public sealed class HoverItemTracker : ModSystem
 		}
 	}
 
-	// Live fluid widgets call this on hover; recipe-browser cells use PushFluid on click.
 	public static void SetFluid(string fluidId)
 	{
 		if (string.IsNullOrEmpty(fluidId)) return;
@@ -64,7 +54,6 @@ public sealed class HoverItemTracker : ModSystem
 		LastKind = Kind.Fluid;
 	}
 
-	// Click-driven push - bypasses the suppress guard (browser continuously arms it).
 	public static void PushItem(int itemType)
 	{
 		if (itemType <= 0) return;

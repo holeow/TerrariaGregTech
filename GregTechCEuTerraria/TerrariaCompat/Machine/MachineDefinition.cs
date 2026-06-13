@@ -82,6 +82,7 @@ public sealed class MachineDefinition
 	public string        PipeOverlayBasename     { get; init; } = "";
 	public string        TintedOverlayBasename   { get; init; } = "";
 	public string        EmissiveOverlayBasename { get; init; } = "";
+	public bool          AnimateIdleOverlay      { get; init; }
 
 	public string? CustomFaceAssetPath { get; init; }
 

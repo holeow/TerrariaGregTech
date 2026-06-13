@@ -16,14 +16,6 @@ using RecipeIO = GregTechCEuTerraria.Api.Capability.Recipe.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Steam;
 
-// 1:1 port of SteamWorkableMachine. Singleblock steam machine + RecipeLogic.
-// Steam production state machine runs in parallel on SteamBoilerMachine.
-//
-// Adaptations: CapabilitiesProxy/Flat replaced with trait walks at IO time
-// (Route*); outputFacing dropped (no facing); cleanroom not attached.
-// EnergyStored/TryDrainEU route through protected virtual cores - boilers
-// keep no-op defaults; SimpleSteamMachine overrides to pay recipe EU from
-// the steam tank.
 public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 {
 	protected SteamWorkableMachine() : base() { }
@@ -31,8 +23,6 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 
 	public abstract GTRecipeType GetRecipeType();
 
-	// Boiler subclasses override - they share STEAM_BOILER recipes but each
-	// burns only a subset.
 	public virtual bool ShowsInRecipeBrowser(GTRecipe recipe) => true;
 
 	private RecipeLogic? _recipeLogic;
@@ -54,8 +44,6 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 
 	public RecipeLogic GetRecipeLogic() { EnsureRecipeLogic(); return _recipeLogic!; }
 
-	// Verbatim onLoad's handlerList.subscribe(recipeLogic::updateTickSubscription).
-	// Without this RecipeLogic stays idle when player inserts fuel/water.
 	private bool _recipeWakeWired;
 	private void WireRecipeLogicWakeOnce()
 	{
@@ -126,33 +114,15 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 
 	public virtual void NotifyStatusChanged(RecipeLogicStatus oldStatus, RecipeLogicStatus newStatus)
 	{
-		if (newStatus == RecipeLogicStatus.WORKING)
-			((IRecipeLogicMachine)this).EnsureLoopSound(((IRecipeLogicMachine)this).GetWorldPos());
-		else
-			((IRecipeLogicMachine)this).StopLoopSound();
+		if (newStatus == RecipeLogicStatus.WORKING) MachineLoopVoiceArbiter.SetWant(this);
+		else                                        MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
-	// Restart the loop sound for a boiler that loaded mid-recipe - the WORKING
-	// status comes back via trait load with no SetStatus transition, so
-	// NotifyStatusChanged never fires. EnsureLoopSound is idempotent.
 	protected override void OnMachineLoaded()
 	{
 		base.OnMachineLoaded();
-		if (Recipe.IsWorking())
-			((IRecipeLogicMachine)this).EnsureLoopSound(((IRecipeLogicMachine)this).GetWorldPos());
+		if (Recipe.IsWorking()) MachineLoopVoiceArbiter.SetWant(this);
 	}
-
-	// Steam machines don't voltage-overclock. RecipeLogic.SetupRecipe uses the
-	// recipe duration directly; ActiveEut resolves to 0 (no EU contents).
-	// SteamBoilerMachine's HP variant applies its 0.5x duration through a
-	// FullModifyRecipe override.
-
-	// === IO routing =========================================================
-	// Trait-walker approach: scan Traits.AllTraits for handlers matching IO +
-	// content capability (Ingredient for items, FluidIngredient for fluids).
-	// Upstream uses precomputed capabilitiesProxy maps; equivalent dispatch
-	// at IO call time. Subclasses attach traits and the walker picks them up
-	// automatically - no need to override hooks per-trait.
 
 	ActionResult IRecipeLogicMachine.TryMatchInputContents(
 		Api.Recipe.GTRecipe recipe,
@@ -235,7 +205,6 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 	}
 
 	ActionResult IRecipeLogicMachine.TryDrainEU(Api.Recipe.GTRecipe recipe, long voltage) => TryDrainEUCore(voltage);
-	// SimpleSteamMachine overrides to pay via SteamEnergyRecipeHandler.
 	protected virtual ActionResult TryDrainEUCore(long voltage) => ActionResult.SUCCESS;
 
 	ActionResult IRecipeLogicMachine.DepositOutputEU(Api.Recipe.GTRecipe recipe, long voltage) => ActionResult.SUCCESS;
@@ -348,7 +317,6 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 		var style = StationSounds.TryGetLoop(GetRecipeType().RegistryName);
 		if (style is null) return;
 
-		// Tracker uses explicit flag; see WorkableTieredMachine.EnsureLoopSound.
 		_loopTracker = new MachineAudioTracker(this);
 		var tracker = _loopTracker;
 		_loopSlot = Terraria.Audio.SoundEngine.PlaySound(style.Value, worldPos, tracker.Tick);
@@ -372,13 +340,10 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 	{
 		base.OnClientSync();
 		EnsureRecipeLogic();
-		var rl = (IRecipeLogicMachine)this;
-		if (_recipeLogic!.IsWorking()) rl.EnsureLoopSound(rl.GetWorldPos());
-		else                           rl.StopLoopSound();
+		if (_recipeLogic!.IsWorking()) MachineLoopVoiceArbiter.SetWant(this);
+		else                          MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
-	// Field-only reads (no EnsureRecipeLogic) - reached from MetaMachineTile.ModifyLight
-	// on FastParallel worker threads. See WorkableTieredMachine for the pattern rationale.
 	int IWorkable.GetProgress()    => _recipeLogic?.GetProgress() ?? 0;
 	int IWorkable.GetMaxProgress() => _recipeLogic?.GetMaxProgress() ?? 0;
 	bool IWorkable.IsActive()      => _recipeLogic?.IsActive() ?? false;
@@ -399,7 +364,7 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 	public override void OnKill()
 	{
 		base.OnKill();
-		((IRecipeLogicMachine)this).StopLoopSound();
+		MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
 	public override void SaveData(TagCompound tag)
@@ -421,6 +386,11 @@ public abstract class SteamWorkableMachine : SteamMachine, IRecipeLogicMachine
 	public override void AppendTooltip(List<string> lines)
 	{
 		base.AppendTooltip(lines);
+		AppendRecipeStatus(lines);
+	}
+
+	protected virtual void AppendRecipeStatus(List<string> lines)
+	{
 		lines.Add(RecipeStatusText.StatusLine(_recipeLogic, "Burning"));
 		RecipeStatusText.AppendFailureDetail(_recipeLogic, lines);
 	}

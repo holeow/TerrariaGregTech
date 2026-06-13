@@ -14,10 +14,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Steam;
 
-// port of SteamBoilerMachine. Adds waterTank on top of steamTank.
-// Per-tick state machine: heating ratchets temp every 12t HP / 24t LP;
-// idle + cooldown lapsed drops by CoolDownRate; every 10t at temp >= 100
-// drains 1 mB water + fills steamTank; water-empty-while-hot = explode.
 public abstract class SteamBoilerMachine : SteamWorkableMachine
 {
 	protected SteamBoilerMachine() : base() { }
@@ -144,7 +140,6 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 				{
 					this.HasNoWater = !hasDrainedWater;
 				}
-				// Upstream vents 4 buckets of steam as a particle cloud; we void.
 				if (filledSteam == 0 && hasDrainedWater)
 				{
 					SteamTank.Drain(4_000, simulate: false);
@@ -243,6 +238,8 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		HasNoWater            = tag.GetBool("hasNoWater");
 	}
 
+	protected override void AppendRecipeStatus(List<string> lines) { }
+
 	public override void AppendTooltip(List<string> lines)
 	{
 		base.AppendTooltip(lines);
@@ -251,7 +248,7 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 		var steam = GetTank(SteamTankAbsoluteIndex);
 		lines.Add($"Water: {(water.IsEmpty ? 0 : water.Amount):N0}/{WaterTankCapacity:N0} mB");
 		lines.Add($"Steam: {(steam.IsEmpty ? 0 : steam.Amount):N0}/{SteamTankCapacity:N0} mB");
-		long perTick = IsHeating() ? GetTotalSteamOutput() / 10 : 0;
+		long perTick = CurrentTemperature >= 100 ? GetTotalSteamOutput() / 10 : 0;
 		lines.Add($"Output: {perTick:N0} mB/t");
 	}
 }

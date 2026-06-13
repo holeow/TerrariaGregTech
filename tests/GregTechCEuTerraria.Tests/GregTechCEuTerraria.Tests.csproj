@@ -31,6 +31,7 @@
     <Compile Include="..\..\GregTechCEuTerraria\TerrariaCompat\Worldgen\LayerDepthMapping.cs"            Link="Source/LayerDepthMapping.cs" />
     <Compile Include="..\..\GregTechCEuTerraria\Common\Energy\VoltageTier.cs"                            Link="Source/VoltageTier.cs" />
     <Compile Include="..\..\GregTechCEuTerraria\Api\Recipe\OverclockingLogic.Algorithms.cs"              Link="Source/OverclockingLogic.Algorithms.cs" />
+    <Compile Include="..\..\GregTechCEuTerraria\Api\Pipenet\PipePassthrough.cs"                          Link="Source/PipePassthrough.cs" />
     <Compile Include="..\..\GregTechCEuTerraria\Api\Pipenet\GridLayer.cs"                                Link="Source/GridLayer.cs" />
     <Compile Include="..\..\GregTechCEuTerraria\TerrariaCompat\Pipelike\Cable\CableCell.cs"              Link="Source/CableCell.cs" />
     <Compile Include="..\..\GregTechCEuTerraria\TerrariaCompat\Pipelike\Cable\CableLayer.cs"             Link="Source/CableLayer.cs" />

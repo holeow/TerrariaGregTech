@@ -1,6 +1,8 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using GregTechCEuTerraria.Api.Fluids;
 using GregTechCEuTerraria.Common.Materials;
 using GregTechCEuTerraria.TerrariaCompat.Items.Fluids;
@@ -10,7 +12,6 @@ using Terraria.GameContent.Bestiary;
 using Terraria.ID;
 using Terraria.Localization;
 using Terraria.ModLoader;
-using Terraria.Utilities;
 
 namespace GregTechCEuTerraria.TerrariaCompat.NPCs.EBFChan;
 
@@ -37,9 +38,39 @@ public class EBFChanNPC : ModNPC
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Bestiary",
 			() => "The spirit of a Electric Blast Furnace, settled and friendly now that her Fallen shell is dealt with. She runs a little stall of heat-treated ingredients - and is always hot to the touch.");
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.DeathMessage", () => "{0} let her coils go cold...");
-		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat1", () => "Hold on, I'm still cooking your kanthal ingot...");
-		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat2", () => "Don't touch the casing. It's hot. Everything's hot.");
-		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat3", () => "Overclock responsibly. I've seen what happens when you don't.");
+		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat", () =>
+			"""
+			V Theres MORE TIPS button V
+
+			Dont like microcrafting - install MagicStorage. Caution: magic storage cant do fluid crafting (e.g. treated wood) yet
+
+			Dont like mining - check Mining Hammer, it mines fast
+
+			Dont like primitive age - I boosted PBF speed so its crazy fast, you wont need to wait for steel
+
+			How to see recipes - check TMI button on the right side of your inventory
+
+			How to progress - check Questbook button on the right side of your inventory (inaccurate for now)
+
+			How to intersect pipes - check Pipe Intersection item (crafted from stone)
+
+			How to connect pipes - put pipe near machine and then click RMB onto it with empty hand
+
+			How to connect wires - put behind machines
+
+			How to build multiblocks - put multiblock controller, it will show ghost tiles
+
+			How to get rubber - 1. from gel 2. cut trees using saw to get rubber wood, into extractor 3. from EBF Chan
+
+			How to get sulfur - 1. from hell 2. from ore processing 3. from EBF Chan
+
+			How to get ores - upper layers of caves spawn gt overworld ores, lower layers and hell spawn nether/end gt ores
+
+			How to store lots of steam - check large steel tank
+
+			How to get lots of resources - 1. steam/electric miner 2. Extractinator accepts pipes 3. Large Miner / Drilling Rig
+			""");
+		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.MoreTips", () => "More tips");
 
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Census.SpawnCondition", () => "{$Census.SpawnConditions.Guide}");
 	}
@@ -54,7 +85,7 @@ public class EBFChanNPC : ModNPC
 		NPC.damage = 10;
 		NPC.defense = 15;
 		NPC.lifeMax = 250;
-		NPC.HitSound = SoundID.NPCHit4;     // metallic clang
+		NPC.HitSound = SoundID.NPCHit4;
 		NPC.DeathSound = SoundID.NPCDeath14;
 		NPC.knockBackResist = 0.5f;
 
@@ -78,24 +109,80 @@ public class EBFChanNPC : ModNPC
 	public override ITownNPCProfile TownNPCProfile() =>
 		new Profiles.DefaultNPCProfile(Texture, ModContent.GetModHeadSlot(HeadTexture));
 
+	private const int ChatLineBudget = 9; // panel hard-truncates at 10
+
+	private static string[] _chatPages = Array.Empty<string>();
+	private static int _chatPage;
+
 	public override string GetChat()
 	{
-		WeightedRandom<string> chat = new();
-		chat.Add(Language.GetTextValue("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat1"));
-		chat.Add(Language.GetTextValue("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat2"));
-		chat.Add(Language.GetTextValue("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat3"));
-		return chat;
+		_chatPages = BuildChatPages();
+		_chatPage = 0;
+		return _chatPages.Length > 0 ? _chatPages[0] : "";
 	}
 
 	public override void SetChatButtons(ref string button, ref string button2)
 	{
 		button = Language.GetTextValue("LegacyInterface.28"); // "Shop"
+		if (_chatPages.Length > 1)
+			button2 = Language.GetTextValue("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.MoreTips");
 	}
 
 	public override void OnChatButtonClicked(bool firstButton, ref string shop)
 	{
 		if (firstButton)
+		{
 			shop = ShopName;
+			return;
+		}
+
+		if (_chatPages.Length == 0) return;
+		_chatPage = (_chatPage + 1) % _chatPages.Length;
+		Main.npcChatText = _chatPages[_chatPage];
+	}
+
+	private static string[] BuildChatPages()
+	{
+		string full = Language.GetTextValue("Mods.GregTechCEuTerraria.NPCs.EBFChanNPC.Chat");
+		string[] tips = full.Replace("\r\n", "\n")
+			.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+		var pages = new List<string>();
+		var sb = new StringBuilder();
+		foreach (string raw in tips)
+		{
+			string tip = raw.Trim();
+			if (tip.Length == 0) continue;
+
+			if (sb.Length == 0)
+			{
+				sb.Append(tip);
+				continue;
+			}
+
+			string candidate = sb + "\n\n" + tip;
+			if (MeasureWrappedLines(candidate) > ChatLineBudget)
+			{
+				pages.Add(sb.ToString());
+				sb.Clear();
+				sb.Append(tip);
+			}
+			else
+			{
+				sb.Clear();
+				sb.Append(candidate);
+			}
+		}
+		if (sb.Length > 0) pages.Add(sb.ToString());
+		if (pages.Count == 0) pages.Add(full);
+		return pages.ToArray();
+	}
+
+	private static int MeasureWrappedLines(string text)
+	{
+		if (Main.dedServ) return 1;
+		Terraria.Utils.WordwrapString(text, FontAssets.MouseText.Value, 460, 100, out int lines);
+		return Math.Max(1, lines);
 	}
 
 	public override void AddShops()
@@ -110,10 +197,13 @@ public class EBFChanNPC : ModNPC
 		AddIfPresent(shop, "tin_dust", Item.buyPrice(silver: 8));
 		AddIfPresent(shop, "nickel_dust", Item.buyPrice(silver: 12));
 		AddIfPresent(shop, "lead_dust", Item.buyPrice(silver: 10));
+		AddIfPresent(shop, "sulfur_dust", Item.buyPrice(silver: 6));
+		AddIfPresent(shop, "redstone_dust", Item.buyPrice(silver: 6));
+		AddIfPresent(shop, "raw_rubber_dust", Item.buyPrice(silver: 15));
 
-		AddIfPresent(shop, "steel_ingot", Item.buyPrice(gold: 25));
-		AddIfPresent(shop, "aluminium_ingot", Item.buyPrice(gold: 35));
-		AddIfPresent(shop, "kanthal_ingot", Item.buyPrice(gold: 50));
+		AddIfPresent(shop, "steel_ingot", Item.buyPrice(gold: 10));
+		AddIfPresent(shop, "aluminium_ingot", Item.buyPrice(gold: 50));
+		AddIfPresent(shop, "kanthal_ingot", Item.buyPrice(platinum: 1));
 
 		shop.Register();
 	}

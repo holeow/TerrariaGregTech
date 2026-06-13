@@ -65,6 +65,7 @@ public class TieredMachineTile : MetaMachineTile
 	public override string PipeOverlayBasename     => _def!.PipeOverlayBasename;
 	public override string TintedOverlayBasename   => _def!.TintedOverlayBasename;
 	public override string EmissiveOverlayBasename => _def!.EmissiveOverlayBasename;
+	public override bool   AnimateIdleOverlay      => _def!.AnimateIdleOverlay;
 	public override string? CustomFaceAssetPath => _def!.CustomFaceAssetPath;
 	protected override VoltageTier TileTier => _tier;
 

@@ -48,7 +48,7 @@ public sealed class SimpleItemPipeItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32; Item.height = 32;
 		Item.useTime = 2; Item.useAnimation = 6;
 		Item.useStyle = ItemUseStyleID.Swing;
@@ -64,9 +64,7 @@ public sealed class SimpleItemPipeItem : ModItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "PipeKind", $"{Capitalize(SizeWord)} Simple Item Pipe"));
 
 		float rate = 0.25f * Pipelike.ItemPipe.ItemPipeSizeModifier.For(Size, false).RateMultiplier;
-		string rateLine = (rate % 1 != 0f)
-			? $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64) + 0.5f)} items/s"
-			: $"[c/55FFFF:Transfer Rate:] {(int)rate} stacks/s";
+		string rateLine = $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64) + 0.5f)} items/s";
 		tooltips.Add(new TooltipLine(Mod, "PipeRate", rateLine));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimple", "[c/AAFFAA:Auto-connects to adjacent storage on placement.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimpleUI", "[c/AAFFAA:Right-click to toggle per-side mode (Off / Insert / Extract).]"));

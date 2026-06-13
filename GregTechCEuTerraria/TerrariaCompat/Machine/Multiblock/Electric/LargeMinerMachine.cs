@@ -5,38 +5,30 @@ using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.Api.Fluids;
 using GregTechCEuTerraria.Api.Machine.Trait;
 using GregTechCEuTerraria.Common.Energy;
+using GregTechCEuTerraria.TerrariaCompat.Machine;
 using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 using Terraria;
-using Terraria.ID;
+using Status = GregTechCEuTerraria.Api.Machine.Feature.RecipeLogicStatus;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Adapted port of LargeMinerMachine. 3D chunk-walker -> biome-keyed lottery
-// (BiomeWorldIOTables). Per tick: V[tier] EU + drilling_fluid gate. Every
-// CycleTicks: drain DrillingFluidPerCycle mB + push OutputCount raw_ore to
-// first OUT bus. RecipeLogic dormant (IsRecipeLogicAvailable=false).
 public class LargeMinerMachine : WorkableElectricMultiblockMachine
 {
-	private bool   _isWorking;
-	private int    _cycleProgress;
-	private BiomeProbe.Biome _cachedBiome;
+	private BiomeWorldIOTables.MinerBucket _cachedBucket;
 	private bool   _biomeCached;
 	private string _lastOreId = "";
-	private string _idleReason = "";
 
 	private NotifiableFluidTank?         _drillingFluidIn;
 	private NotifiableItemStackHandler?  _oreOut;
 
-	// Position-seeded so adjacent miners desync.
 	private Random? _rng;
 	private Random Rng => _rng ??= new Random(unchecked(Position.X * 73856093 ^ Position.Y * 19349663));
 
 	public LargeMinerMachine() : base() { }
 
-	// Recipe type is browser-display only; production runs from OnTick.
-	public override bool IsRecipeLogicAvailable() => false;
+	protected override RecipeLogic CreateRecipeLogic() => new LargeMinerLogic();
+	public new LargeMinerLogic Recipe => (LargeMinerLogic)base.Recipe;
 
-	// EV=10s / IV=7.5s / LuV=5s (upstream's 64/tier per-block speed).
 	private int CycleTicks => Tier switch
 	{
 		VoltageTier.EV  => 200,
@@ -45,7 +37,6 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 		_               => 200,
 	};
 
-	// EV=1, IV=2, LuV=4.
 	private int OutputCount => Tier switch
 	{
 		VoltageTier.EV  => 1,
@@ -54,7 +45,6 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 		_               => 1,
 	};
 
-	// Upstream's 8-(tier-5) per-tick -> 4/3/2 per cycle.
 	private int DrillingFluidPerCycle => Tier switch
 	{
 		VoltageTier.EV  => 4,
@@ -63,13 +53,13 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 		_               => 4,
 	};
 
-	// VA[tier] = V x 15/16, NOT V[tier].
 	private long EuPerTick => VoltageTiers.VA((int)Tier);
 
 	public override void OnStructureFormed()
 	{
 		base.OnStructureFormed();
 		RebindIoParts();
+		Recipe.SetDuration(CycleTicks);
 	}
 
 	public override void OnStructureInvalid()
@@ -102,43 +92,31 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 		}
 	}
 
-	protected override void OnTick()
+	public bool PrepareTick(out string reason)
 	{
-		base.OnTick();
-		if (!IsServer) return;
-		if (!IsFormed) { ClearWorking("Structure not formed"); return; }
-		if (GetMultiblockState().HasError()) { ClearWorking("Structure not formed"); return; }
-		if (!WorkingEnabled) { ClearWorking("Disabled by player"); return; }
+		reason = "";
+		if (!IsFormed || GetMultiblockState().HasError()) { reason = "Structure not formed"; return false; }
+		if (!WorkingEnabled) { reason = "Disabled by player"; return false; }
 
 		if (_drillingFluidIn == null || _oreOut == null) RebindIoParts();
-		if (_oreOut == null) { ClearWorking("Need an output bus"); return; }
+		if (_oreOut == null) { reason = "Need an output bus"; return false; }
 
 		if (_energyContainer is null) _energyContainer = GetEnergyContainer();
-		if (_energyContainer.EnergyStored < EuPerTick)
-		{
-			ClearWorking("Out of power");
-			return;
-		}
-		_energyContainer.ChangeEnergy(-EuPerTick);
+		if (_energyContainer.EnergyStored < EuPerTick) { reason = "Out of power"; return false; }
 
-		// Cycle model: gate on stored fluid, drain at production time.
 		if (_drillingFluidIn == null || GetDrillingFluidStored() < DrillingFluidPerCycle)
 		{
-			ClearWorking("Need drilling fluid");
-			return;
+			reason = "Need drilling fluid";
+			return false;
 		}
 
-		SetWorkingState(true, "");
-
-		if (++_cycleProgress < CycleTicks) return;
-		_cycleProgress = 0;
-		HandleProductionCycle();
+		_energyContainer.ChangeEnergy(-EuPerTick);
+		return true;
 	}
 
-	private void HandleProductionCycle()
+	public void ProduceCycle()
 	{
-		// Re-scan per cycle to catch terraforming.
-		_cachedBiome = BiomeProbe.GetForTile(Position.X, Position.Y);
+		_cachedBucket = BiomeWorldIOTables.Classify(Position.X, Position.Y);
 		_biomeCached = true;
 
 		if (_drillingFluidIn == null) return;
@@ -148,11 +126,10 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 			new FluidStack(drillingFluid, DrillingFluidPerCycle), simulate: false);
 		if (drained.IsEmpty || drained.Amount < DrillingFluidPerCycle) return;
 
-		var (itemType, matId) = BiomeWorldIOTables.RollOre(_cachedBiome, Rng);
+		var (itemType, matId) = BiomeWorldIOTables.RollFromBucket(_cachedBucket, Rng);
 		if (itemType <= 0) return;
 		_lastOreId = matId;
 
-		// Overflow is silently lost (no chunk walker for LootContext overflow).
 		if (_oreOut == null) return;
 		var leftover = OutputCount;
 		for (int slot = 0; slot < _oreOut.SlotCount && leftover > 0; slot++)
@@ -174,22 +151,6 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 		return stack.Amount;
 	}
 
-	private void ClearWorking(string reason)
-	{
-		_cycleProgress = 0;
-		SetWorkingState(false, reason);
-	}
-
-	private void SetWorkingState(bool working, string reason)
-	{
-		if (_isWorking == working && _idleReason == reason) return;
-		_isWorking = working;
-		_idleReason = reason;
-	}
-
-	public override bool IsActive => _isWorking;
-
-	// Skip WMM's recipe-shaped status (dormant logic would duplicate "Idle").
 	public override void AppendTooltip(List<string> lines)
 	{
 		lines.Add(DisplayName);
@@ -201,37 +162,66 @@ public class LargeMinerMachine : WorkableElectricMultiblockMachine
 			return;
 		}
 
-		if (_isWorking)
+		if (Recipe.IsWorking())
 		{
-			string biome = _biomeCached ? _cachedBiome.ToString() : "scanning";
+			string biome = _biomeCached ? BiomeWorldIOTables.Label(_cachedBucket) : "scanning";
 			if (!string.IsNullOrEmpty(_lastOreId))
-				lines.Add($"[c/55FF55:Mining ({biome}):] {_lastOreId} x{OutputCount} / {CycleTicks / 60.0:0.0}s");
+				lines.Add($"[c/55FF55:Mining ({biome}):] {_lastOreId} x{OutputCount} / {CycleTicks / 20.0:0.0}s");
 			else
 				lines.Add($"[c/55FF55:Mining ({biome}):] warming up");
 		}
 		else
 		{
-			lines.Add(string.IsNullOrEmpty(_idleReason)
-				? "Idle"
-				: $"[c/AAAAAA:Idle:] {_idleReason}");
+			lines.Add(RecipeStatusText.StatusLineForMulti(this, Recipe));
 		}
 	}
 
-	// Biome re-scans next cycle, not persisted.
 	public override void SaveData(Terraria.ModLoader.IO.TagCompound tag)
 	{
 		base.SaveData(tag);
-		tag["lm_working"]   = _isWorking;
-		tag["lm_progress"]  = _cycleProgress;
-		tag["lm_lastOre"]   = _lastOreId;
+		tag["lm_lastOre"] = _lastOreId;
 	}
 
 	public override void LoadData(Terraria.ModLoader.IO.TagCompound tag)
 	{
 		base.LoadData(tag);
-		_isWorking     = tag.GetBool("lm_working");
-		_cycleProgress = tag.GetInt("lm_progress");
-		_lastOreId     = tag.GetString("lm_lastOre");
-		// _biomeCached stays false -> first OnTick re-scans.
+		_lastOreId = tag.GetString("lm_lastOre");
+	}
+
+	public sealed class LargeMinerLogic : RecipeLogic
+	{
+		public LargeMinerLogic() : base() { }
+
+		public new LargeMinerMachine Machine => (LargeMinerMachine)base.Machine;
+
+		protected override IReadOnlyList<Type> ValidMachineClasses() =>
+			new[] { typeof(LargeMinerMachine) };
+
+		public override void ServerTick()
+		{
+			if (_duration <= 0) return;
+			if (Main.GameUpdateCount % (uint)global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(1) != 0) return;
+
+			var m = Machine;
+			if (!m.PrepareTick(out string reason))
+			{
+				_progress = 0;
+				SetWaiting(reason);
+				return;
+			}
+
+			SetStatus(Status.WORKING);
+			if (_progress++ < _duration)
+			{
+				if (!m.OnWorking()) InterruptRecipe();
+				return;
+			}
+			_progress = 0;
+			m.ProduceCycle();
+		}
+
+		public override void SaveForSync(Terraria.ModLoader.IO.TagCompound tag) => Save(tag);
+
+		public void SetDuration(int max) { _duration = max; }
 	}
 }

@@ -268,14 +268,8 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 
 	public virtual void NotifyStatusChanged(RecipeLogicStatus oldStatus, RecipeLogicStatus newStatus)
 	{
-		if (newStatus == RecipeLogicStatus.WORKING)
-		{
-			((IRecipeLogicMachine)this).EnsureLoopSound(((IRecipeLogicMachine)this).GetWorldPos());
-		}
-		else
-		{
-			((IRecipeLogicMachine)this).StopLoopSound();
-		}
+		if (newStatus == RecipeLogicStatus.WORKING) MachineLoopVoiceArbiter.SetWant(this);
+		else                                        MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
 	public bool IsRunning        => _recipeLogic?.IsWorking() ?? false;
@@ -373,8 +367,7 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	protected override void OnMachineLoaded()
 	{
 		base.OnMachineLoaded();
-		if (Recipe.IsWorking())
-			((IRecipeLogicMachine)this).EnsureLoopSound(((IRecipeLogicMachine)this).GetWorldPos());
+		if (Recipe.IsWorking()) MachineLoopVoiceArbiter.SetWant(this);
 	}
 
 	// we dont have OC tier selector button ported yet
@@ -597,10 +590,8 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	internal override void OnClientSync()
 	{
 		base.OnClientSync();
-		var rl = (IRecipeLogicMachine)this;
-		var worldPos = rl.GetWorldPos();
-		if (Recipe.IsWorking()) rl.EnsureLoopSound(worldPos);
-		else                    rl.StopLoopSound();
+		if (Recipe.IsWorking()) MachineLoopVoiceArbiter.SetWant(this);
+		else                    MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
 	private static Ingredient PeelToInner(Ingredient ing) => ing switch
@@ -656,7 +647,7 @@ public class WorkableTieredMachine : TieredEnergyMachine, IItemHandler, IFluidHa
 	public override void OnKill()
 	{
 		base.OnKill();
-		((IRecipeLogicMachine)this).StopLoopSound();
+		MachineLoopVoiceArbiter.ClearWant(this);
 	}
 
 	public override void SaveData(TagCompound tag)

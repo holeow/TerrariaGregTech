@@ -14,42 +14,12 @@ using RecipeContent = GregTechCEuTerraria.Api.Recipe.Content.Content;
 
 namespace GregTechCEuTerraria.Api.Machine.Multiblock;
 
-// Port of com.gregtechceu.gtceu.api.machine.multiblock.MultiblockDisplayText.
-//
-// Builder that assembles a multiblock controller's status tooltip - energy
-// usage, working state, progress, parallels, fuel needs, maintenance problems,
-// per-recipe output rate lines, etc. Consumed by a future
-// `MultiblockControllerMachine.OnAddFancyInformationTooltip` override.
-//
-// Adaptations: List<Component> -> List<string> (no Mojang rich-text);
-// ChatFormatting colours dropped (TODO [c/RRGGBB:] once the tooltip renderer
-// parses them); HoverEvent line-hover dropped (no Terraria analogue - add a
-// visible line instead); Component.translatable -> Language.GetTextValue;
-// FormattingUtil number formats -> ToString("N0") / ("0.00"); GTValues.VNF /
-// getFloorTierByVoltage / getTierByVoltage -> VoltageTiers.ShortName /
-// FloorTierByVoltage / TierByVoltage; enableMaintenance gate dropped on
-// AddMaintenanceProblemLines; static factory `builder` -> `Create` (C# name
-// collision with the nested Builder class).
 public static class MultiblockDisplayText
 {
 	private const string EmptyComponent = "";
 
-	// DEVIATION - upstream's verbatim line is
-	// `Tr(reason)` against the raw `gtceu.recipe_logic.*`
-	// / `gtceu.recipe_modifier.*` key, resolved through MC's lang file. We
-	// route through this delegate which forwards to `RecipeStatusText.Resolve`
-	// (TerrariaCompat-side) -> our existing `Mods.GregTechCEuTerraria.Recipe
-	// Status.*` locale section. Same input key -> same English string, but
-	// through a different locale namespace than upstream would. Kept because
-	// it shares the translation table with the world-hover tooltip (single
-	// source of truth) and `port-locale.py` already auto-mirrors upstream's
-	// reason keys into RecipeStatus. The Api layer can't reference the
-	// TerrariaCompat-side resolver directly, so the consumer installs the
-	// mapping at `Mod.Load` (`MultiblockLocale.RegisterAll`). Default identity
-	// - without the hook, raw key strings would leak to the GUI.
 	public static Func<string, string> FailReasonResolver { get; set; } = id => id;
 
-	// Namespacing resolver for the raw upstream `gtceu.*` keys
 	public static Func<string, string> KeyResolver { get; set; } = k => k;
 
 	internal static string Tr(string key, params object[] args)
@@ -60,8 +30,6 @@ public static class MultiblockDisplayText
 		catch { return text.Value; }
 	}
 
-	// Construct a new Multiblock Display Text builder. Automatically adds the
-	// "Invalid Structure" line if the structure is not formed.
 	public static Builder Create(List<string> textList, bool isStructureFormed) =>
 		Create(textList, isStructureFormed, true);
 
@@ -77,7 +45,6 @@ public static class MultiblockDisplayText
 		private bool _isWorkingEnabled;
 		private bool _isActive;
 
-		// Three-state working-system translation keys (customisable by multis).
 		private string _idlingKey  = "gtceu.multiblock.idling";
 		private string _pausedKey  = "gtceu.multiblock.work_paused";
 		private string _runningKey = "gtceu.multiblock.running";
@@ -89,15 +56,11 @@ public static class MultiblockDisplayText
 
 			if (!isStructureFormed && showIncompleteStructureWarning)
 			{
-				// Upstream: red "Invalid Structure" with a grey hover tooltip.
-				// We surface both as visible lines (no hover affordance).
 				textList.Add(Tr("gtceu.multiblock.invalid_structure"));
 				textList.Add(Tr("gtceu.multiblock.invalid_structure.tooltip"));
 			}
 		}
 
-		// Set the current working-enabled / active flags. Several add* methods
-		// gate on these.
 		public Builder SetWorkingStatus(bool isWorkingEnabled, bool isActive)
 		{
 			_isWorkingEnabled = isWorkingEnabled;
@@ -105,8 +68,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Override the three-state "Idling" / "Paused" / "Running" keys; pass
-		// null for any to keep the default.
 		public Builder SetWorkingStatusKeys(string? idlingKey, string? pausedKey, string? runningKey)
 		{
 			if (idlingKey  is not null) _idlingKey  = idlingKey;
@@ -115,9 +76,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Energy lines ========================================================
-
-		// Max EU/t the multi can use (per the bound energy container).
 		public Builder AddEnergyUsageLine(IEnergyContainer? energyContainer)
 		{
 			if (!_isStructureFormed) return this;
@@ -133,7 +91,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Max recipe tier this multi can use for recipe lookup.
 		public Builder AddEnergyTierLine(int tier)
 		{
 			if (!_isStructureFormed) return this;
@@ -143,7 +100,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Exact EU/t this multi needs to run.
 		public Builder AddEnergyUsageExactLine(long energyUsage)
 		{
 			if (!_isStructureFormed) return this;
@@ -158,9 +114,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Max EU/t this multi can PRODUCE. Skips itself if the recipe needs
-		// more than the multi can output (recipeEUt is the recipe's EUt; both
-		// are signed so the comparison is upstream-verbatim).
 		public Builder AddEnergyProductionLine(long maxVoltage, long recipeEUt)
 		{
 			if (!_isStructureFormed) return this;
@@ -175,7 +128,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Max EU/t including amps. Recommended for multi-amp output multis.
 		public Builder AddEnergyProductionAmpsLine(long maxVoltage, int amperage)
 		{
 			if (!_isStructureFormed) return this;
@@ -189,8 +141,6 @@ public static class MultiblockDisplayText
 			}
 			return this;
 		}
-
-		// === Computation lines (HPCA / research-station family) =================
 
 		public Builder AddComputationUsageLine(int maxCWUt)
 		{
@@ -214,18 +164,24 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Working-status three-state =========================================
-
-		// Adds the running/paused/idling line based on current flags.
-		public Builder AddWorkingStatusLine()
+		public Builder AddWorkingStatusLine(RecipeLogic? recipeLogic = null)
 		{
 			if (!_isStructureFormed) return this;
 			if (!_isWorkingEnabled) return AddWorkPausedLine(false);
+			if (recipeLogic != null && recipeLogic.IsWaiting()
+				&& recipeLogic.GetWaitingReason() is { } reason)
+				return AddWaitingLine(reason);
 			if (_isActive) return AddRunningPerfectlyLine(false);
 			return AddIdlingLine(false);
 		}
 
-		// "Work Paused." Added if working is not enabled, or if checkState=false.
+		private Builder AddWaitingLine(string reason)
+		{
+			if (!_isStructureFormed) return this;
+			_textList.Add("[c/FFCC44:Waiting:] " + FailReasonResolver(reason));
+			return this;
+		}
+
 		public Builder AddWorkPausedLine(bool checkState)
 		{
 			if (!_isStructureFormed) return this;
@@ -234,7 +190,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// "Running Perfectly." Added if active, or if checkState=false.
 		public Builder AddRunningPerfectlyLine(bool checkState)
 		{
 			if (!_isStructureFormed) return this;
@@ -243,7 +198,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// "Idling." Added if not active and working enabled, or if checkState=false.
 		public Builder AddIdlingLine(bool checkState)
 		{
 			if (!_isStructureFormed) return this;
@@ -251,8 +205,6 @@ public static class MultiblockDisplayText
 				_textList.Add(Tr(_idlingKey));
 			return this;
 		}
-
-		// === Progress lines =====================================================
 
 		public Builder AddProgressLineOnlyPercent(double progressPercent)
 		{
@@ -270,7 +222,6 @@ public static class MultiblockDisplayText
 				recipeLogic.GetProgressPercent());
 		}
 
-		// Current/max recipe duration (in ticks) + percent.
 		public Builder AddProgressLine(double currentDuration, double maxDuration, double progressPercent)
 		{
 			if (!_isStructureFormed || !_isActive) return this;
@@ -284,7 +235,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Custom per-multiblock progress line via RecipeLogic.GetCustomProgressLine.
 		public Builder AddCustomProgressLine(RecipeLogic recipeLogic)
 		{
 			if (!_isStructureFormed || !_isActive) return this;
@@ -293,21 +243,12 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// Per-recipe setup-failure reasons (e.g. missing input, no cleanroom).
 		public Builder AddRecipeFailReasonLine(RecipeLogic recipeLogic)
 		{
 			if (!_isStructureFormed || !recipeLogic.IsIdle()) return this;
 			var reasons = recipeLogic.GetFailureReasons();
 			if (reasons.Count == 0) return this;
 
-			// DEVIATION - upstream does NOT dedupe.
-			// Upstream's failure list collects per-candidate per-tick, so the
-			// same reason (e.g. `insufficient_in`) recurs once per failed
-			// recipe candidate (30+ identical lines). LowDragLib's
-			// `ComponentPanelWidget` is scrollable so upstream gets away with
-			// it; our `UIMultiLineDynamicLabel` is a flat stack and would fill
-			// the panel with duplicates. Dedupe via HashSet keeps the panel
-			// readable. Hard rule applied: deviation surfaced, asked, approved.
 			HashSet<string>? seen = null;
 			bool headerAdded = false;
 			foreach (var reason in reasons)
@@ -324,8 +265,6 @@ public static class MultiblockDisplayText
 			}
 			return this;
 		}
-
-		// === Batch / parallel info ==============================================
 
 		public Builder AddBatchModeLine(bool batchEnabled, int batchAmount)
 		{
@@ -357,11 +296,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Output lines per recipe ============================================
-
-		// Iterates the recipe's item + fluid outputs and emits a rate line per
-		// output ("X per Y sec" or "Y sec per X"). Honours chanced outputs via
-		// ChanceBoostFunction.
 		public Builder AddOutputLines(GTRecipe? recipe)
 		{
 			if (!_isStructureFormed || !_isActive) return this;
@@ -412,7 +346,7 @@ public static class MultiblockDisplayText
 					count = Math.Max(1, (int)Math.Round(countD));
 					displaycount = count.ToString();
 				}
-				string itemName = Lang.GetItemName(stack.type).Value;
+				string itemName = Util.TerrariaText.ItemName(stack.type);
 				if (countD < maxDurationSec)
 				{
 					string key = "gtceu.multiblock.output_line." + (rounded ? "2" : "0");
@@ -481,15 +415,9 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Mode / parallels / warnings ========================================
-
-		// "Mode: <recipe type>" - for multis that flip between recipe types.
 		public Builder AddMachineModeLine(GTRecipeType recipeType, bool hasMultipleModes)
 		{
 			if (!_isStructureFormed || !hasMultipleModes) return this;
-			// Upstream: registryName.toLanguageKey() -> "<namespace>.<path>" - for
-			// `gtceu:electric_blast_furnace` that's `gtceu.electric_blast_furnace`.
-			// Our RegistryName is the bare path, so prepend the gtceu namespace.
 			string modeName = Tr($"gtceu.{recipeType.RegistryName}");
 			_textList.Add(Tr("gtceu.gui.machinemode", modeName));
 			return this;
@@ -532,11 +460,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Maintenance ========================================================
-
-		// Bitfield: bits 0..5 = wrench / screwdriver / soft_mallet / hammer /
-		// wire_cutter / crowbar problems. A `0` bit = problem present. Upstream
-		// gates on a ConfigHolder flag we don't have - gate dropped.
 		public Builder AddMaintenanceProblemLines(byte maintenanceProblems)
 		{
 			if (!_isStructureFormed) return this;
@@ -562,7 +485,6 @@ public static class MultiblockDisplayText
 		private void AddMaintenanceProblemHeader() =>
 			_textList.Add(Tr("gtceu.multiblock.universal.has_problems"));
 
-		// Two-line "Muffler obstructed!" + tooltip-line warning.
 		public Builder AddMufflerObstructedLine(bool isObstructed)
 		{
 			if (!_isStructureFormed) return this;
@@ -574,7 +496,6 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// "Fuel needed: <name> (ticks: <N>)" - for the steam-turbine family.
 		public Builder AddFuelNeededLine(string? fuelName, int previousRecipeDuration)
 		{
 			if (!_isStructureFormed || !_isActive || fuelName is null) return this;
@@ -583,22 +504,18 @@ public static class MultiblockDisplayText
 			return this;
 		}
 
-		// === Misc ===============================================================
-
 		public Builder AddEmptyLine()
 		{
 			_textList.Add(EmptyComponent);
 			return this;
 		}
 
-		// Hand the list to caller-supplied logic for custom additions.
 		public Builder AddCustom(Action<List<string>> customConsumer)
 		{
 			customConsumer(_textList);
 			return this;
 		}
 
-		// Current EU/t this turbine is producing.
 		public Builder AddCurrentEnergyProductionLine(long euOutput)
 		{
 			_textList.Add(Tr("gtceu.multiblock.turbine.energy_per_tick_maxed",

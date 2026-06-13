@@ -12,19 +12,12 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 
-// Composites upstream layers into a Texture2D and installs into
-// TextureAssets.Tile/Item so vanilla draws machines (inventory, world,
-// placement ghost, minimap) through its normal pipeline.
-//
-// PreDraw wouldn't work for the placement ghost / minimap (they read
-// TextureAssets directly, no hook). Lazy build per tier so unused tiers
-// pay nothing.
 public static class MachineRenderer
 {
-	private const int Face = 16;          // upstream face PNG
-	private const int Up   = 32;          // 2x upscale
-	private const int Cell = 18;          // Style2x2 stride (16 + 2 gutter)
-	private const uint ActiveTicksPerFrame = 4;
+	private const int Face = 16;
+	private const int Up   = 32;
+	private const int Cell = 18;
+	public const int AnimationTicksPerFrame = 8;
 
 	public enum Casing
 	{
@@ -60,8 +53,6 @@ public static class MachineRenderer
 		TextureAssets.Item[itemType] = WrapAsset(tex, $"gtceu_item_{itemType}");
 	}
 
-	// Conditional overlay (idle PNG, no animation strip). Used by the rotor
-	// holder's IsFormed-gated overlay_rotor_holder frame.
 	public static void DrawStaticOverlay(SpriteBatch sb, int i, int j,
 	                                     string overlayDir, string overlayBasename)
 	{
@@ -91,24 +82,93 @@ public static class MachineRenderer
 		return up;
 	}
 
-	// Animated overlay drawn over the vanilla base. Pre-upscaled 2x then
-	// drawn 1:1 for sampler-agnostic pixel precision.
+	private static readonly Dictionary<(Texture2D, byte), Texture2D> _paintedSheets = new();
+	private static readonly HashSet<(Texture2D, byte)> _pendingPaintBakes = new();
+	private static SpriteBatch? _paintBatch;
+
+	public static Texture2D GetPaintedSheet(Texture2D src, byte paint)
+	{
+		if (paint == 0) return src;
+		var key = (src, paint);
+		if (_paintedSheets.TryGetValue(key, out var painted))
+		{
+			if (painted is RenderTarget2D rt && rt.IsContentLost)
+				_pendingPaintBakes.Add(key);
+			return painted;
+		}
+		_pendingPaintBakes.Add(key);
+		return src;
+	}
+
+	public static void ProcessPendingPaintBakes()
+	{
+		if (_pendingPaintBakes.Count == 0 || Main.dedServ) return;
+		var gd = Main.graphics.GraphicsDevice;
+		var prevTargets = gd.GetRenderTargets();
+		_paintBatch ??= new SpriteBatch(gd);
+		Effect shader = Main.tileShader;
+
+		foreach (var key in _pendingPaintBakes)
+		{
+			var (src, paint) = key;
+			if (src is null || src.IsDisposed) continue;
+			int w = src.Width, h = src.Height;
+			if (!(_paintedSheets.TryGetValue(key, out var existing)
+			      && existing is RenderTarget2D rt && !rt.IsDisposed))
+			{
+				rt = new RenderTarget2D(gd, w, h, false,
+					gd.PresentationParameters.BackBufferFormat, DepthFormat.None, 0,
+					RenderTargetUsage.PreserveContents);
+				RuntimeTextureRegistry.Track(rt);
+			}
+			gd.SetRenderTarget(rt);
+			gd.Clear(Color.Transparent);
+			_paintBatch.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend);
+			shader.Parameters["leafHueTestOffset"].SetValue(0f);
+			shader.Parameters["leafMinHue"].SetValue(0f);
+			shader.Parameters["leafMaxHue"].SetValue(0f);
+			shader.Parameters["leafMinSat"].SetValue(0f);
+			shader.Parameters["leafMaxSat"].SetValue(0f);
+			shader.Parameters["invertSpecialGroupResult"].SetValue(false);
+			int pass = Main.ConvertPaintIdToTileShaderIndex(paint, false, false);
+			if (pass >= 0 && pass < shader.CurrentTechnique.Passes.Count)
+				shader.CurrentTechnique.Passes[pass].Apply();
+			_paintBatch.Draw(src, new Rectangle(0, 0, w, h), Color.White);
+			_paintBatch.End();
+			_paintedSheets[key] = rt;
+		}
+		_pendingPaintBakes.Clear();
+
+		if (prevTargets is null || prevTargets.Length == 0) gd.SetRenderTarget(null);
+		else gd.SetRenderTargets(prevTargets);
+	}
+
 	public static void DrawActiveOverlay(SpriteBatch sb, int i, int j,
 	                                     string overlayDir, string overlayBasename)
+		=> DrawOverlayFrames(sb, i, j, GetActiveOverlay(overlayDir, overlayBasename));
+
+	public static void DrawAnimatedIdleOverlay(SpriteBatch sb, int i, int j,
+	                                           string overlayDir, string overlayBasename,
+	                                           string emissiveBasename)
 	{
-		var tex = GetActiveOverlay(overlayDir, overlayBasename);
+		DrawOverlayFrames(sb, i, j, GetStaticOverlay(overlayDir, overlayBasename));
+		if (!string.IsNullOrEmpty(emissiveBasename))
+			DrawOverlayFrames(sb, i, j, GetStaticOverlay(overlayDir, emissiveBasename));
+	}
+
+	private static void DrawOverlayFrames(SpriteBatch sb, int i, int j, Texture2D? tex)
+	{
 		if (tex is null) return;
 
 		Tile tile = Main.tile[i, j];
 		int cornerX = tile.TileFrameX >= Cell ? 1 : 0;
 		int cornerY = tile.TileFrameY >= Cell ? 1 : 0;
 
-		// Frames are Up-px-tall bands stacked vertically.
 		int frameY = 0;
 		if (tex.Height > Up)
 		{
 			int frames = tex.Height / Up;
-			int frame  = (int)((Main.GameUpdateCount / ActiveTicksPerFrame) % (uint)frames);
+			int frame  = (int)((Main.GameUpdateCount / (uint)AnimationTicksPerFrame) % (uint)frames);
 			frameY = frame * Up;
 		}
 
@@ -116,12 +176,11 @@ public static class MachineRenderer
 		Vector2 pos  = new Vector2(i * 16 - (int)Main.screenPosition.X,
 		                           j * 16 - (int)Main.screenPosition.Y) + zero;
 		Color light  = Lighting.GetColor(i, j);
+		tex = GetPaintedSheet(tex, tile.TileColor);
 		var src = new Rectangle(cornerX * (Up / 2), frameY + cornerY * (Up / 2), Up / 2, Up / 2);
 		sb.Draw(tex, pos, src, light, 0f, Vector2.Zero, 1f, SpriteEffects.None, 0f);
 	}
 
-	// Reskin a multiblock part with its controller's appearance casing
-	// (upstream IS_FORMED model property + multi's casing reference).
 	private static readonly Dictionary<(int partTileType, int fusedCasingTileType, VoltageTier tier), Texture2D?>
 		_fusedSheets = new();
 
@@ -131,7 +190,6 @@ public static class MachineRenderer
 		var key = (partTileType, (int)fusedCasingTileType, tier);
 		if (_fusedSheets.TryGetValue(key, out var cached)) return cached;
 
-		// Prefer the source PNG so we don't dig through Style2x2 gutters.
 		Color[]? fusedCasingFace = null;
 		if (!string.IsNullOrEmpty(fusedCasingTexturePath))
 			fusedCasingFace = Tiles.Casings.CasingRenderer.LoadFace16(fusedCasingTexturePath);
@@ -145,8 +203,6 @@ public static class MachineRenderer
 		return sheet;
 	}
 
-	// Draw the fused composite at cell (i, j). Mirrors `DrawActiveOverlay`'s
-	// per-cell math - picks the right Style2x2 quadrant from the sheet.
 	public static void DrawFusedComposite(SpriteBatch sb, int i, int j, Texture2D sheet)
 	{
 		Tile tile = Main.tile[i, j];
@@ -157,12 +213,11 @@ public static class MachineRenderer
 		Vector2 pos  = new Vector2(i * 16 - (int)Main.screenPosition.X,
 		                           j * 16 - (int)Main.screenPosition.Y) + zero;
 		Color light  = Lighting.GetColor(i, j);
-		// Style2x2 quadrants at (0,0)/(Cell,0)/(0,Cell)/(Cell,Cell), each Up/2xUp/2.
+		sheet = GetPaintedSheet(sheet, tile.TileColor);
 		var src = new Rectangle(cornerX * Cell, cornerY * Cell, Up / 2, Up / 2);
 		sb.Draw(sheet, pos, src, light, 0f, Vector2.Zero, 1f, SpriteEffects.None, 0f);
 	}
 
-	// Pre-upscaled to match the idle base (sampler-agnostic).
 	private static readonly Dictionary<string, Texture2D?> _activeOverlays = new();
 
 	private static Texture2D? GetActiveOverlay(string overlayDir, string overlayBasename)
@@ -189,16 +244,12 @@ public static class MachineRenderer
 		return tex;
 	}
 
-	// Transformer 2x2 face is split (HV top / LV bottom); both DOWN + UP
-	// directions are pre-composited. DOWN bakes into the base sheet; UP is
-	// drawn per-cell in PostDraw when the screwdriver flips it.
 	private static Color[]? CompositeTransformerFace(VoltageTier tier, int baseAmp, bool isUp)
 	{
 		var casing16 = ReadFace(LoadCasing(Casing.Voltage, tier), srcY: 0);
 		if (casing16 is null) return null;
 		var art = Upscale2x(casing16);
 
-		// HV face = baseAmp amps; LV face = baseAmp x 4. Direction flips IO.
 		string hv = $"block/overlay/machine/overlay_energy_{baseAmp}a_{(isUp ? "out" : "in")}";
 		string lv = $"block/overlay/machine/overlay_energy_{baseAmp * 4}a_{(isUp ? "in" : "out")}";
 		CompositeFaceBand(art, hv, topHalf: true);
@@ -206,14 +257,12 @@ public static class MachineRenderer
 		return art;
 	}
 
-	// Overlay drawn at NATIVE 16x16 (not 2x upscale) - each band is only 16 px
-	// tall, so a 2x icon would overflow.
 	private static void CompositeFaceBand(Color[] art32, string overlayPath, bool topHalf)
 	{
 		var ov16 = ReadFace(LoadOptional($"{TexRoot}/{overlayPath}"), srcY: 0);
 		if (ov16 is null) return;
 		int dstY0 = topHalf ? 0 : Up / 2;
-		const int xOff = (Up - Face) / 2;   // centre 16-wide in 32-wide band
+		const int xOff = (Up - Face) / 2;
 		for (int y = 0; y < Face; y++)
 		for (int x = 0; x < Face; x++)
 		{
@@ -252,7 +301,6 @@ public static class MachineRenderer
 		TextureAssets.Item[itemType] = WrapAsset(MakeTexture(art, Up, Up), $"gtceu_item_{itemType}");
 	}
 
-	// UP art is opaque casing, fully covers the DOWN base.
 	private static readonly Dictionary<string, Texture2D?> _transformerUp = new();
 
 	public static void DrawTransformerUpFace(SpriteBatch sb, int i, int j,
@@ -275,8 +323,6 @@ public static class MachineRenderer
 		sb.Draw(tex, pos, src, light, 0f, Vector2.Zero, 1f, SpriteEffects.None, 0f);
 	}
 
-	// Layer order back->front: casing -> pipe -> tinted -> directional -> emissive
-	// (mirrors upstream model JSON). Returns null if a required source is missing.
 	private static Color[]? CompositeFace(IMachineTextureSpec spec, VoltageTier tier,
 	                                       bool active, int frame,
 	                                       Color[]? overrideCasingFace = null)
@@ -291,15 +337,10 @@ public static class MachineRenderer
 
 		if (overrideCasingFace != null)
 		{
-			// Fused-casing path - caller supplied the face (cleanroom->plascrete).
 			result = (Color[])overrideCasingFace.Clone();
 		}
 		else if (!string.IsNullOrEmpty(spec.CustomCasingTexturePath))
 		{
-			// Multi controllers carry the appearance-block path (heatproof /
-			// frostproof / watertight / etc.) so each multi renders with its
-			// own casing instead of a tier-voltage one. Mirrors upstream's
-			// `workableCasingModel(appearance, overlay)` first arg.
 			var casingPx = ReadFace(LoadOptional($"{TexRoot}/{spec.CustomCasingTexturePath}"), srcY: 0);
 			if (casingPx is null) return null;
 			result = casingPx;
@@ -311,17 +352,11 @@ public static class MachineRenderer
 			result = casingPx;
 		}
 
-		// 1. Pipe overlay (no tint) - upstream `#overlay_pipe`.
 		CompositeOverlay(ref result, spec.OverlayDir, spec.PipeOverlayBasename, tint: null);
 
-		// 2. Tinted overlay (tier-color multiplied) - upstream `#overlay_tint`
-		//    with `tintindex: 2`. The tier text color maps directly to MC's
-		//    ChatFormatting hex, which is what `tintindex: 2` resolves to for
-		//    GT machine models.
 		CompositeOverlay(ref result, spec.OverlayDir, spec.TintedOverlayBasename,
 			tint: VoltageTiers.TextColor(tier));
 
-		// 3. Directional overlay - carries the _active animation.
 		var directionalTex = LoadOverlay(spec.OverlayDir, spec.OverlayBasename, active);
 		var directionalPx  = ReadFace(directionalTex, srcY: active ? frame * Face : 0);
 		if (directionalPx is not null)
@@ -330,16 +365,11 @@ public static class MachineRenderer
 			else AlphaCompositeOver(result, directionalPx);
 		}
 
-		// 4. Emissive overlay - baked at full brightness (no per-pixel vanilla
-		// lighting). Darkness dims uniformly with the casing instead of staying lit.
 		CompositeOverlay(ref result, spec.OverlayDir, spec.EmissiveOverlayBasename, tint: null);
 
 		return result;
 	}
 
-	// MC's model UV is [0,16] regardless of source resolution, so 32x32 PNGs
-	// (overlay_pipe_9x) downsample to 16. Animated strips stay; ReadFace
-	// grabs the first frame.
 	private static void CompositeOverlay(ref Color[]? result, string overlayDir,
 	                                      string overlayBasename, Color? tint)
 	{
@@ -361,7 +391,6 @@ public static class MachineRenderer
 		return ReadFace(tex, srcY: 0);
 	}
 
-	// Alpha-weighted RGB average; transparent pixels don't darken the mix.
 	private static Color[] BoxDownsampleToFace(Texture2D src)
 	{
 		int n = src.Width;
@@ -391,7 +420,6 @@ public static class MachineRenderer
 		return dst;
 	}
 
-	// MC tintindex semantics: RGB only, alpha untouched.
 	private static void ApplyTint(Color[] px, Color tint)
 	{
 		for (int k = 0; k < px.Length; k++)
@@ -418,8 +446,6 @@ public static class MachineRenderer
 		return face;
 	}
 
-	// Straight-alpha src-over (tML PNGs are NOT premultiplied; the
-	// premultiplied form over-brightens 0<a<255 pixels = halos on AA edges).
 	private static void AlphaCompositeOver(Color[] dst, Color[] src)
 	{
 		for (int k = 0; k < dst.Length; k++)
@@ -450,10 +476,8 @@ public static class MachineRenderer
 		return up;
 	}
 
-	// Internal so MaterialBlockRenderer shares the layout math.
 	internal static Texture2D BuildStyle2x2Sheet(Color[] face16) => BuildSheetFrom32(Upscale2x(face16));
 
-	// Direct-32 path used by the Transformer's split face.
 	internal static Texture2D BuildSheetFrom32(Color[] art32)
 	{
 		var sheet = new Color[36 * 36];
@@ -469,18 +493,12 @@ public static class MachineRenderer
 		return tex;
 	}
 
-	// PNG round-trip once per machine (lazy) - negligible cost.
 	internal static Asset<Texture2D> WrapAsset(Texture2D tex, string name)
 	{
 		using var ms = new MemoryStream();
 		tex.SaveAsPng(ms, tex.Width, tex.Height);
 		ms.Position = 0;
 		var asset = Main.Assets.CreateUntracked<Texture2D>(ms, name + ".png");
-		// CreateUntracked decodes a SEPARATE ReLogic-owned Texture2D (the copy that
-		// lives in TextureAssets and is actually drawn). "Untracked" = ReLogic
-		// won't dispose it, so we track it for Mod.Unload disposal - otherwise it
-		// stays pinned in FNA's resource list and roots our ALC on reload. The
-		// encode-source `tex` is already tracked (its caller built it via New()).
 		RuntimeTextureRegistry.Track(asset.Value);
 		return asset;
 	}
@@ -493,9 +511,6 @@ public static class MachineRenderer
 		{
 			Casing.None          => null,
 			Casing.Voltage       => $"{TexRoot}/block/casings/voltage/{VoltageTiers.ShortName(tier).ToLowerInvariant()}/side",
-			// Plain-brick face from casings/steam/bricked_*. The previous
-			// firebox/machine_casing_firebox_bronze mapping baked a hatch
-			// behind every machine - not what upstream does.
 			Casing.BrickedBronze => $"{TexRoot}/block/casings/steam/bricked_bronze/side",
 			Casing.BrickedSteel  => $"{TexRoot}/block/casings/steam/bricked_steel/side",
 			Casing.CokeBricks    => $"{TexRoot}/block/casings/solid/machine_coke_bricks",
@@ -508,7 +523,6 @@ public static class MachineRenderer
 
 	private static Texture2D? LoadOverlay(string overlayDir, string overlayBasename, bool active)
 	{
-		// Empty basename = casing alone (e.g. coke_oven_hatch).
 		if (string.IsNullOrEmpty(overlayBasename)) return null;
 		string name = active ? $"{overlayBasename}_active" : overlayBasename;
 		var primary = LoadOptional($"{TexRoot}/{overlayDir}/{name}");

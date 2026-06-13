@@ -1,8 +1,6 @@
 #nullable enable
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Stable byte ordinals - only add new values at the end. Direction tags
-// below mark the INITIATING side; both sides handle every packet.
 public enum PacketType : byte
 {
 	// === Client -> Server (action intents) ===
@@ -46,8 +44,8 @@ public enum PacketType : byte
 	FluidUpdate      = 66,   // Single-tank delta
 	CursorUpdate     = 67,   // Authoritative cursor (Main.mouseItem) result after a SlotAction
 	EnderChannelSync = 68,   // Server->Client virtual ender channel contents (for the ender-cover settings view)
-	ActiveCasingSet  = 69,   // Server->Client multiblock active-casing edge (active=true/false, packed cells[])
-	ActiveCasingRequest = 70, // Client->Server "I just joined, send me every formed-and-active multi's cells"
+	// 69 (ActiveCasingSet) from controller state
+	// 70 (ActiveCasingRequest) coil glow from controller state
 	MultiblockFormed = 71,   // Server->Client multiblock formed/unformed edge - toggles IsFormed + IsFlipped on the client controller
 	BlockExplosionEffect = 72, // Server->Client play the bomb-sound + smoke-dust at (x, y) - the visual half of a machine self-destruct (boiler water-empty, energy over-voltage). The KillTile half goes through vanilla MessageID.TileManipulation.
 	EnergyNetStats   = 73,   // Server->Client per-network throughput broadcast - keyed by each network's anchor cell so wire tooltips on the client can show live extracted / delivered EU.

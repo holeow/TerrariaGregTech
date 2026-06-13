@@ -11,9 +11,7 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
-// Single upstream variant - OpticalPipeType.NORMAL. Carries research data
-// and CWU along one axis between transmitter/receiver hatches. Mirror of
-// LaserPipeItem.
+// Single variant OpticalPipeType.NORMAL
 public sealed class OpticalPipeItem : ModItem, ITextureWarmUp
 {
 	public override string Name    => "normal_optical_pipe";
@@ -29,7 +27,7 @@ public sealed class OpticalPipeItem : ModItem, ITextureWarmUp
 
 	public override void SetDefaults()
 	{
-		Item.maxStack = 999;
+		Item.maxStack = 9999;
 		Item.width = 32; Item.height = 32;
 		Item.useTime = 2; Item.useAnimation = 6;
 		Item.useStyle = ItemUseStyleID.Swing;

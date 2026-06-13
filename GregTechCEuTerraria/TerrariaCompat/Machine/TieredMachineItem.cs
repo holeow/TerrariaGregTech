@@ -9,8 +9,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Universal def-driven machine Item. One class, registered per (def, tier)
-// by TieredMachineFactory. Parameterless ctor is the autoload probe.
 public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 {
 	[CloneByReference] protected readonly MachineDefinition? _def;
@@ -20,11 +18,9 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 
 	protected override string SnakeName => _def?.Id ?? GetType().Name;
 
-	// Non-tiered = bare material id (drum/crate).
 	public override string Name =>
 		_def != null && !_def.Tiered ? _def.Id : base.Name;
 
-	// PreDraw composites the real icon.
 	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsItem";
 
 	public override void SetStaticDefaults()
@@ -52,7 +48,6 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 		return null;
 	}
 
-	// Transformer overrides for its 2-face composite icon.
 	public virtual void WarmUpTexture()
 	{
 		var spec = SiblingSpec();
@@ -83,7 +78,6 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 		AppendHpcaComponentTooltip(tooltips);
 	}
 
-	// Stats from HPCAComponentPartMachine SSOT (upstream's locale keys not mirrored).
 	private void AppendHpcaComponentTooltip(List<TooltipLine> tooltips)
 	{
 		if (_def?.Family != MachineFamily.HpcaComponent || _def.HpcaKind is not { } kind) return;
@@ -130,7 +124,6 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 
 	protected virtual void AppendTierTooltip(List<TooltipLine> tooltips)
 	{
-		// Energy hatches: V x A throughput; the per-amp default under-reports.
 		if (_def?.Family == MachineFamily.EnergyHatch && _def.PartAmperage > 0)
 		{
 			long amps = _def.PartAmperage;
@@ -143,7 +136,6 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "TierLine",
 			$"{VoltageTiers.ShortName(_tier)} - cap {VoltageTiers.Voltage(_tier):N0} EU/t"));
 
-		// Verbatim GCYMMachines.java:79-80 .tooltips chain.
 		if (_def?.Family == MachineFamily.ParallelHatch)
 		{
 			int maxParallel = (int)System.Math.Pow(4, (int)_tier - (int)VoltageTier.EV);
@@ -153,9 +145,19 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 				"[c/AAAAAA:Cannot be shared between multiblocks]"));
 		}
 
-		// Miner / SteamMiner area+speed+draw (item hover = structure; world hover
-		// = live state). Tier formulas mirror MinerMachine / SteamMinerMachine
-		// (SSOT). Depth is world-height-scaled - fall back to 1200 at menu.
+		if (_def?.Family == MachineFamily.BatteryBuffer)
+		{
+			if (_def.OutputAmps > 0)
+			{
+				tooltips.Add(new TooltipLine(Mod, "BufferFaces", "[c/AAAAAA:Bottom side = input, top side = output]"));
+				tooltips.Add(new TooltipLine(Mod, "BufferWire", "[c/AAAAAA:Output needs a wire - won't power a directly touching machine]"));
+			}
+			else
+			{
+				tooltips.Add(new TooltipLine(Mod, "BufferFaces", "[c/AAAAAA:Charges batteries - accepts power on any side]"));
+			}
+		}
+
 		int h = Terraria.Main.maxTilesY > 0 ? Terraria.Main.maxTilesY : 1200;
 		if (_def?.Family == MachineFamily.Miner)
 		{

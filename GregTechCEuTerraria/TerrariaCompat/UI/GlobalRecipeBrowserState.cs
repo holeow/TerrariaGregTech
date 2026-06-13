@@ -90,7 +90,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private UIText? _chipHint;
 	private UITextButton? _chipButton;
 	private UIElement? _chipShown;
-	private UIElement? _chipPending; // Pending swap stashed by UpdateChip, applied in Update
+	private UIElement? _chipPending;
 	private string _chipLabel = "";
 	private bool _haveOnly;
 	private bool _hideObvious;
@@ -104,7 +104,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private UIList? _modList;
 	private UIScrollbar? _modScroll;
 	private int _modBtnW;
-	private int _haveOnlyTick; // Periodic re-filter while have-only is active (~0.5 s).
+	private int _haveOnlyTick;
 	private List<GTRecipe> _all = new();
 	private List<GTRecipe> _filtered = new();
 	private static string _lastQuery = "";
@@ -127,7 +127,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private const int HeaderPad = 8;
 	private const int SearchH   = 26;
 	private const int ChipH     = 18;
-	private const int HintH     = 32; // Hint (no filter) is two lines tall; chip BUTTON (active filter) stays one.
+	private const int HintH     = 32;
 	private const string CheatHintLine = "Ctrl+LMB: cheat 1 to inventory  *  Ctrl+RMB: a full stack (Journey Mode)";
 
 	private static string HintFor(BrowseMode mode) => mode switch
@@ -153,8 +153,6 @@ public sealed class GlobalRecipeBrowserState : UIState
 		const float FavGap   = 6f;
 		float GroupSidePx = SetWidth + SetGap + FavGap + FavWidth;
 
-		// Fixed fraction of the screen, clamped min/max - large monitors render
-		// at a consistent pixel size, only genuinely small screens shrink.
 		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
 		float uiW = Main.screenWidth / uiScale;
 		float uiH = Main.screenHeight / uiScale;
@@ -904,8 +902,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private void RefilterItems(string text)
 	{
 		var allItems = EnsureItemUniverse();
-		string needle = (text ?? string.Empty).Trim().ToLowerInvariant();
-		bool needText = needle.Length > 0;
+		string[] tokens = RecipeSearch.Tokenize(text ?? string.Empty);
+		bool needText = tokens.Length > 0;
 		bool needMod  = _hiddenMods.Count > 0;
 		_filteredItems.Clear();
 		if (!needText && !needMod)
@@ -919,10 +917,18 @@ public sealed class GlobalRecipeBrowserState : UIState
 			if (needText)
 			{
 				string name = ItemNameLower(type);
-				if (name.Length == 0 || !name.Contains(needle)) continue;
+				if (!MatchesAllTokens(name, tokens)) continue;
 			}
 			_filteredItems.Add(type);
 		}
+	}
+
+	private static bool MatchesAllTokens(string name, string[] tokens)
+	{
+		if (name.Length == 0) return false;
+		foreach (string t in tokens)
+			if (!name.Contains(t)) return false;
+		return true;
 	}
 
 	private static readonly Dictionary<int, string> _itemNameLowerCache = new();
@@ -1016,8 +1022,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private void RefilterEquippable(string text)
 	{
 		var allEquip = EnsureEquippableUniverse();
-		string needle = (text ?? string.Empty).Trim().ToLowerInvariant();
-		bool needText = needle.Length > 0;
+		string[] tokens = RecipeSearch.Tokenize(text ?? string.Empty);
+		bool needText = tokens.Length > 0;
 		bool needMod  = _hiddenMods.Count > 0;
 		var hidden    = _hiddenEquip;
 		_filteredEquippable.Clear();
@@ -1029,7 +1035,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			if (needText)
 			{
 				string name = ItemNameLower(type);
-				if (name.Length == 0 || !name.Contains(needle)) continue;
+				if (!MatchesAllTokens(name, tokens)) continue;
 			}
 			_filteredEquippable.Add(type);
 		}
@@ -1126,7 +1132,6 @@ public sealed class GlobalRecipeBrowserState : UIState
 			addArray(c.item);
 		}
 
-		// Open container - world chest at chest>=0, portable banks at negatives.
 		if (player.chest != -1)
 		{
 			Chest? open = player.chest switch
@@ -1143,9 +1148,6 @@ public sealed class GlobalRecipeBrowserState : UIState
 		// Void Bag - skipped when its own interface is the open chest (dedup).
 		if (player.useVoidBag() && player.chest != -5) AddChest(player.bank4);
 
-		// Nearby chests at vanilla's 600 px range. CraftFromNearbyChests +
-		// IsLockedOrInUse aren't exposed to a mod project; we treat the setting
-		// as enabled and accept the minor false-positive on locked chests (UI hint).
 		const float Range = 600f;
 		var center = player.Center;
 		for (int i = 0; i < Main.chest.Length; i++)
@@ -1179,9 +1181,6 @@ public sealed class GlobalRecipeBrowserState : UIState
 				if (!HasFluid(content, fluidsHeld)) return false;
 			}
 		}
-		// A recipe with zero item AND zero fluid inputs (e.g. fluid_drilling_rig
-		// / large_miner biome-keyed synthetic recipes producing oil from nothing)
-		// is world-IO production, not player-craftable - exclude from the filter.
 		return hasAnyInput;
 	}
 
@@ -1273,7 +1272,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			case TagIngredient tag:
 			{
 				var members = tag.GetItems();
-				if (members.Count == 0) return false;          // tag resolved to no items
+				if (members.Count == 0) return false;
 				int have = 0;
 				foreach (var it in members)
 				{
@@ -1283,10 +1282,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 				return false;
 			}
 			case IntCircuitIngredient:
-				// Programmed circuit is a machine-GUI setting, not an inventory item. TODO actual circuits
 				return true;
 			default:
-				// Unknown ingredient in the ITEM bucket - conservatively unsatisfiable.
 				return false;
 		}
 	}

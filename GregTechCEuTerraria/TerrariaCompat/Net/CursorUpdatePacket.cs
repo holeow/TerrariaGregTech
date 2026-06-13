@@ -6,15 +6,14 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Authoritative cursor (Main.mouseItem) result after a server-side
-// SlotAction. Mirrors MagicStorage - clients never claim items the server
-// didn't hand them. Delivery picks between cursor and player inventory.
+// Authoritative cursor (Main.mouseItem) after a server-side SlotAction
 public static class CursorUpdatePacket
 {
 	public enum Delivery : byte
 	{
 		Cursor          = 0,
 		PlayerInventory = 1,
+		CursorMerge     = 2,
 	}
 
 	public static void SendTo(int toClient, Item item, Delivery delivery)
@@ -36,16 +35,13 @@ public static class CursorUpdatePacket
 			case Delivery.Cursor:
 				Main.mouseItem = item;
 				break;
+			case Delivery.CursorMerge:
+				global::GregTechCEuTerraria.TerrariaCompat.Net.Actions.SlotAction.MergeOntoCursor(item);
+				break;
 			case Delivery.PlayerInventory:
 				if (item.IsAir) return;
-				// Auto-stacks into inventory; leftover drops on the ground.
-				var leftover = Main.LocalPlayer.GetItem(
-					Main.myPlayer, item,
-					Terraria.GetItemSettings.InventoryEntityToPlayerInventorySettings);
-				if (!leftover.IsAir && leftover.stack > 0)
-					Item.NewItem(new Terraria.DataStructures.EntitySource_Misc("gtceu_cursor_overflow"),
-						Main.LocalPlayer.position, Main.LocalPlayer.width, Main.LocalPlayer.height,
-						leftover.type, leftover.stack, false, leftover.prefix);
+				global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(
+					Main.LocalPlayer, Main.LocalPlayer.GetSource_Misc("gtceu_cursor_overflow"), item);
 				break;
 		}
 	}

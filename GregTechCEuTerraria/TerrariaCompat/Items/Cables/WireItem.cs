@@ -100,9 +100,22 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 
 	void ITextureWarmUp.WarmUpTexture() => EnsureTextureBaked();
 
-	private void EnsureTextureBaked() =>
-		ItemIconBaker.Install(Item.type,
-			new IconLayer(Texture, Tint(), DotScaleForWireSize(_wireSize)));
+	private void EnsureTextureBaked()
+	{
+		Color core = MaterialColor();
+		float dotScale = DotScaleForWireSize(_wireSize);
+		if (_insulated)
+		{
+			float coreScale = System.Math.Max(0.15f, dotScale - 0.12f);
+			ItemIconBaker.Install(Item.type,
+				new IconLayer(Texture, CableRenderer.JacketColor(core), dotScale),
+				new IconLayer(Texture, core, coreScale));
+		}
+		else
+		{
+			ItemIconBaker.Install(Item.type, new IconLayer(Texture, core, dotScale));
+		}
+	}
 
 	private static float DotScaleForWireSize(byte wireSize) => wireSize switch
 	{
@@ -141,7 +154,7 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 		string electrical = $"{VoltageTiers.ShortName(cell.Value.Voltage)} {voltage:N0} EU/t  *  {cell.Value.TotalAmperage}A  *  loss {cell.Value.LossPerAmp}/A";
 
 		string networkLine = net != null
-			? $"Network: {net.Cells.Count} cables  *  effective {VoltageTiers.ShortName(net.EffectiveTier)} {net.EffectiveAmperage}A (cap {net.PerTickCapacity:N0} EU/t)"
+			? $"Network: {net.Cells.Count} cables  *  {VoltageTiers.ShortName(net.EffectiveTier)}  *  cap {net.PerTickCapacity:N0} EU/t ({net.MaxAmperage}A)"
 			: "Network: not initialized";
 
 		string endpointsLine = net != null
@@ -213,7 +226,7 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 	public static bool CutCableAt(Player player, int x, int y) =>
 		CableLayerHandle.Instance.CutAt(x, y, player);
 
-	private CableCell BuildCell()
+	internal CableCell BuildCell()
 	{
 		var mat = _material!;
 		var tier = TryParseTier(mat.CableTier) ?? VoltageTier.ULV;
@@ -234,11 +247,10 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 	private static VoltageTier? TryParseTier(string? name) =>
 		System.Enum.TryParse<VoltageTier>(name, ignoreCase: false, out var t) ? t : null;
 
-	private Color Tint()
+	private Color MaterialColor()
 	{
 		uint c = _material?.Color ?? 0xFFFFFFu;
-		var color = new Color((byte)((c >> 16) & 0xFF), (byte)((c >> 8) & 0xFF), (byte)(c & 0xFF));
-		return _insulated ? CableRenderer.DarkenForInsulation(color) : color;
+		return new Color((byte)((c >> 16) & 0xFF), (byte)((c >> 8) & 0xFF), (byte)(c & 0xFF));
 	}
 
 	public static string WireSizeWord(byte wireSize) => wireSize switch

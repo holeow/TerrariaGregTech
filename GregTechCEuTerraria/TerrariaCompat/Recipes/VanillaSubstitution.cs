@@ -52,6 +52,10 @@ public static class VanillaItemMap
 		{ "minecraft:iron_ingot",       ItemID.IronBar },
 		{ "minecraft:gold_ingot",       ItemID.GoldBar },
 		{ "minecraft:copper_ingot",     ItemID.CopperBar },
+		{ "gtceu:platinum_ingot",       ItemID.PlatinumBar },
+		{ "gtceu:silver_ingot",         ItemID.SilverBar },
+		{ "gtceu:tin_ingot",            ItemID.TinBar },
+		{ "gtceu:lead_ingot",           ItemID.LeadBar },
 		{ "minecraft:diamond",          ItemID.Diamond },
 		{ "minecraft:emerald",          ItemID.Emerald },
 		{ "minecraft:amethyst_shard", 	ItemID.Amethyst },
@@ -132,7 +136,7 @@ public static class VanillaItemMap
 		{ "minecraft:rail",             ItemID.MinecartTrack },
 		{ "minecraft:powered_rail",     ItemID.BoosterTrack },
 		{ "minecraft:detector_rail",    ItemID.PressureTrack },
-		{ "minecraft:minecart",         ItemID.Minecart },
+		{ "minecraft:minecart",         ItemID.MinecartMech },
 
 		// Dyes - MC's 16 colours mapped onto Terraria's basic dyes. magenta ->
 		// Violet. Terraria has no true white / gray dye, so the three MC

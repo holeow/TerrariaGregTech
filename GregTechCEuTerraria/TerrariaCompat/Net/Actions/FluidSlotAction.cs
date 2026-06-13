@@ -10,17 +10,6 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net.Actions;
 
-// R-click on a UIFluidSlot with a bucket OR fluid cell on the cursor. Full
-// server authority - server validates fill/drain against the authoritative
-// IFluidHandler, mutates the tank, and returns the swapped cursor item via
-// CursorUpdatePacket. Constrained to Main.mouseItem (cursor) as the source.
-//
-// Dispatch:
-//   - Cursor is a vanilla bucket (WaterBucket/LavaBucket/EmptyBucket) ->
-//     route via VanillaFluidBridge (1000 mB per click; type swap).
-//   - Cursor is a FluidCellItem -> route via IFluidHandlerItem
-//     (cell-capacity per click; NBT-mutate in place if stack=1; spawn new
-//     filled/empty cell + decrement stack if stack>1).
 public sealed class FluidSlotAction : IMachineAction
 {
 	public PacketType Type => PacketType.FluidSlotAction;
@@ -53,23 +42,10 @@ public sealed class FluidSlotAction : IMachineAction
 		if (_cursor.IsAir) return;
 		if (_tankIndex >= handler.TankCount) return;
 
-		// Raw, direction-free single-tank handler for the clicked tank - the
-		// centralized UI-interaction path (IFluidHandler.GetTankAccess, our
-		// equivalent of upstream's TankWidget binding to getStorages()[tank]).
-		// All transfer below goes through this, never the machine's
-		// whole-handler IO-gated Fill/Drain. Type filters on the storage are
-		// still enforced; only the IO-direction gate is bypassed.
 		var tank = handler.GetTankAccess(_tankIndex);
 
-		// Server-authoritative click gate - same per-tank capability tuple the
-		// UI widget reads (IFluidHandler.GetTankClickCaps), so a malicious
-		// client can't bypass either direction. Mirrors upstream's TankWidget
-		// (allowClickDrained, allowClickFilled) pair.
 		(bool allowFill, bool allowDrain) = handler.GetTankClickCaps(_tankIndex);
 
-		// === FluidBucketItem path - per-fluid filled bucket ================
-		// Fills the tank with one full bucket; the bucket empties to a vanilla
-		// EmptyBucket (which round-trips back via the empty-bucket path below).
 		if (_cursor.ModItem is FluidBucketItem gtBucket && gtBucket.Fluid is { } bucketFluidType)
 		{
 			if (!allowFill) return;
@@ -82,30 +58,28 @@ public sealed class FluidSlotAction : IMachineAction
 			return;
 		}
 
-		// === FluidCellItem path (NBT-discriminated empty/filled) ===========
-		if (_cursor.ModItem is FluidCellItem cell)
+		if (_cursor.ModItem is IFluidHandlerItem container)
 		{
-			if (cell.GetFluidStack().IsEmpty)
+			if (container.GetTank(0).IsEmpty)
 			{
 				if (!allowDrain) return;
-				ApplyFillCellFromTank(tank, cell);
+				ApplyFillContainerFromTank(tank, container);
 			}
 			else
 			{
 				if (!allowFill) return;
-				ApplyDrainCellIntoTank(tank, cell);
+				ApplyDrainContainerIntoTank(tank, container);
 			}
 			DeliverCursor(byWhoAmI);
 			return;
 		}
 
-		// === Vanilla bucket path ============================================
 		var bucketFluid = VanillaFluidBridge.StackFor(_cursor.type);
 		if (!bucketFluid.IsEmpty)
 		{
 			if (!allowFill) return;
 			int accepted = tank.Fill(bucketFluid, simulate: true);
-			if (accepted < bucketFluid.Amount) return; // not enough room for a full bucket
+			if (accepted < bucketFluid.Amount) return;
 			tank.Fill(bucketFluid, simulate: false);
 			int emptyType = VanillaFluidBridge.EmptyVersion(_cursor.type);
 			SwapOneFromCursorByType(emptyType);
@@ -117,14 +91,10 @@ public sealed class FluidSlotAction : IMachineAction
 			if (!allowDrain) return;
 			var stored = tank.GetTank(0);
 			if (stored.IsEmpty) return;
-			// Water / lava drain into their vanilla filled bucket; every other
-			// fluid drains into its GT per-fluid bucket.
 			int filledType = VanillaFluidBridge.FilledVersion(_cursor.type, stored.Type!);
 			if (filledType == 0)
 				filledType = FluidBucketRegistry.Get(stored.Type!.Id) ?? 0;
 			if (filledType == 0) return;
-			// Simulate first - only hand over a filled bucket if the tank
-			// actually yields a full one.
 			if (tank.Drain(VanillaFluidBridge.BucketAmount, simulate: true).Amount
 			    < VanillaFluidBridge.BucketAmount)
 				return;
@@ -134,86 +104,71 @@ public sealed class FluidSlotAction : IMachineAction
 		}
 	}
 
-	// === Cell fill: tank -> empty cell ===
-	// `tank` is the raw single-tank handler from GetTankAccess.
-	private void ApplyFillCellFromTank(IFluidHandler tank, FluidCellItem cell)
+	private void ApplyFillContainerFromTank(IFluidHandler tank, IFluidHandlerItem container)
 	{
 		var tankStack = tank.GetTank(0);
 		if (tankStack.IsEmpty) return;
 
-		// Drain up to cell capacity. Cells require a full transfer of what
-		// the tank can spare - partial fills are allowed (upstream matches).
-		int wantAmount = cell.Capacity;
-		var simDrained = tank.Drain(wantAmount, simulate: true);
+		var simDrained = tank.Drain(container.GetCapacity(0), simulate: true);
 		if (simDrained.IsEmpty) return;
-		tank.Drain(simDrained.Amount, simulate: false);
+		int canFill = container.Fill(simDrained, simulate: true);
+		if (canFill <= 0) return;
+		var moved = simDrained.WithAmount(System.Math.Min(simDrained.Amount, canFill));
+		tank.Drain(moved.Amount, simulate: false);
 
 		if (_cursor.stack == 1)
 		{
-			// Mutate the cursor cell's NBT in place.
-			cell.Fill(simDrained, simulate: false);
+			container.Fill(moved, simulate: false);
 		}
 		else
 		{
-			// Stack > 1: decrement and spawn a new filled cell of the same
-			// type into the player's inventory via the pending-delivery slot.
 			_cursor.stack -= 1;
-			_extraDelivery = MakeFilledCell(_cursor.type, simDrained);
+			_extraDelivery = MakeFilledContainer(moved);
 		}
 	}
 
-	// === Cell drain: filled cell -> tank ===
-	// `tank` is the raw single-tank handler from GetTankAccess.
-	private void ApplyDrainCellIntoTank(IFluidHandler tank, FluidCellItem cell)
+	private void ApplyDrainContainerIntoTank(IFluidHandler tank, IFluidHandlerItem container)
 	{
-		var cellStack = cell.GetFluidStack();
-		if (cellStack.IsEmpty) return;
-		int accepted = tank.Fill(cellStack, simulate: true);
+		var contents = container.GetTank(0);
+		if (contents.IsEmpty) return;
+		int accepted = tank.Fill(contents, simulate: true);
 		if (accepted <= 0) return;
 
-		tank.Fill(cellStack.WithAmount(accepted), simulate: false);
+		tank.Fill(contents.WithAmount(accepted), simulate: false);
 
 		if (_cursor.stack == 1)
 		{
-			// Drain the cursor cell's NBT in place. If tank couldn't take all
-			// of it, the cell keeps the remainder.
-			cell.Drain(accepted, simulate: false);
+			container.Drain(accepted, simulate: false);
 		}
 		else
 		{
-			// Stack > 1: decrement and spawn either an empty cell (full
-			// transfer) or a partially-drained cell (partial transfer).
 			_cursor.stack -= 1;
-			if (accepted < cellStack.Amount)
-				_extraDelivery = MakeFilledCell(_cursor.type, cellStack.WithAmount(cellStack.Amount - accepted));
-			else
-				_extraDelivery = MakeEmptyCell(_cursor.type);
+			_extraDelivery = accepted < contents.Amount
+				? MakeFilledContainer(contents.WithAmount(contents.Amount - accepted))
+				: MakeEmptyContainer();
 		}
 	}
 
-	// === Cell construction helpers ===
-	private static Item MakeFilledCell(int cellItemType, FluidStack contents)
+	private Item MakeEmptyContainer()
 	{
-		var item = new Item();
-		item.SetDefaults(cellItemType);
-		if (item.ModItem is FluidCellItem c)
-			c.Fill(contents, simulate: false);
+		var item = _cursor.Clone();
+		item.stack = 1;
+		if (item.ModItem is IFluidHandlerItem f)
+		{
+			var s = f.GetTank(0);
+			if (!s.IsEmpty) f.Drain(s.Amount, simulate: false);
+		}
 		return item;
 	}
 
-	private static Item MakeEmptyCell(int cellItemType)
+	private Item MakeFilledContainer(FluidStack contents)
 	{
-		var item = new Item();
-		item.SetDefaults(cellItemType);
+		var item = MakeEmptyContainer();
+		if (item.ModItem is IFluidHandlerItem f)
+			f.Fill(contents, simulate: false);
 		return item;
 	}
 
-	// === Vanilla bucket helpers ===
-
-	// Mirror of UIFluidSlot.SwapHeldStack - replace ONE bucket out of the
-	// cursor stack with the swap type. Stack>1: drop the rest server-side
-	// (the non-swapped buckets go to the player's inventory via
-	// DeliverCursor's extra-delivery path).
 	private void SwapOneFromCursorByType(int swapToType)
 	{
 		if (swapToType <= 0) return;
@@ -229,8 +184,6 @@ public sealed class FluidSlotAction : IMachineAction
 		}
 	}
 
-	// Pending delivery item for the stack>1 case - held until Apply finishes
-	// so we can address it at the right player.
 	private Item? _extraDelivery;
 
 	private void DeliverCursor(int byWhoAmI)
@@ -242,17 +195,9 @@ public sealed class FluidSlotAction : IMachineAction
 				CursorUpdatePacket.SendTo(byWhoAmI, extra, CursorUpdatePacket.Delivery.PlayerInventory);
 			return;
 		}
-		// SinglePlayer - write back in-process.
 		Main.mouseItem = _cursor;
 		if (_extraDelivery is { IsAir: false } e)
-		{
-			var leftover = Main.LocalPlayer.GetItem(
-				Main.myPlayer, e,
-				Terraria.GetItemSettings.InventoryEntityToPlayerInventorySettings);
-			if (!leftover.IsAir && leftover.stack > 0)
-				Item.NewItem(new Terraria.DataStructures.EntitySource_Misc("gtceu_bucket_overflow"),
-					Main.LocalPlayer.position, Main.LocalPlayer.width, Main.LocalPlayer.height,
-					leftover.type, leftover.stack, false, leftover.prefix);
-		}
+			global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(
+				Main.LocalPlayer, Main.LocalPlayer.GetSource_Misc("gtceu_bucket_overflow"), e);
 	}
 }

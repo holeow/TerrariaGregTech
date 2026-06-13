@@ -384,10 +384,63 @@ public static class CompatRecipes
 	]
 	""";
 
+	// Terraria coin conversion in the packer
+	private const string Coins = """
+	[
+	  { "id": "packer/compat_pack_copper_coins", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:CopperCoin" } } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 1 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:SilverCoin" } } ] } },
+
+	  { "id": "packer/compat_pack_silver_coins", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:SilverCoin" } } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 1 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:GoldCoin" } } ] } },
+
+	  { "id": "packer/compat_pack_gold_coins", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:GoldCoin" } } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 1 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:PlatinumCoin" } } ] } },
+
+	  { "id": "packer/compat_unpack_silver_coin", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "item": "terraria:SilverCoin" } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 2 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:CopperCoin" } } } ] } },
+
+	  { "id": "packer/compat_unpack_gold_coin", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "item": "terraria:GoldCoin" } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 2 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:SilverCoin" } } } ] } },
+
+	  { "id": "packer/compat_unpack_platinum_coin", "type": "gtceu:packer", "duration": 100,
+	    "inputs": { "item": [
+	      { "content": { "item": "terraria:PlatinumCoin" } },
+	      { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 2 } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 4 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 100, "ingredient": { "item": "terraria:GoldCoin" } } } ] } }
+	]
+	""";
+
 	private static readonly string[] JsonGroups =
 	{
 		HatchesAndBuses, Bootstrap, SteamMachineOverrides, Misc, SimplePipes, Casings, Clay,
-		TerrariaIntermediates, TerraPrisma, RedstoneGem,
+		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins,
 	};
 
 	// Per-tier crafting recipes for our custom-block machines

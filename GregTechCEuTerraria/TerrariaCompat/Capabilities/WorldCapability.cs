@@ -26,7 +26,8 @@ public static class WorldCapability
 		if (TerrariaCompat.Pipelike.ItemPipe.ItemPipeLayerSystem.Pipes.Has(x, y))
 			return TerrariaCompat.Pipelike.ItemPipe.ItemPipeLayerSystem
 				.EnsureSides(x, y).GetItemHandlerCap(arrivalSide, useCoverCapability: true);
-		return Handlers.VanillaChestItemHandler.At(x, y);
+		return Handlers.VanillaChestItemHandler.At(x, y)
+			?? Handlers.ExtractinatorItemHandler.At(x, y);
 	}
 
 	public static IFluidHandler? FluidHandlerAt(int x, int y, IODirection arrivalSide)
@@ -51,16 +52,12 @@ public static class WorldCapability
 	public static IEnumerable<(IODirection side, int x, int y)> Perimeter(
 		int originX, int originY, int width, int height)
 	{
-		// Top edge (Up)
 		for (int dx = 0; dx < width; dx++)
 			yield return (IODirection.Up, originX + dx, originY - 1);
-		// Bottom edge (Down) - Terraria Y grows downward, so "down" = origin+height
 		for (int dx = 0; dx < width; dx++)
 			yield return (IODirection.Down, originX + dx, originY + height);
-		// Left edge
 		for (int dy = 0; dy < height; dy++)
 			yield return (IODirection.Left, originX - 1, originY + dy);
-		// Right edge
 		for (int dy = 0; dy < height; dy++)
 			yield return (IODirection.Right, originX + width, originY + dy);
 	}
@@ -68,9 +65,6 @@ public static class WorldCapability
 	public static IEnumerable<(IODirection side, int x, int y)> Perimeter(MetaMachine machine) =>
 		Perimeter(machine.Position.X, machine.Position.Y, machine.Size.Width, machine.Size.Height);
 
-	// For a cable at (cableX, cableY), return the IEnergyContainer endpoint
-	// that sits at the same cell (the "wire behind machine" connectivity
-	// model
 	public static (IODirection sideFromCable, IEnergyContainer ep)? CableEndpointAtCell(int cableX, int cableY)
 	{
 		var ep = Get<IEnergyContainer>(cableX, cableY);
@@ -92,7 +86,6 @@ public static class WorldCapability
 		}
 	}
 
-	// Inverse of CableEndpointAtCell
 	public static IEnumerable<(IODirection side, int x, int y, CableCell cable)>
 		AdjacentCables(MetaMachine machine)
 	{
