@@ -36,6 +36,7 @@ public sealed class PipeIntersectionItem : ModItem
 	{
 		CreateRecipe()
 			.AddIngredient(ItemID.StoneBlock, 4)
+			.DisableDecraft()
 			.Register();
 	}
 }

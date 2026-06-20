@@ -45,6 +45,7 @@ public sealed class LaserPipeItem : ModItem, ITextureWarmUp
 			"[c/AAFFAA:Lossless straight-line transmission between laser hatches.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeAxis",
 			"[c/AAAAAA:Connects only along one axis - no bends or T-junctions.]"));
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	public override bool? UseItem(Player player)

@@ -18,6 +18,9 @@ public static class WireItemRegistry
 	public static int? Get(string materialId, byte wireSize, bool insulated) =>
 		_items.TryGetValue((materialId, wireSize, insulated), out var it) ? it.Type : null;
 
+	internal static void Index(string materialId, byte wireSize, bool insulated, WireItem item) =>
+		_items[(materialId, wireSize, insulated)] = item;
+
 	public static CableCell? BuildCell(string materialId, byte wireSize, bool insulated) =>
 		_items.TryGetValue((materialId, wireSize, insulated), out var it)
 			? it.BuildCell() : (CableCell?)null;

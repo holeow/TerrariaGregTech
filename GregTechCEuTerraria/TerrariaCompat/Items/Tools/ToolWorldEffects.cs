@@ -74,15 +74,21 @@ public sealed class ToolWorldEffects : GlobalTile
 			return false;
 		}
 
-		if (tool.IsMortar && type == TileID.Stone)
+		if (tool.IsMortar)
 		{
-			SpawnItem(i, j, ItemID.SiltBlock, 1);
-			return false;
-		}
-		if (tool.IsMortar && type == TileID.Dirt)
-		{
-			SpawnItem(i, j, ItemID.SandBlock, 1);
-			return false;
+			int ground = type switch
+			{
+				TileID.Stone     => ItemID.SiltBlock,
+				TileID.Silt      => ItemID.DirtBlock,
+				TileID.Dirt      => ItemID.ClayBlock,
+				TileID.ClayBlock => ItemID.SandBlock,
+				_                => 0,
+			};
+			if (ground > 0)
+			{
+				SpawnItem(i, j, ground, 1);
+				return false;
+			}
 		}
 
 		return true;

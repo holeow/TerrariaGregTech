@@ -14,12 +14,8 @@ using RecipeContent = GregTechCEuTerraria.Api.Recipe.Content.Content;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// At Mod.AddRecipes, walks RecipeRegistry.ForStation(...) for every station with
-// a Terraria-tile equivalent and pushes fully-resolvable recipes into the
-// vanilla Recipe API
 public static class VanillaCraftingBridge
 {
-	// Station id = recipe.RecipeType.RegistryName
 	private static readonly Dictionary<string, int> StationToTile = new()
 	{
 		{ "crafting_shaped",        TileID.WorkBenches },
@@ -33,8 +29,6 @@ public static class VanillaCraftingBridge
 		{ "campfire_cooking",       TileID.Campfire },
 	};
 
-	// DEVIATION: every GT crafting-TABLE recipe (shaped / shapeless / strict /
-	// energy-transfer / fluid-container) is hand-craftable
 	internal static readonly HashSet<string> HandStations = new()
 	{
 		"crafting_shaped", "crafting_shapeless", "crafting_shaped_strict",
@@ -57,8 +51,6 @@ public static class VanillaCraftingBridge
 		int totalConsidered = 0, totalRegistered = 0;
 		var unresolvedItems  = new Dictionary<string, int>();
 		var unresolvedTags   = new Dictionary<string, int>();
-		// GTCEu declares 2x2-hand + 3x3-table variants of crafting_shaped_strict;
-		// both collapse to one Terraria recipe so the duplicate is dropped.
 		var seen = new HashSet<string>();
 		_deduped = 0;
 
@@ -114,7 +106,6 @@ public static class VanillaCraftingBridge
 
 		var resolved = new List<(bool isGroup, int itemOrGroupId, int count)>(itemInputs.Count);
 		var fluidReqs = new List<(FluidIngredient fluid, int units)>();
-		bool hasCatalyst = false;
 		foreach (var ci in itemInputs)
 		{
 			var ing = (Ingredient)ci.Payload;
@@ -126,10 +117,7 @@ public static class VanillaCraftingBridge
 			if (TryResolveItem(ing, out int it, out int ct, out _))
 				resolved.Add((false, it, ct));
 			else if (TryResolveGroup(ing, out int gid, out int gct))
-			{
 				resolved.Add((true, gid, gct));
-				if (ToolRecipeGroups.IsCatalystGroup(gid)) hasCatalyst = true;
-			}
 			else
 			{
 				BumpMiss(IsTagIngredient(ing) ? missTags : missItems, RefKey(ing));
@@ -138,12 +126,17 @@ public static class VanillaCraftingBridge
 		}
 		if (resolved.Count == 0 && fluidReqs.Count == 0) return false;
 
+		var stationKeys = Tiles.CraftingStations.CraftingStationRegistry.StationKeysFor(gt);
+		var stationTiles = ResolveStationTiles(stationKeys);
+		if (stationKeys.Count > 0 && stationTiles.Count == 0) return false;
+
 		if (fluidReqs.Count == 0)
 		{
 			var parts = resolved
 				.Select(r => $"{(r.isGroup ? 'g' : 'i')}{r.itemOrGroupId}x{r.count}")
 				.OrderBy(s => s, System.StringComparer.Ordinal);
-			string sig = $"{outType}*{outCount}|{string.Join(",", parts)}";
+			string stationSig = stationKeys.Count == 0 ? "" : "|@" + string.Join("+", stationKeys);
+			string sig = $"{outType}*{outCount}|{string.Join(",", parts)}{stationSig}";
 			if (!seen.Add(sig)) { _deduped++; return false; }
 		}
 
@@ -154,11 +147,10 @@ public static class VanillaCraftingBridge
 			else         recipe.AddIngredient(itemOrGroupId, count);
 		}
 
-		if (!isHand)
+		if (stationKeys.Count > 0)
+			foreach (int st in stationTiles) recipe.AddTile(st);
+		else if (!isHand)
 			recipe.AddTile(tileId);
-
-		if (hasCatalyst)
-			recipe.AddConsumeIngredientCallback(NoConsumeCatalysts);
 
 		foreach (var (fluid, units) in fluidReqs)
 		{
@@ -169,6 +161,7 @@ public static class VanillaCraftingBridge
 		}
 
 		recipe.Register();
+		recipe.DisableDecraft();
 		BridgeRegistered.Add(recipe);
 		GTToVanilla[gt] = recipe;
 		return true;
@@ -211,8 +204,6 @@ public static class VanillaCraftingBridge
 		return found >= units;
 	}
 
-	// Mirrors upstream ShapedFluidContainerRecipe.getRemainingItems +
-	// FluidContainerIngredient.getExtractedStack
 	private static void ConsumeFluidContainers(FluidIngredient fluid, int units)
 	{
 		var inv = Main.LocalPlayer.inventory;
@@ -222,7 +213,6 @@ public static class VanillaCraftingBridge
 		{
 			var it = inv[i];
 			if (it is null || it.IsAir || !MatchesContainer(it, fluid)) continue;
-			// Drainable container
 			if (it.ModItem is Api.Capability.IFluidHandlerItem handler
 			    && handler.Drain(fluid.Amount, simulate: false).Amount >= fluid.Amount)
 			{
@@ -230,7 +220,12 @@ public static class VanillaCraftingBridge
 				continue;
 			}
 
-			// Non-drainable container
+			if (Api.Fluids.VanillaBuckets.IsBottomless(it.type))
+			{
+				remaining--;
+				continue;
+			}
+
 			it.stack -= 1;
 			if (it.stack <= 0) it.TurnToAir();
 			returnedBuckets++;
@@ -257,17 +252,10 @@ public static class VanillaCraftingBridge
 
 	private static bool BucketMatches(int itemType, FluidIngredient fluid)
 	{
-		string? id = itemType switch
-		{
-			ItemID.WaterBucket => "water",
-			ItemID.LavaBucket  => "lava",
-			ItemID.HoneyBucket => "honey",
-			_                  => null,
-		};
-		return id is not null
-		    && FluidRegistry.TryGet(id, out var type)
+		return VanillaBuckets.TryGet(itemType, out var e)
+		    && FluidRegistry.TryGet(e.FluidId, out var type)
 		    && fluid.TestFluid(type)
-		    && fluid.Amount <= 1000;
+		    && fluid.Amount <= VanillaBuckets.Amount;
 	}
 
 	private static bool TryResolveItem(Ingredient ing, out int itemType, out int count, out string key)
@@ -311,11 +299,6 @@ public static class VanillaCraftingBridge
 		return false;
 	}
 
-	// Tag -> RecipeGroup. Order: (1) alias / pre-registered (vanilla group ids
-	// or tool catalysts via VanillaSubstitution.Groups - required so e.g.
-	// forge:wood recipes accept Terraria's Boreal/Mahogany alongside our
-	// items). (2) Lazy auto-register from tag.ResolvedTypes when >=2 items.
-	// Single-item tags route through TryResolveItem instead.
 	private static bool TryResolveTagToGroup(TagIngredient tag, out int groupId)
 	{
 		if (VanillaItemMap.TryGetGroup(tag.TagName, out groupId)) return true;
@@ -366,11 +349,17 @@ public static class VanillaCraftingBridge
 		return sb.ToString();
 	}
 
-	private static void NoConsumeCatalysts(Terraria.Recipe recipe, int type, ref int amount, bool isDecrafting)
+	private static List<int> ResolveStationTiles(IReadOnlyList<string> keys)
 	{
-		if (Items.Tools.ToolItemLoader.CatalystItemTypes.Contains(type))
-			amount = 0;
+		if (keys.Count == 0) return _noStationTiles;
+		var tiles = new List<int>(keys.Count);
+		foreach (var key in keys)
+			if (Tiles.CraftingStations.CraftingStationRegistry.TryGetTile(key, out int tile))
+				tiles.Add(tile);
+		return tiles;
 	}
+
+	private static readonly List<int> _noStationTiles = new();
 
 	private static bool IsTagIngredient(Ingredient ing) => ing switch
 	{

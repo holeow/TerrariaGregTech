@@ -6,22 +6,26 @@ using Terraria.ModLoader.Config;
 
 namespace GregTechCEuTerraria.Config;
 
-// Per-client display preferences (each player decides for themselves, never
-// synced). ClientSide so it lives in the player's own config file.
 public sealed class GTClientConfig : ModConfig
 {
 	public override ConfigScope Mode => ConfigScope.ClientSide;
 
-	// Shows the clickable "help with playtesting/feedback" Discord invite at the
-	// top of the screen while in-game. On by default during the playtest period.
 	[DefaultValue(true)]
 	public bool ShowDiscordInvite { get; set; } = true;
+
+	[DefaultValue(false)]
+	public bool QuestbookEditMode { get; set; } = false;
 
 	public static GTClientConfig Instance => ModContent.GetInstance<GTClientConfig>();
 
 	public void DismissDiscordInvite()
 	{
 		ShowDiscordInvite = false;
+		Persist();
+	}
+
+	public void Persist()
+	{
 		typeof(ConfigManager)
 			.GetMethod("Save", BindingFlags.Static | BindingFlags.NonPublic)
 			?.Invoke(null, new object[] { this });

@@ -11,72 +11,88 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Profiler;
 
-// Profiler window: graph of the selected counter on top, scrollable counter
-// table below. Click a row -> graph swaps to that counter. Live per frame.
-public sealed class ProfilerUIState : UIState
+public sealed class ProfilerUIState : FreeModalWindow
 {
 	private UITerrariaPanel _panel = null!;
 	private UIPanel _graphPanel = null!;
 	private CounterGraph _graph = null!;
 	private UIText _graphLabel = null!;
 	private UIList _list = null!;
+	private UIScrollbar _bar = null!;
+	private UIText _dumpBtn = null!;
+	private bool _built;
 
 	private ProfilerCounter? _selected;
 	private readonly List<RowWidget> _rows = new();
 
-	public override void OnInitialize()
-	{
-		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
-		float w = Main.screenWidth / uiScale * 0.78f;
-		float h = Main.screenHeight / uiScale * 0.88f;
+	private const int Pad = 8;
+	private const int TitleH = 28;
+	private const int GraphH = 110;
+	private const int ListTop = Pad + TitleH + GraphH + 8;
+	private const int MoveKnobW = 20;
+	private const int ResizeKnobSz = 28;
 
-		_panel = new UITerrariaPanel
-		{
-			HAlign = 0.5f, VAlign = 0.5f,
-			Width = StyleDimension.FromPixels(w),
-			Height = StyleDimension.FromPixels(h),
-		};
+	protected override void RebuildWindow()
+	{
+		var root = RootSize();
+		ResolveSize(root.X, root.Y);
+		float w = CurW, h = CurH;
+
+		if (!_built) { BuildStructure(); _built = true; }
+
+		_panel.Width  = StyleDimension.FromPixels(w);
+		_panel.Height = StyleDimension.FromPixels(h);
+
+		int listH = (int)h - ListTop - Pad;
+		_list.Height = StyleDimension.FromPixels(listH);
+		_bar.Height  = StyleDimension.FromPixels(listH);
+
+		LayoutHeaderButtons(_panel, w, Pad, TitleH);
+		_dumpBtn.Left = StyleDimension.FromPixels(HeaderButtonsLeft(w, Pad) - 6 - w);
+		LayoutResizeKnob(_panel, w, h, ResizeKnobSz, "Drag to resize the profiler");
+		ApplyCenteredMoveClamp(_panel, root, w, h);
+
+		Recalculate();
+	}
+
+	private void BuildStructure()
+	{
+		_panel = new UITerrariaPanel { HAlign = 0.5f, VAlign = 0.5f };
 		Append(_panel);
 
-		const int pad = 8;
-		const int titleH = 28;
-		const int graphH = 110;
+		var moveKnob = NewMoveKnob("Drag to move the profiler");
+		moveKnob.Left   = StyleDimension.FromPixels(Pad);
+		moveKnob.Top    = StyleDimension.FromPixels(Pad);
+		moveKnob.Width  = StyleDimension.FromPixels(MoveKnobW);
+		moveKnob.Height = StyleDimension.FromPixels(TitleH);
+		_panel.Append(moveKnob);
 
 		var title = new UIText("GregTech Profiler", 1.05f)
 		{
-			Left = StyleDimension.FromPixels(pad),
-			Top  = StyleDimension.FromPixels(pad),
+			Left = StyleDimension.FromPixels(Pad + MoveKnobW + 6),
+			Top  = StyleDimension.FromPixels(Pad),
+			IgnoresMouseInteraction = true,
 		};
 		_panel.Append(title);
 
-		var dumpBtn = new UIText("[Dump JSON]", 0.9f)
+		_dumpBtn = new UIText("[Dump JSON]", 0.9f)
 		{
 			HAlign = 1f,
-			Left = StyleDimension.FromPixels(-pad - 22),
-			Top  = StyleDimension.FromPixels(pad + 4),
+			Top  = StyleDimension.FromPixels(Pad + 4),
 		};
-		dumpBtn.OnLeftClick += (_, _) =>
+		_dumpBtn.OnLeftClick += (_, _) =>
 		{
 			string path = ProfilerSystem.DumpToFile();
 			Main.NewText($"[GregTech] Profile saved to {path}", 180, 220, 255);
 		};
-		_panel.Append(dumpBtn);
-
-		var close = new UIText("X", 1.1f)
-		{
-			HAlign = 1f,
-			Left = StyleDimension.FromPixels(-pad),
-			Top  = StyleDimension.FromPixels(pad),
-		};
-		close.OnLeftClick += (_, _) => ProfilerUISystem.Close();
-		_panel.Append(close);
+		_panel.Append(_dumpBtn);
 
 		_graphPanel = new UIPanel
 		{
-			Left = StyleDimension.FromPixels(pad),
-			Top  = StyleDimension.FromPixels(pad + titleH),
-			Width  = StyleDimension.FromPixelsAndPercent(-pad * 2, 1f),
-			Height = StyleDimension.FromPixels(graphH),
+			Left = StyleDimension.FromPixels(Pad),
+			Top  = StyleDimension.FromPixels(Pad + TitleH),
+			Width  = StyleDimension.FromPixelsAndPercent(-Pad * 2, 1f),
+			Height = StyleDimension.FromPixels(GraphH),
 		};
 		_panel.Append(_graphPanel);
 
@@ -96,37 +112,37 @@ public sealed class ProfilerUIState : UIState
 		};
 		_graphPanel.Append(_graph);
 
-		int listTop = pad + titleH + graphH + 8;
-		int listH = (int)h - listTop - pad;
-
 		_list = new UIList
 		{
-			Left = StyleDimension.FromPixels(pad),
-			Top  = StyleDimension.FromPixels(listTop),
-			Width  = StyleDimension.FromPixelsAndPercent(-pad * 2 - 20, 1f),
-			Height = StyleDimension.FromPixels(listH),
+			Left = StyleDimension.FromPixels(Pad),
+			Top  = StyleDimension.FromPixels(ListTop),
+			Width  = StyleDimension.FromPixelsAndPercent(-Pad * 2 - 20, 1f),
 			ListPadding = 2f,
 		};
 		_panel.Append(_list);
 
-		var bar = new UIScrollbar
+		_bar = new UIScrollbar
 		{
 			HAlign = 1f,
-			Left = StyleDimension.FromPixels(-pad),
-			Top  = StyleDimension.FromPixels(listTop),
-			Height = StyleDimension.FromPixels(listH),
+			Left = StyleDimension.FromPixels(-Pad),
+			Top  = StyleDimension.FromPixels(ListTop),
 		};
-		_panel.Append(bar);
-		_list.SetScrollbar(bar);
+		_panel.Append(_bar);
+		_list.SetScrollbar(_bar);
 	}
 
-	// Rebuild only on counter-set changes; per-row DrawSelf reads live values.
+	protected override void ApplyOffsetLive()
+	{
+		if (_panel is null) return;
+		_panel.Left = StyleDimension.FromPixels(OffsetX);
+		_panel.Top  = StyleDimension.FromPixels(OffsetY);
+		Recalculate();
+	}
+
 	private int _lastCounterCount = -1;
 
-	public override void Update(GameTime gameTime)
+	protected override void OnModalUpdate(GameTime gameTime)
 	{
-		base.Update(gameTime);
-
 		var all = global::GregTechCEuTerraria.TerrariaCompat.Profiler.Profiler.All;
 		if (_lastCounterCount != all.Count)
 		{
@@ -143,7 +159,6 @@ public sealed class ProfilerUIState : UIState
 		}
 	}
 
-	// Group by category (declared CategoryOrder; unlisted alpha) then by name.
 	private void Rebuild(System.Collections.Generic.IReadOnlyList<ProfilerCounter> all)
 	{
 		_rows.Clear();
@@ -189,8 +204,6 @@ public sealed class ProfilerUIState : UIState
 		return r.Bottom >= lr.Top && r.Top <= lr.Bottom;
 	}
 
-	// Visual divider + section title + aggregate sum (bytes/count categories
-	// only). Non-interactive; clicks fall through.
 	private sealed class CategoryHeader : UIElement
 	{
 		private readonly string _category;
@@ -219,8 +232,6 @@ public sealed class ProfilerUIState : UIState
 				new Vector2(rect.X + 6, rect.Y + 3),
 				new Color(220, 230, 255), 0.82f);
 
-			// Right-aligned sum for bytes / count families (no sum for gauges -
-			// adding heap_mb to fps is nonsense).
 			if (TryAggregate(out double sum))
 			{
 				string formatted = ProfilerFormat.Format(_members[0], sum);
@@ -323,8 +334,6 @@ public sealed class ProfilerUIState : UIState
 			int innerW = d.Width - 4, innerH = d.Height - 4;
 			if (innerW <= 0 || innerH <= 0) return;
 
-			// Two render modes by samples/pixels ratio. n<=innerW: one bar per
-			// sample. n>innerW: bucket-max columns (preserves spikes when zoomed out).
 			if (n <= innerW)
 			{
 				float barW = innerW / (float)n;
@@ -368,7 +377,6 @@ public sealed class ProfilerUIState : UIState
 				}
 			}
 
-			// Frame-budget reference line for Timer counters (16.67 ms = 100%).
 			if (_c.Kind == ProfilerKind.Timer)
 			{
 				int budgetY = innerY + innerH - (int)(ProfilerFormat.FrameMs / maxSample * innerH);
@@ -377,7 +385,6 @@ public sealed class ProfilerUIState : UIState
 						new Color(255, 90, 80, 180));
 			}
 
-			// Window label bottom-right (3 min at default WindowSamples).
 			double windowSec = n * global::GregTechCEuTerraria.TerrariaCompat.Profiler.Profiler.SamplePeriodFrames / 60.0;
 			string windowLabel = windowSec >= 60
 				? $"{windowSec / 60.0:0.#} min"

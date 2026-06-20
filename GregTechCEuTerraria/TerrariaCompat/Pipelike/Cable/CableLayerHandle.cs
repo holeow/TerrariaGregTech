@@ -39,6 +39,37 @@ public sealed class CableLayerHandle : IGridLayerHandle
 		return true;
 	}
 
+	public bool TryPlaceRefundSingles(CableCell cell, int x, int y, Player placer)
+	{
+		if (Pipelike.PipeIntersection.BlocksPipeAt(x, y)) return false;
+		var existing = CableLayerSystem.Cables.CellAt(x, y);
+		if (existing.HasValue && existing.Value.Equals(cell)) return false;
+		if (existing.HasValue) RefundAsSingles(placer, existing.Value);
+		CableLayerSystem.Cables.Set(x, y, cell);
+		CablePackets.SendSet(x, y, cell);
+		return true;
+	}
+
+	public bool CutAsSingles(int x, int y, Player remover)
+	{
+		if (x <= 0 || x >= Main.maxTilesX - 1 || y <= 0 || y >= Main.maxTilesY - 1) return false;
+		var existing = CableLayerSystem.Cables.CellAt(x, y);
+		if (existing is not { } cell) return false;
+		CableLayerSystem.Cables.Remove(x, y);
+		CablePackets.SendRemove(x, y);
+		RefundAsSingles(remover, cell);
+		SoundEngine.PlaySound(SoundID.Tink, new Vector2(x * 16f, y * 16f));
+		return true;
+	}
+
+	private static void RefundAsSingles(Player player, CableCell cell)
+	{
+		int? single = WireItemRegistry.Get(cell.MaterialId, 1, cell.Insulated);
+		if (single is null) return;
+		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(
+			player, player.GetSource_ItemUse(player.HeldItem), single.Value, cell.WireSize);
+	}
+
 	private static void RefundCableAt(Player player, CableCell cell)
 	{
 		int? type = WireItemRegistry.Get(cell.MaterialId, cell.WireSize, cell.Insulated);

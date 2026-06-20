@@ -34,6 +34,10 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 
 	public override string Name => _id ?? nameof(WireItem);
 
+	internal string? MaterialId => _material?.Id;
+	internal byte WireSize => _wireSize;
+	internal bool Insulated => _insulated;
+
 	public override string Texture => "GregTechCEuTerraria/Content/Textures/block/material_sets/dull/wire_end";
 	protected override bool CloneNewInstances => true;
 	public override bool IsLoadingEnabled(Mod mod) => _material != null;
@@ -58,8 +62,6 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 		if (_material is null) return;
 		var cell = BuildCell();
 		long voltage = VoltageTiers.Voltage(cell.Voltage);
-		string kind = cell.Insulated ? "Cable" : "Wire";
-		string sizeWord = WireSizeWord(cell.WireSize);
 
 		tooltips.Add(new TooltipLine(Mod, "WireTier",
 			$"{VoltageTiers.ShortName(cell.Voltage)} - {voltage:N0} EU/t"));
@@ -67,8 +69,7 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 			$"{cell.TotalAmperage}A ({cell.BaseAmperage} x {cell.WireSize})"));
 		tooltips.Add(new TooltipLine(Mod, "WireLoss",
 			$"Loss: {cell.LossPerAmp} EU per amp per cable"));
-		tooltips.Add(new TooltipLine(Mod, "WireKind",
-			$"{sizeWord} {kind}{(cell.Insulated ? " (insulated)" : "")}"));
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	public override bool? UseItem(Player player)
@@ -214,6 +215,7 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 
 	private void HandleHeldRightClickRemove(Player player)
 	{
+		if (player.mouseInterface || Main.gameMenu) { _removeCooldown = 0; return; }
 		if (!Main.mouseRight) { _removeCooldown = 0; return; }
 		if (_removeCooldown > 0) { _removeCooldown--; return; }
 
@@ -226,17 +228,19 @@ public sealed class WireItem : ModItem, ITextureWarmUp
 	public static bool CutCableAt(Player player, int x, int y) =>
 		CableLayerHandle.Instance.CutAt(x, y, player);
 
-	internal CableCell BuildCell()
+	internal CableCell BuildCell() => BuildCellWithSize(_wireSize);
+
+	internal CableCell BuildCellWithSize(byte wireSize)
 	{
 		var mat = _material!;
 		var tier = TryParseTier(mat.CableTier) ?? VoltageTier.ULV;
 		int baseAmp = mat.CableAmperage ?? 1;
-		return new CableCell(mat.Id, _wireSize, _insulated, tier, baseAmp, ComputeLoss(mat));
+		return new CableCell(mat.Id, wireSize, _insulated, tier, baseAmp, ComputeLoss(mat, wireSize));
 	}
 
-	private int ComputeLoss(Material mat)
+	private int ComputeLoss(Material mat, byte wireSize)
 	{
-		int lossMult = _insulated ? 1 : (_wireSize <= 2 ? 2 : 3);
+		int lossMult = _insulated ? 1 : (wireSize <= 2 ? 2 : 3);
 		int baseLoss = mat.CableLoss ?? 0;
 		bool superconductor = mat.CableIsSuperconductor ?? false;
 		if (!superconductor && baseLoss == 0)

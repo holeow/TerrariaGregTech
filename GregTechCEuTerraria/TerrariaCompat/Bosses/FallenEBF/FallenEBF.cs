@@ -48,7 +48,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.FallenEBF.DisplayName", () => "Fallen EBF");
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.FallenEBF.Bestiary",
-			() => "A blast furnace that overheated, tore itself from its coils, and took flight. It fights by smelting - and pours the results at anything nearby.");
+			() => "its overclocked too much");
 	}
 
 	public override void SetDefaults()
@@ -76,7 +76,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 
 	public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment)
 	{
-		// Base 3300 -> ~4500 in expert single-player
 		NPC.lifeMax = (int)(NPC.lifeMax * balance * bossAdjustment);
 	}
 
@@ -101,8 +100,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		FallenEBFWorld.MarkDowned();
 		Mod.Logger.Info($"[EBF-chan] Fallen EBF defeated at {NPC.Center} -> Downed = {FallenEBFWorld.Downed}");
 	}
-
-	// ---- AI ----------------------------------------------------------------
 
 	public override void AI()
 	{
@@ -170,7 +167,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			: stackalloc int[] { S_Fan, S_Charge, S_Rain, S_Spiral, S_MachineGun };
 
 		int pick = pool[Main.rand.Next(pool.Length)];
-		if (pick == last) pick = pool[Main.rand.Next(pool.Length)]; // one reroll to reduce repeats
+		if (pick == last) pick = pool[Main.rand.Next(pool.Length)];
 		return pick;
 	}
 
@@ -264,7 +261,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			ReturnToHover();
 	}
 
-	// Ingots rain down from the sky across a wide band over the player.
 	private void Rain(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -285,7 +281,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= telegraph + dur) ReturnToHover();
 	}
 
-	// A rotating spiral of ingots radiating from the core.
 	private void Spiral(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -309,7 +304,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= telegraph + dur) ReturnToHover();
 	}
 
-	// A rapid aimed stream with slight spread
 	private void MachineGun(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -323,7 +317,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		if (((int)NPC.ai[1] - telegraph) % every == 0)
 		{
 			if ((int)NPC.ai[1] % 6 == 0)
-				SoundEngine.PlaySound(SoundID.Item11 with { Volume = 0.45f }, NPC.Center); // all clients
+				SoundEngine.PlaySound(SoundID.Item11 with { Volume = 0.45f }, NPC.Center);
 			if (Main.netMode != NetmodeID.MultiplayerClient)
 			{
 				Vector2 muzzle = NPC.Center + new Vector2(0f, 10f);
@@ -373,8 +367,6 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			NPC.netUpdate = true;
 		}
 	}
-
-	// ---- IDebuggableBoss (GTConfig.DebugMobs overlay) ---------------------
 
 	public string CurrentAttackLabel() => StateName((int)NPC.ai[0]);
 	public int CurrentPhase() => (int)NPC.ai[3];
@@ -435,13 +427,10 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// ---- visuals --------------------------------------
-
 	private void UpdateVisuals()
 	{
 		bool phase2 = NPC.ai[3] >= 1f;
 
-		// Wing frame cycle.
 		NPC.localAI[0]++;
 		float frameSpeed = phase2 ? 3f : 5f;
 		if (NPC.localAI[0] >= frameSpeed)
@@ -497,7 +486,7 @@ public class FallenEBF : ModNPC, IDebuggableBoss
 			float g = NPC.localAI[2];
 			spriteBatch.Draw(glow, pos, null, Color.White * MathHelper.Clamp(g, 0f, 1f),
 				NPC.rotation, origin, scale, SpriteEffects.None, 0f);
-			if (g > 1f) // overheating: extra bright pass
+			if (g > 1f)
 				spriteBatch.Draw(glow, pos, null, Color.White * (g - 1f),
 					NPC.rotation, origin, scale, SpriteEffects.None, 0f);
 		}

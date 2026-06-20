@@ -3,10 +3,6 @@ using System.Collections.Generic;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Questbook;
 
-// DTOs mirroring Data/Questbook/questlog.json. Quests are global; chapters
-// carry NodeData with per-chapter x/y. Nodes from a chapter's own quests AND
-// from FTB `quest_links` (quests defined elsewhere) flatten to the same shape.
-
 internal sealed class QuestLogData
 {
 	public string Pack { get; set; } = "";
@@ -37,6 +33,7 @@ internal sealed class QuestData
 	public string Title { get; set; } = "";
 	public string Subtitle { get; set; } = "";
 	public string Desc { get; set; } = "";
+	public float Size { get; set; } = 1f;
 	public List<string> Deps { get; set; } = [];
 	public List<TaskData> Tasks { get; set; } = [];
 }

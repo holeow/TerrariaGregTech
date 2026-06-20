@@ -10,24 +10,10 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Loot;
 
-// Aggregates "how does the player obtain this item from VANILLA Terraria sources"
-// for the recipe browser's Loot mode. Three streams:
-//
-//   - NPC drops + treasure bags + crates (walked via Main.ItemDropsDB +
-//     IItemDropRule.ReportDroprates, the same path the Bestiary uses).
-//   - NPC shops (NPCShopDatabase.AllShops - every Entry's Item + Conditions).
-//   - Shimmer transmutations (ItemID.Sets.ShimmerTransformToItem).
-//
-// Built once on first read and cached for the session. Cheap (a few thousand
-// rows) so we keep the full list in memory and let the browser filter inline.
 public static class LootRegistry
 {
 	public enum LootKind { NpcDrop, Shop, Shimmer }
 
-	// One row per (source, target) pair. Source icon is EITHER an item id
-	// (banner for enemy NPCs, shimmer source item, opened-container item)
-	// OR a town-NPC head-texture index (shops - no banner item exists).
-	// SourceLabelLower is cached for the @source token match.
 	public readonly struct LootEntry
 	{
 		public readonly LootKind Kind;
@@ -35,9 +21,6 @@ public static class LootRegistry
 		public readonly string SourceLabelLower;
 		public readonly int SourceIconItem;
 		public readonly int SourceHeadIndex;
-		// > 0 when the source is an NPC (drop or shop). Lets BrowserSlotInteraction
-		// spawn the NPC on Ctrl+click of the source icon. 0 for container / shimmer
-		// rows where the source is itself an item.
 		public readonly int SourceNpcType;
 		public readonly int TargetItem;
 		public readonly string Detail;
@@ -78,9 +61,6 @@ public static class LootRegistry
 		_entries = list;
 	}
 
-	// Force a build off the hot path. Called from
-	// GlobalRecipeBrowserSystem.OnWorldLoad so the first browser open
-	// doesn't stutter on the ~8k-row scan.
 	public static void Warm() => EnsureBuilt();
 
 	private static void LogWarn(string section, System.Exception e)
@@ -89,12 +69,6 @@ public static class LootRegistry
 			$"[loot-registry] {section} extraction failed: {e.GetType().Name}: {e.Message}");
 	}
 
-	// === NPC drops ====================================================
-	// Walks every concrete (non-negative-alias) NPC type and asks each
-	// rule chain to ReportDroprates - the same path the Bestiary uses
-	// to populate its drop list. Skips negative net-IDs (those are
-	// "global drop" aliases keyed by Main.ItemDropsDB; their entries
-	// are surfaced as standalone "Universal Drops" rows below).
 	private static void CollectNpcDrops(List<LootEntry> list)
 	{
 		var db = Main.ItemDropsDB;
@@ -167,14 +141,6 @@ public static class LootRegistry
 		return sb.ToString();
 	}
 
-	// === Item-keyed drops =============================================
-	// Walks every item id and pulls drop rules registered to that ITEM
-	// (Main.ItemDropsDB._entriesByItemId, exposed via the tML extension
-	// `GetRulesForItemID`). This is the path crates, treasure bags,
-	// lockboxes, biome keys, fishing crates, herb bags etc. use - they
-	// drop loot when *opened* rather than when an NPC is killed, so they
-	// don't surface through the NPC-keyed walk. Source icon is the
-	// container item itself; source label is its display name.
 	private static void CollectItemKeyedDrops(List<LootEntry> list)
 	{
 		var db = Main.ItemDropsDB;
@@ -222,8 +188,6 @@ public static class LootRegistry
 			string npcName = Lang.GetNPCNameValue(npcType);
 			if (string.IsNullOrWhiteSpace(npcName)) continue;
 			string label = shop.Name == "Shop" ? npcName : $"{npcName} ({shop.Name})";
-			// Town NPCs don't have banner items - use their head index so
-			// UILootList can render the bestiary-style portrait instead.
 			int headIdx = NPC.TypeToDefaultHeadIndex(npcType);
 
 			foreach (var entry in shop.ActiveEntries)
@@ -247,7 +211,7 @@ public static class LootRegistry
 	private static string FormatShopEntry(AbstractNPCShop.Entry entry)
 	{
 		var sb = new StringBuilder();
-		long price = entry.Item.value > 0 ? entry.Item.value : 0;
+		long price = entry.Item.shopCustomPrice ?? (entry.Item.value > 0 ? entry.Item.value : 0);
 		if (price > 0) sb.Append(FormatCoinPrice(price));
 		else sb.Append("Free");
 		bool first = true;
@@ -277,7 +241,6 @@ public static class LootRegistry
 		return s.Length == 0 ? "0c" : s;
 	}
 
-	// === Shimmer ======================================================
 	private static void CollectShimmer(List<LootEntry> list)
 	{
 		var table = ItemID.Sets.ShimmerTransformToItem;
@@ -318,7 +281,6 @@ public static class LootRegistry
 		return sb.ToString();
 	}
 
-	// === Search =======================================================
 	public static bool Matches(in LootEntry entry, string[] tokens)
 	{
 		if (tokens.Length == 0) return true;
@@ -328,13 +290,10 @@ public static class LootRegistry
 		{
 			if (t.Length == 0) continue;
 
-			// `@<text>` = source-only match. Mirrors RecipeSearch's `@station:`
-			// semantics - type `@king` to scope to King Slime, `@merchant`
-			// to scope to the Merchant's shop, etc.
 			if (t[0] == '@')
 			{
 				string needle = t.Substring(1);
-				if (needle.Length == 0) continue;           // bare '@' = no constraint
+				if (needle.Length == 0) continue;
 				if (!source.Contains(needle)) return false;
 				continue;
 			}
@@ -344,11 +303,6 @@ public static class LootRegistry
 		return true;
 	}
 
-	// True if every non-`@` token matches the target item's name - the
-	// "outputs first" rank the recipe-browser uses to sort matches that
-	// produce the searched term ahead of matches that only reference it.
-	// `@source` tokens are ignored here (already enforced by Matches and
-	// don't discriminate target-vs-source).
 	public static bool MatchesTarget(in LootEntry entry, string[] tokens)
 	{
 		if (tokens.Length == 0) return true;

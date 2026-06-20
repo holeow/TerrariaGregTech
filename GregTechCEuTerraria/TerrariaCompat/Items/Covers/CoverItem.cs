@@ -1,5 +1,7 @@
 #nullable enable
+using System.Collections.Generic;
 using GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
 using Terraria;
@@ -8,9 +10,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Covers;
 
-// A cover item - placed into a machine's cover slot. Materialised from the
-// registry dump by CoverItemLoader (ComponentItem entries carrying a
-// CoverPlaceBehavior). CoverId is the bare cover-definition id this item places.
 public sealed class CoverItem : ModItem, ITextureWarmUp
 {
 	private readonly string? _id;
@@ -35,17 +34,12 @@ public sealed class CoverItem : ModItem, ITextureWarmUp
 	public override string Name => _id ?? nameof(CoverItem);
 	public override string Texture => $"GregTechCEuTerraria/Content/Textures/item/{Name}";
 
-	// REQUIRED: without this tML builds each per-Item via the parameterless
-	// ctor, leaving `_id` null -> Name degrades to "CoverItem" -> invalid item
-	// on world reload. Same pattern as MaterialItem / WireItem / BatteryItem.
 	protected override bool CloneNewInstances => true;
 
 	public override void SetStaticDefaults()
 	{
 		if (_label != null)
 		{
-			// Force "... Cover" suffix so a search for "cover" surfaces all of
-			// them (upstream names are inconsistent).
 			string display = _label.Contains("cover", System.StringComparison.OrdinalIgnoreCase)
 				? _label
 				: _label + " Cover";
@@ -55,8 +49,6 @@ public sealed class CoverItem : ModItem, ITextureWarmUp
 
 		if (Main.dedServ) return;
 
-		// Vertical frame strip -> vertical DrawAnimation. mcmeta frametime is in
-		// MC ticks (20 Hz); scale x3 for Terraria's 60 Hz item animator.
 		var tex = ModContent.Request<Texture2D>(Texture, AssetRequestMode.ImmediateLoad).Value;
 		if (tex.Width > 0 && tex.Height > tex.Width && tex.Height % tex.Width == 0)
 		{
@@ -82,4 +74,18 @@ public sealed class CoverItem : ModItem, ITextureWarmUp
 	}
 
 	void ITextureWarmUp.WarmUpTexture() => ItemIconBaker.Install(Item.type, Texture);
+
+	private static readonly HashSet<string> InertCoverIds = new()
+	{
+		"computer_monitor", "wireless_transmitter",
+	};
+
+	public override void ModifyTooltips(List<TooltipLine> tooltips)
+	{
+		base.ModifyTooltips(tooltips);
+		if (_coverId != null && InertCoverIds.Contains(_coverId))
+			tooltips.Add(new TooltipLine(Mod, "InertCover",
+				"Does nothing as a cover - crafting ingredient only")
+			{ OverrideColor = new Color(170, 170, 180) });
+	}
 }

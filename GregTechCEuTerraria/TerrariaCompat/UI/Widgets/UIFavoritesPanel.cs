@@ -10,24 +10,26 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Pinned-items pane right of the recipe browser. Alt+click in the browser
-// pins; click semantics route through BrowserSlotInteraction with
-// inFavoritesPane=true so Alt+LMB REMOVES. Mouse-wheel scroll (no scrollbar).
 public sealed class UIFavoritesPanel : UITerrariaPanel
 {
 	private const int Cols = 4;
 	private const int CellSize = 30;
 	private const int CellPad = 2;
 	private const int Margin = 6;
-	public const int PanelWidth = Cols * (CellSize + CellPad) + Margin * 2;
-	private const int ScrollbarWidth = 0;
+	private const int ScrollbarWidth = VanillaScrollbar.Width;
+	private const int MinThumbHeight = 28;
+	public const int PanelWidth = Cols * (CellSize + CellPad) + Margin * 2 + ScrollbarWidth;
 	private const float VanillaNativeSlotPixels = 52f;
+
+	public int ScrollBottomInset;
 
 	private static readonly Item[] _slotItems = { new() };
 
 	private int _scroll;
 	private bool _leftDown;
 	private bool _rightDown;
+	private bool _drag;
+	private int _dragAnchorOffsetPx;
 
 	public Func<bool>? IsOccluded;
 
@@ -42,7 +44,7 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 	{
 		base.ScrollWheel(evt);
 		if (!IsMouseHovering) return;
-		_scroll -= evt.ScrollWheelValue / 6;
+		_scroll -= evt.ScrollWheelValue;
 		if (_scroll < 0) _scroll = 0;
 	}
 
@@ -61,7 +63,7 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 			outer.Width - Margin * 2 - ScrollbarWidth,
 			outer.Height - 22 - Margin);
 
-		var entries = FavoritesRegistry.Entries;
+		var entries = FavoritesPlayer.Local.Entries;
 		if (entries.Count == 0)
 		{
 			Terraria.Utils.DrawBorderString(sb, "Alt+click\nto pin",
@@ -80,7 +82,7 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 
 		bool occluded = IsOccluded?.Invoke() ?? false;
 
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = GlobalRecipeBrowserState.BrowserCursor();
 		bool inside = !occluded && content.Contains(mouse);
 		if (IsMouseHovering && !occluded)
 		{
@@ -88,14 +90,55 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 			PlayerInput.LockVanillaMouseScroll("GregTechCEuTerraria/FavoritesPanel");
 		}
 
-		// Items via UISlot's ItemSlot.Draw pipeline; fluids via the recipe-row
-		// helper - same look as in recipe rows.
+		int totalH = totalRows * rowH;
+		bool draggingThisFrame = false;
+		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
+		if (totalH > viewH)
+		{
+			int barX = outer.Right - Margin - ScrollbarWidth;
+			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
+			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
+			float frac = (float)viewH / totalH;
+			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
+			int travel = barH - thumbH;
+			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
+			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
+
+			if (!occluded)
+			{
+				if (Main.mouseLeft && !_leftDown && trackRect.Contains(mouse))
+				{
+					_drag = true;
+					_dragAnchorOffsetPx = thumbRect.Contains(mouse) ? mouse.Y - thumbY : thumbH / 2;
+				}
+				if (_drag && Main.mouseLeft)
+				{
+					int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
+					int travelMax = Math.Max(1, barH - thumbH);
+					int clampedTop = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
+					_scroll = (int)((float)clampedTop / travelMax * maxScroll);
+					draggingThisFrame = true;
+				}
+				else if (!Main.mouseLeft)
+				{
+					_drag = false;
+				}
+				if (draggingThisFrame)
+				{
+					thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
+					thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
+				}
+			}
+		}
+
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = CellSize / VanillaNativeSlotPixels;
-		FavoritesRegistry.Entry hovered = default;
+		FavoritesPlayer.Entry hovered = default;
 		bool hasHovered = false;
 		try
 		{
+			ScissorDraw.Draw(sb, ScissorDraw.DeviceClip(content), () =>
+			{
 			for (int i = 0; i < entries.Count; i++)
 			{
 				int col = i % Cols;
@@ -109,7 +152,7 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 					CellSize, CellSize);
 
 				var entry = entries[i];
-				bool isHover = inside && rect.Contains(mouse);
+				bool isHover = !draggingThisFrame && inside && rect.Contains(mouse);
 
 				if (entry.ItemType > 0)
 				{
@@ -146,14 +189,14 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 						BrowserHover.SetFluid(entry.FluidId, entry.FluidLabel ?? entry.FluidId);
 				}
 			}
+			});
 		}
 		finally
 		{
 			Main.inventoryScale = oldScale;
 		}
 
-		// inFavoritesPane=true flips Alt+LMB from add to remove.
-		if (hasHovered && !_dragging())
+		if (hasHovered && !_drag)
 		{
 			var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
 			if (hovered.ItemType > 0)
@@ -166,14 +209,18 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 					BrowserSlotInteraction.HandleFluid(click, fluid,
 						recipeAmountMb: null, inFavoritesPane: true);
 				else if (click.Alt && click.Lmb)
-					FavoritesRegistry.RemoveFluid(hovered.FluidId);
+					FavoritesPlayer.Local.RemoveFluid(hovered.FluidId);
 			}
 		}
 		_leftDown  = Main.mouseLeft;
 		_rightDown = Main.mouseRight;
-	}
 
-	// No scrollbar yet - stub for parity with UIRecipeList.
-	private bool _dragging() => false;
+		if (totalH > viewH)
+		{
+			bool thumbHot = _drag || thumbRect.Contains(mouse);
+			VanillaScrollbar.Draw(sb, trackRect, thumbRect, thumbHot);
+			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
+		}
+	}
 
 }

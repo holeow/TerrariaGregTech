@@ -9,6 +9,7 @@ using GregTechCEuTerraria.Api.Recipe.Ingredient;
 using GregTechCEuTerraria.Common.Energy;
 using GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
+using GregTechCEuTerraria.TerrariaCompat.Tiles.CraftingStations;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
@@ -30,7 +31,6 @@ public static class RecipeRowRenderer
 	private const int TagCyclePeriod = 48;
 	private const int CircuitCellWidth = CellSize;
 
-	private static Asset<Texture2D>? _arrow;
 	private static readonly Item[] TempSlot = { new() };
 	private static Mod? _mod;
 	private static Mod? GetMod() => _mod ??= ModLoader.GetMod("GregTechCEuTerraria");
@@ -67,6 +67,7 @@ public static class RecipeRowRenderer
 		EnsureInventorySnapshot();
 		int x = bounds.X + 4;
 		int cy = bounds.Y + 2;
+		bool craftable = FindAvailableVanillaCraft(recipe) != null;
 
 		int circuit = ExtractCircuit(recipe, out var circuitContent);
 		if (circuit >= 0)
@@ -82,7 +83,7 @@ public static class RecipeRowRenderer
 			x += CellSize + CellPad;
 		}
 
-		DrawArrow(sb, new Rectangle(x + 2, cy + (CellSize - ArrowSize) / 2, ArrowSize, ArrowSize), lightColor);
+		DrawArrow(sb, new Rectangle(x + 2, cy + (CellSize - ArrowSize) / 2, ArrowSize, ArrowSize), lightColor, craftable);
 		x += ArrowSize + 6;
 
 		foreach (var c in AllOutputs(recipe))
@@ -91,29 +92,43 @@ public static class RecipeRowRenderer
 			x += CellSize + CellPad;
 		}
 
-		// Trailing metadata: station icon + duration/EU/t + conditions.
 		float labelX = x + 6;
-		string stationId = recipe.RecipeType.RegistryName ?? "";
-		string stationLabel = Humanize(stationId);
-		int stationItemType = StationIcon.ItemTypeFor(stationId, GetMod());
-		if (stationItemType > 0)
+		string ownStation = recipe.RecipeType.RegistryName ?? "";
+		var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
+		int firstStationItem = 0;
+		if (stationKeys.Count > 0)
 		{
-			var iconRect = new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize);
-			DrawItemIconFit(sb, iconRect, stationItemType, lightColor);
-			labelX += StationIconSize + 4;
+			foreach (var key in stationKeys)
+			{
+				int it = StationIcon.ItemTypeFor(key, GetMod());
+				if (it <= 0) continue;
+				if (firstStationItem == 0) firstStationItem = it;
+				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), it, lightColor);
+				labelX += StationIconSize + 4;
+			}
 		}
-		else if (stationLabel.Length > 0)
+		else
 		{
-			Terraria.Utils.DrawBorderString(sb, stationLabel,
-				new Vector2(labelX, cy + 1),
-				new Color(180, 220, 255), 0.7f);
+			firstStationItem = StationIcon.ItemTypeFor(ownStation, GetMod());
+			if (firstStationItem > 0)
+			{
+				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), firstStationItem, lightColor);
+				labelX += StationIconSize + 4;
+			}
+			else
+			{
+				string stationLabel = StationIcon.TryGetDisplayName(ownStation, out var dn) ? dn : Humanize(ownStation);
+				if (stationLabel.Length > 0)
+					Terraria.Utils.DrawBorderString(sb, stationLabel,
+						new Vector2(labelX, cy + 1), new Color(180, 220, 255), 0.7f);
+			}
 		}
 
 		int nativeTile = recipe.Data.GetInt("nativeTile");
-		if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(stationId))
+		if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(ownStation))
 		{
 			int nativeItemType = StationIcon.ItemTypeForTile(nativeTile);
-			if (nativeItemType > 0 && nativeItemType != stationItemType)
+			if (nativeItemType > 0 && nativeItemType != firstStationItem)
 			{
 				var alsoRect = new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize);
 				DrawItemIconFit(sb, alsoRect, nativeItemType, lightColor);
@@ -153,7 +168,7 @@ public static class RecipeRowRenderer
 				new Color(255, 210, 110) * (lightColor.A / 255f), 0.62f);
 		}
 
-		if (FindAvailableVanillaCraft(recipe) != null)
+		if (craftable)
 			DrawCraftButton(sb, CraftButtonRect(bounds));
 	}
 
@@ -427,11 +442,11 @@ public static class RecipeRowRenderer
 			new Vector2(dest.X + 4, dest.Y + 4), lightColor, 1.0f);
 	}
 
-	private static void DrawArrow(SpriteBatch sb, Rectangle dest, Color lightColor)
+	private static void DrawArrow(SpriteBatch sb, Rectangle dest, Color lightColor, bool craftable)
 	{
-		_arrow ??= ModContent.Request<Texture2D>("GregTechCEuTerraria/Content/Textures/gui/progress_bar/progress_bar_arrow");
-		if (_arrow?.Value is not { } tex) return;
-		sb.Draw(tex, dest, new Rectangle(0, 0, 20, 20), lightColor);
+		if (TextureAssets.CraftToggle[craftable ? 3 : 2]?.Value is not { } tex) return;
+		var center = new Vector2(dest.X + dest.Width / 2f, dest.Y + dest.Height / 2f);
+		sb.Draw(tex, center, null, lightColor, 0f, tex.Size() / 2f, 0.5f, SpriteEffects.None, 0f);
 	}
 
 	public static void EmitTooltipFor(GTRecipe recipe, Rectangle bounds, Point mouse)
@@ -463,32 +478,53 @@ public static class RecipeRowRenderer
 
 		string stationId = recipe.RecipeType.RegistryName ?? "";
 		float labelX = x + 6;
-		int stationItemType = StationIcon.ItemTypeFor(stationId, GetMod());
-		if (stationItemType > 0)
+		var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
+		int firstStationItem = 0;
+		if (stationKeys.Count > 0)
 		{
-			var iconRect = new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize);
-			if (iconRect.Contains(mouse))
+			foreach (var key in stationKeys)
 			{
-				string label = VanillaCraftingBridge.IsHandStation(stationId)
-					? "By Hand" : Humanize(stationId);
-				var text = new System.Text.StringBuilder(label);
-				if (recipe.Conditions.Count > 0)
+				int it = StationIcon.ItemTypeFor(key, GetMod());
+				if (it <= 0) continue;
+				if (firstStationItem == 0) firstStationItem = it;
+				if (new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize).Contains(mouse))
 				{
-					text.Append("\nConditions:");
-					foreach (var c in recipe.Conditions)
-						text.Append("\n  ").Append(ConditionText(c));
+					Main.instance.MouseText(Lang.GetItemNameValue(it));
+					return;
 				}
-				Main.instance.MouseText(text.ToString());
-				return;
+				labelX += StationIconSize + 4;
 			}
-			labelX += StationIconSize + 4;
+		}
+		else
+		{
+			firstStationItem = StationIcon.ItemTypeFor(stationId, GetMod());
+			if (firstStationItem > 0)
+			{
+				var iconRect = new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize);
+				if (iconRect.Contains(mouse))
+				{
+					string label = VanillaCraftingBridge.IsHandStation(stationId)
+						? "By Hand"
+						: StationIcon.TryGetDisplayName(stationId, out var dn) ? dn : Humanize(stationId);
+					var text = new System.Text.StringBuilder(label);
+					if (recipe.Conditions.Count > 0)
+					{
+						text.Append("\nConditions:");
+						foreach (var c in recipe.Conditions)
+							text.Append("\n  ").Append(ConditionText(c));
+					}
+					Main.instance.MouseText(text.ToString());
+					return;
+				}
+				labelX += StationIconSize + 4;
+			}
 		}
 
 		int nativeTile = recipe.Data.GetInt("nativeTile");
 		if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(stationId))
 		{
 			int nativeItemType = StationIcon.ItemTypeForTile(nativeTile);
-			if (nativeItemType > 0 && nativeItemType != stationItemType)
+			if (nativeItemType > 0 && nativeItemType != firstStationItem)
 			{
 				var alsoRect = new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize);
 				if (alsoRect.Contains(mouse))
@@ -528,24 +564,40 @@ public static class RecipeRowRenderer
 	public static string? StationChipAt(GTRecipe recipe, Rectangle bounds, Point mouse)
 	{
 		string stationId = recipe.RecipeType.RegistryName ?? "";
-		if (stationId.Length == 0) return null;
-
 		int cy = bounds.Y + 2;
 		float labelX = TrailingStartX(recipe, bounds) + 6;
 
-		int stationItemType = StationIcon.ItemTypeFor(stationId, GetMod());
-		if (stationItemType > 0)
+		var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
+		int firstStationItem = 0;
+		if (stationKeys.Count > 0)
 		{
-			if (new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize).Contains(mouse))
-				return stationId;
-			labelX += StationIconSize + 4;
+			foreach (var key in stationKeys)
+			{
+				int it = StationIcon.ItemTypeFor(key, GetMod());
+				if (it <= 0) continue;
+				if (firstStationItem == 0) firstStationItem = it;
+				if (new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize).Contains(mouse))
+					return key;
+				labelX += StationIconSize + 4;
+			}
+		}
+		else
+		{
+			if (stationId.Length == 0) return null;
+			firstStationItem = StationIcon.ItemTypeFor(stationId, GetMod());
+			if (firstStationItem > 0)
+			{
+				if (new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize).Contains(mouse))
+					return stationId;
+				labelX += StationIconSize + 4;
+			}
 		}
 
 		int nativeTile = recipe.Data.GetInt("nativeTile");
 		if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(stationId))
 		{
 			int nativeItemType = StationIcon.ItemTypeForTile(nativeTile);
-			if (nativeItemType > 0 && nativeItemType != stationItemType
+			if (nativeItemType > 0 && nativeItemType != firstStationItem
 			    && new Rectangle((int)labelX, cy + 1, StationIconSize, StationIconSize).Contains(mouse))
 				return stationId;
 		}

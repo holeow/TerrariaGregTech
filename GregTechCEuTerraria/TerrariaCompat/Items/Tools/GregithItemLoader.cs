@@ -8,9 +8,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Tools;
 
-// One GregithItem per full-toolset metallic/alloy material. MinTools=8 admits
-// every metallic + alloy (18-19 non-electric tools each) and rejects partial
-// sets (flint=7, wood=1, rubber=0). MUST run AFTER ToolItemLoader.Register.
 public static class GregithItemLoader
 {
 	private const int MinTools = 8;
@@ -22,9 +19,6 @@ public static class GregithItemLoader
 	{
 		_byMaterialId.Clear();
 		int registered = 0;
-
-		// For the Overclocked Gregith assembled below: recipe = one of each
-		// Gregith; visual/projectile pool = every Gregith's tool set.
 		var allGregithTypes = new List<int>();
 		var allToolPool = new List<int>();
 		Material? overclockMaterial = null;
@@ -38,7 +32,7 @@ public static class GregithItemLoader
 			{
 				var type = GTToolType.Get(typeName);
 				if (type == null || type.IsElectric) continue;
-				if (type == GTToolType.MORTAR) continue;                // user request
+				if (type == GTToolType.MORTAR) continue;
 				string toolId = $"gtceu:{type.ResolveId(material.Id)}";
 				if (ToolItemLoader.TryGet(toolId, out int itemType))
 					ingredients.Add(itemType);
@@ -57,27 +51,19 @@ public static class GregithItemLoader
 
 			allGregithTypes.Add(item.Type);
 			allToolPool.AddRange(ingredients);
-			// Prefer neutronium (tier 9 - anchors Overclocked's damage doubling).
 			if (material.Id == "neutronium" || overclockMaterial == null)
 				overclockMaterial = material;
-
-			// Catalyst for every tool tag - runs BEFORE ToolRecipeGroups.Register
-			// so per-tag RecipeGroups pick this type up.
-			ToolItemLoader.RegisterAsCatalystForAllTags(item.Type);
 		}
 
-		// Overclocked Gregith pinned at tier 9 so the orbit reach matches
-		// Neutronium; GregithItem applies the 2x damage / 4x shot count.
 		if (allGregithTypes.Count >= 2 && overclockMaterial != null)
 		{
-			const int overclockTier = ToolTier.TierCount - 1; // 9 = UHV+
+			const int overclockTier = ToolTier.TierCount - 1;
 			var oc = new GregithItem("overclocked_gregith", "Overclocked Gregith",
 				overclockMaterial, overclockTier, allToolPool.ToArray(),
 				overclocked: true, recipeItemTypes: allGregithTypes.ToArray());
 			mod.AddContent(oc);
 			_byMaterialId["overclocked"] = oc.Type;
 			registered++;
-			ToolItemLoader.RegisterAsCatalystForAllTags(oc.Type);
 		}
 
 		mod.Logger.Info($"GregithItemLoader: registered {registered} Gregith weapons.");

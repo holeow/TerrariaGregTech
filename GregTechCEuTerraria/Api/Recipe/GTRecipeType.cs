@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Linq;
 using GregTechCEuTerraria.Api.Recipe.Category;
 using GregTechCEuTerraria.Api.Recipe.Chance.Boost;
 using GregTechCEuTerraria.Api.Recipe.Lookup;
@@ -17,8 +18,6 @@ public sealed class GTRecipeType
 		lock (_registry) _registry[registryName] = this;
 	}
 
-	// === Registry =============================================================
-	// Mirrors upstream's `GTRegistries.RECIPE_TYPES` lookup but flat
 	private static readonly System.Collections.Generic.Dictionary<string, GTRecipeType> _registry = new();
 
 	private GTRecipeType() : this("__placeholder__") { }
@@ -31,13 +30,9 @@ public sealed class GTRecipeType
 		{
 			if (_registry.TryGetValue(registryName, out var existing)) return existing;
 		}
-		return new GTRecipeType(registryName); // ctor inserts
+		return new GTRecipeType(registryName);
 	}
 
-	// === Research data-stick entries ========================================
-	// Port of GTRecipeType.researchEntries (addDataStickEntry /
-	// getDataStickEntry / removeDataStickEntry). Maps a research_id to the
-	// recipes. Populated at recipe-load when a recipe carries a ResearchCondition
 	private readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.HashSet<GTRecipe>> _researchEntries = new();
 
 	public void AddDataStickEntry(string researchId, GTRecipe recipe)
@@ -84,9 +79,6 @@ public sealed class GTRecipeType
 
 	public ChanceBoostFunction ChanceFunction { get; set; } = ChanceBoostFunction.NONE;
 
-	// === RecipeLookup trie ==================================================
-	// Port of upstream's per-GTRecipeType `RecipeDB db`. Built lazily on first
-	// SearchRecipe from the station's RecipeRegistry list
 	private RecipeDB?       _db;
 	private List<GTRecipe>? _untrieable;
 	private int             _dbBuiltAtCount = -1;
@@ -98,13 +90,39 @@ public sealed class GTRecipeType
 
 		var db         = new RecipeDB();
 		var untrieable = new List<GTRecipe>();
+
+		var compiled = new List<(GTRecipe Recipe, List<List<AbstractMapIngredient>> Slots)>();
+		var freq     = new Dictionary<AbstractMapIngredient, int>();
 		foreach (var r in TerrariaCompat.Recipes.RecipeRegistry.ForStation(RegistryName))
 		{
-			if (HasUnresolvedItemInput(r)) continue;
+			if (HasUnresolvedItemInput(r)) { untrieable.Add(r); continue; }
 			var lists = RecipeLookupCompiler.TryCompileRecipe(r);
-			if (lists == null || lists.Count == 0 || !db.Add(r, lists))
+			if (lists == null || lists.Count == 0) { untrieable.Add(r); continue; }
+			compiled.Add((r, lists));
+			foreach (var slot in lists)
+				foreach (var key in slot)
+					freq[key] = freq.TryGetValue(key, out var c) ? c + 1 : 1;
+		}
+
+		int SlotFreq(List<AbstractMapIngredient> slot)
+		{
+			int min = int.MaxValue;
+			foreach (var key in slot)
+				if (freq.TryGetValue(key, out var c) && c < min) min = c;
+			return min == int.MaxValue ? 0 : min;
+		}
+
+		foreach (var (r, lists) in compiled)
+		{
+			var ordered = lists
+				.Select((slot, i) => (slot, i, f: SlotFreq(slot)))
+				.OrderBy(t => t.f).ThenBy(t => t.i)
+				.Select(t => t.slot)
+				.ToList();
+			if (!db.Add(r, ordered))
 				untrieable.Add(r);
 		}
+
 		_db             = db;
 		_untrieable     = untrieable;
 		_dbBuiltAtCount = count;
@@ -143,7 +161,6 @@ public sealed class GTRecipeType
 			if (seen.Add(r) && filter(r)) yield return r;
 	}
 
-	// Used by RecipeLogic to re-attach the running recipe after a world load / MP join
 	public GTRecipe? GetRecipeById(string id)
 	{
 		foreach (var r in TerrariaCompat.Recipes.RecipeRegistry.ForStation(RegistryName))
@@ -151,7 +168,6 @@ public sealed class GTRecipeType
 		return null;
 	}
 
-	// === Capability presence ================================================
 	private HashSet<object>? _inputCaps;
 	private HashSet<object>? _outputCaps;
 	private int              _capsBuiltAtCount = -1;

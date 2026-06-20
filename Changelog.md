@@ -1,3 +1,47 @@
+## 0.0.6
+
+QoL update! Basically a small intermediate update with lots of random stuff that will hopefully make the gameplay a bit smoother. AE2 will be next update
+
+Important:
+- Added Magic Storage gregtech piping support, both in/out from heart and access points
+- Added Manual Crafting Stations for better Magic Storage compatibility and reducing recipe amount when hand crafting
+- Added Gregtech Mutlitool for better wires/pipes setup UX (thanks Flungus)
+- Added functionality to Prospector device (thanks Flungus, TrRzeczy)
+- Added terraria metals superconductors (thanks TrRzeczy)
+- Fixed plascrete recipe (thanks CreepersX17)
+- Fixed distillery first output (thanks CreepersX17)
+- Fixed gray pressure plate recipe (thanks hhhhhhhhhhhhhhh)
+- Fixed removed calcite recipes
+- Changed compat recipes internal format for easier contributions
+- Changed questbook data storage so its multiplayer compatible and all the players share the same progress
+- Removed duplicated ingots, with legacy conversion recipes (thanks Flungus)
+- Removed shimmer recipes for all gt stuff because people are unable to self-restrain from duping stuff
+- Removed shimmer for substituded vanilla ingots, can enable back in mod config
+
+QOL:
+- Added ultimate battery as a requirement of the final Gregith (thanks Flungus)
+- Added nether star recipe from mana stars (thanks Royal Tek)
+- Added questbook editor
+- Added shimmer and honey fluids for later compatibility
+- Added bottomless bucket extractor recipes (thanks TheLarvi)
+- Added recipes between Chum Bucket and fermented biomass
+- Added hotkeys for TMI and questbook
+- Added more rubber into starter bags
+- Changed raw rubber dust yield so its more rewarding to automate it (thanks Bup Supreme)
+- Changed recipe browser favorites list to be persistent on the player
+- Changed questbook to track tasks separately (thanks Leha44581)
+
+Visuals:
+- Added move/resize to recipe browser, improved visuals (thanks Flungus)
+- Added pin button to recipe browser
+- Added gt armor sprites (thanks Flareguy)
+- Added multiblocks, saw actions, ore veins in recipe browser (thanks hamood)
+- Added tooltip to wooden form so its obvious its an intentional recipe change
+- Changed nether star texture
+- Changed the rest of wood textures
+- Fixed dimension condition tooltip in recipe browser (thanks TheLarvi)
+- Removed all the unresolved recipes from the recipe browser
+
 ## 0.0.5
 
 Bugfix update! I want to get core gregtech logic to a full stability until introducing new mechanics and overhauls

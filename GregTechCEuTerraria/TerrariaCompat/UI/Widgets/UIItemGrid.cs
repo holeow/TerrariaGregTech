@@ -12,20 +12,15 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Scrolling slot grid for the browser's Items mode. Source list provided by
-// the caller; the grid owns scroll + click dispatch + draw. Clicks route
-// through BrowserSlotInteraction; R/U hover hotkeys apply.
 public sealed class UIItemGrid : UIElement
 {
 	private const int CellSize = 36;
 	private const int CellPad  = 2;
 	private const int Margin   = 6;
-	private const int ScrollbarWidth = 14;
+	private const int ScrollbarWidth = VanillaScrollbar.Width;
 	private const int MinThumbHeight = 28;
 	private const float VanillaNativeSlotPixels = 52f;
 
-	// SetDefaults clones a fresh ModItem and walks every GlobalItem hook;
-	// per-frame per-cell calls visibly stutter at scroll. Cache pays it once.
 	private static readonly Dictionary<int, Item> _itemCache = new();
 	private static readonly Item[] _drawSlot = { new() };
 
@@ -45,22 +40,35 @@ public sealed class UIItemGrid : UIElement
 
 	private readonly Func<IReadOnlyList<int>> _source;
 	private readonly string _emptyHint;
+	private readonly Action<int>? _onPick;
 	private int _scroll;
 	private bool _leftDown, _rightDown;
+	private bool _pickArmed;
 	private bool _dragging;
 	private int _dragAnchorOffsetPx;
 
-	public UIItemGrid(Func<IReadOnlyList<int>> source, string emptyHint = "No items match this search")
+	public int ScrollBottomInset;
+
+	public UIItemGrid(Func<IReadOnlyList<int>> source, string emptyHint = "No items match this search",
+		Action<int>? onPick = null)
 	{
 		_source = source;
 		_emptyHint = emptyHint;
+		_onPick = onPick;
+	}
+
+	public void ResetPickArming()
+	{
+		_pickArmed = false;
+		_leftDown = Main.mouseLeft;
+		_rightDown = Main.mouseRight;
 	}
 
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
 		if (!IsMouseHovering) return;
-		_scroll -= evt.ScrollWheelValue / 4;
+		_scroll -= evt.ScrollWheelValue;
 		if (_scroll < 0) _scroll = 0;
 	}
 
@@ -102,17 +110,18 @@ public sealed class UIItemGrid : UIElement
 		int maxScroll = Math.Max(0, totalH - viewH);
 		if (_scroll > maxScroll) _scroll = maxScroll;
 
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = GlobalRecipeBrowserState.BrowserCursor();
 
 		bool draggingThisFrame = false;
 		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
-			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, content.Height);
+			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
+			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
 			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(content.Height * frac));
-			int travel = content.Height - thumbH;
+			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
+			int travel = barH - thumbH;
 			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
 			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
 
@@ -126,7 +135,7 @@ public sealed class UIItemGrid : UIElement
 			if (_dragging && Main.mouseLeft)
 			{
 				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax = Math.Max(1, content.Height - thumbH);
+				int travelMax = Math.Max(1, barH - thumbH);
 				int clampedTop = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
 				_scroll = (int)((float)clampedTop / travelMax * maxScroll);
 				draggingThisFrame = true;
@@ -144,9 +153,8 @@ public sealed class UIItemGrid : UIElement
 
 		bool inside = content.Contains(mouse);
 
-		// Fully-inside-content rows only (avoids the mid-Draw scissor dance).
-		int firstRow = (_scroll + step - 1) / step;
-		int lastRow  = Math.Min(rows - 1, (_scroll + viewH) / step - 1);
+		int firstRow = _scroll / step;
+		int lastRow  = Math.Min(rows - 1, (_scroll + viewH - 1) / step);
 
 		int hoveredType = 0;
 		Rectangle hoveredRect = Rectangle.Empty;
@@ -155,6 +163,8 @@ public sealed class UIItemGrid : UIElement
 		Main.inventoryScale = CellSize / VanillaNativeSlotPixels;
 		try
 		{
+			ScissorDraw.Draw(sb, ScissorDraw.DeviceClip(content), () =>
+			{
 			for (int r = firstRow; r <= lastRow; r++)
 			{
 				int yTop = content.Y - _scroll + r * step;
@@ -188,6 +198,7 @@ public sealed class UIItemGrid : UIElement
 						new Vector2(rect.X, rect.Y));
 				}
 			}
+			});
 		}
 		finally
 		{
@@ -199,8 +210,17 @@ public sealed class UIItemGrid : UIElement
 			Main.LocalPlayer.mouseInterface = true;
 			BrowserHover.SetItem(hoveredType);
 
-			var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
-			BrowserSlotInteraction.HandleItem(click, hoveredType, inFavoritesPane: false);
+			if (_onPick != null)
+			{
+				if (!Main.mouseLeft) _pickArmed = true;
+				if (_pickArmed && Main.mouseLeft && !_leftDown)
+					_onPick(hoveredType);
+			}
+			else
+			{
+				var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
+				BrowserSlotInteraction.HandleItem(click, hoveredType, inFavoritesPane: false);
+			}
 		}
 
 		_leftDown = Main.mouseLeft;
@@ -208,14 +228,8 @@ public sealed class UIItemGrid : UIElement
 
 		if (totalH > viewH)
 		{
-			sb.Draw(px, trackRect, new Color(10, 12, 30) * 0.7f);
-			sb.Draw(px, new Rectangle(trackRect.X, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
-			sb.Draw(px, new Rectangle(trackRect.Right - 1, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
 			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			var thumbColor = thumbHot ? new Color(180, 200, 240) : new Color(140, 160, 220);
-			sb.Draw(px, thumbRect, thumbColor);
-			sb.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, thumbRect.Width, 1), Color.White * 0.5f);
-			sb.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, 1, thumbRect.Height), Color.White * 0.5f);
+			VanillaScrollbar.Draw(sb, trackRect, thumbRect, thumbHot);
 			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
 		}
 	}

@@ -119,6 +119,7 @@ REMOVED_TOKENS = (
     "treated_wood_boat", "treated_wood_door", "treated_wood_fence",
     "treated_wood_sign", "treated_wood_slab", "treated_wood_stairs",
     "treated_wood_trapdoor",
+    "treated_wood_plate",
     "candle", "white_bed", "white_carpet",
     "end_crystal", "ghast_tear", "polished_basalt", "stained_glass",
     "activator_rail", "nether_brick",
@@ -144,8 +145,8 @@ REMOVED_TOKENS = (
     "brown_mushroom", "kelp", "pitcher_pod", "potato", "sweet_berries",
     "ink_sac", "music_disc", "deepslate_bricks",
     "energy_converter",
-    "monitor", # not ported yet (AE2 ingredient)
-    "charcoal_pile_igniter", # not ported
+    "advanced_monitor", "central_monitor", "gtceu:monitor",
+    "charcoal_pile_igniter",
     "chicken", "rabbit", "porkchop", "mutton",
     "melon", "packed_ice", "blue_ice",
     "borderless_lamp", "redstone_lamp",
@@ -161,13 +162,15 @@ REMOVED_TOKENS = (
     "cobblestone_wall", "stone_stairs",
     "brick_wall", "brick_stairs", "brick_slab",
     "quartz_stairs",
-    "calcite", "cobbled_deepslate", "chiseled_deepslate",
+    "cobbled_deepslate", "chiseled_deepslate",
     "purpur", "prismarine",
     "quartz_bricks", "quartz_pillar", "chiseled_quartz_block",
     "nether_wart", "spider_eye", "cocoa_beans", "shulker", "chorus",
     "beehive", "hanging_sign",
     "grindstone",
-    "duct_pipe", # not ported
+    "duct_pipe",
+    "passthrough_hatch",
+    "reservoir_hatch",
 )
 
 REMOVED_EXACT_IDS = (
@@ -178,6 +181,7 @@ REMOVED_EXACT_IDS = (
     "minecraft:lead",
     "minecraft:target",
     "minecraft:allium",
+    "minecraft:stone_slab",
     "minecraft:wooden_axe", "minecraft:wooden_pickaxe", "minecraft:wooden_sword",
     "minecraft:wooden_shovel", "minecraft:wooden_hoe",
     "minecraft:stone_axe", "minecraft:stone_pickaxe", "minecraft:stone_sword",
@@ -199,6 +203,11 @@ REMOVED_RECIPE_IDS = frozenset((
     "macerator/macerate_item_detector_cover",
     "arc_furnace/arc_shutter_module_cover",
     "macerator/macerate_shutter_module_cover",
+    "shaped/lv_buffer", "shaped/mv_buffer", "shaped/hv_buffer",
+    "arc_furnace/arc_lv_buffer", "arc_furnace/arc_mv_buffer", "arc_furnace/arc_hv_buffer",
+    "macerator/macerate_lv_buffer", "macerator/macerate_mv_buffer", "macerator/macerate_hv_buffer",
+    "assembler/repeater",
+    "macerator/macerate_calcite",
 ))
 
 
@@ -255,7 +264,6 @@ def is_alt_host_ore_recipe(obj):
     return walk(obj)
 
 
-# Applied Energistics 2 parts are not ported yet
 def is_ae2_recipe(obj):
     """True if a recipe references any AE2 ME part (gtceu:me_* item id)."""
     def walk(x):
@@ -268,8 +276,8 @@ def is_ae2_recipe(obj):
     return walk(obj)
 
 
-# Concrete blocks are explicitly not ported except crafting ingredients
-KEEP_CONCRETE = ("concrete_dust", "dusts/concrete", "concrete_bucket")
+KEEP_CONCRETE = ("concrete_dust", "dusts/concrete", "concrete_bucket",
+                 "forge:concrete", "gtceu:concrete", "concrete_from")
 
 
 def is_concrete_block_recipe(recipe_id, obj):
@@ -369,7 +377,6 @@ def main():
             entry.pop("recipeConditions", None)
         recipes.append(entry)
         recipe_type = obj.get("type", "unknown")
-        # Strip "gtceu:" / "minecraft:" prefix for the histogram.
         type_counts[recipe_type.split(":", 1)[-1]] += 1
 
     if not recipes:

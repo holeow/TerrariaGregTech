@@ -11,9 +11,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Hover hotkeys for the global recipe browser. R/U over an item or fluid
-// (inventory, machine slot, recipe row) open the browser scoped to
-// "how to obtain" / "used as ingredient"
 public sealed class RecipeBrowserKeybinds : ModSystem
 {
 	public static ModKeybind? HowToObtain;
@@ -48,12 +45,6 @@ public sealed class RecipeBrowserKeybinds : ModSystem
 		if (Main.dedServ) return;
 		Handle(HowToObtain, GlobalRecipeBrowserState.BrowseFilter.Output, ref _ownObtain);
 		Handle(UsedAsIngredient, GlobalRecipeBrowserState.BrowseFilter.Input, ref _ownUsed);
-
-		if (GlobalRecipeBrowserSystem.IsOpen && ModalEscape.EscJustPressed)
-		{
-			GlobalRecipeBrowserSystem.Close();
-			ModalEscape.ConsumeEscape();
-		}
 	}
 
 	private void Handle(ModKeybind? kb, GlobalRecipeBrowserState.BrowseFilter dir, ref bool owned)

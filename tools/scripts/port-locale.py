@@ -474,9 +474,13 @@ def _mc_to_terraria(s):
     """Convert §X color codes to Terraria [c/RRGGBB:...] tags."""
     out, i, open_tag = [], 0, False
     def close():                       # Terraria dislikes trailing space in a tag
+        spaces = 0                     # ...but keep it - re-emit outside the tag
         while out and out[-1] == " ":
             out.pop()
+            spaces += 1
         out.append("]")
+        if spaces:
+            out.append(" " * spaces)
     while i < len(s):
         if s[i] == "§" and i + 1 < len(s):
             code = s[i + 1].lower()

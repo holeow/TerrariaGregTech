@@ -16,7 +16,7 @@ Adds:
 - JEI-like recipe browser
 - Questbook (ported from GTCEu Community Edition, not polished yet)
 - Full multiplayer compatibility
-- Optional integration: QuestBooks (not yet released)
+- Magic Storage compatibility with item pipes
 
 Discord: https://discord.gg/sqs4G7u6eX
 There's still bugs, please report if you found any
@@ -30,5 +30,7 @@ Source: https://github.com/GregTechCEu/GregTech-Modern-Community-Pack
 License: LGPL-2.1
 
 Credits: EBF-chan sprite by Qiuqiu, used with their permission
+
+Credits: Armor sprites by Flareguy, used with their permission
 
 AI Usage: Claude was used to speed up the porting process, of course. Theres no fun in manually rewriting stuff line by line, and the existing AST-based java->c# porters are too dumb for such a complex thing. So be aware there still will be stupid unexpected game breaking bugs, play at your own caution

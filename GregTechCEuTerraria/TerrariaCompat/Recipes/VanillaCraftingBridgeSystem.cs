@@ -9,6 +9,14 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 	public override void AddRecipeGroups()
 	{
 		ToolRecipeGroups.Register();
+		RegisterRubberAsVanillaWood();
+	}
+
+	private void RegisterRubberAsVanillaWood()
+	{
+		if (!Terraria.RecipeGroup.recipeGroups.TryGetValue(RecipeGroupID.Wood, out var wood)) return;
+		if (Mod.TryFind<ModItem>("rubber_log", out var log))
+			wood.ValidItems.Add(log.Type);
 	}
 
 	public override void AddRecipes()
@@ -21,6 +29,28 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 	{
 		NativeRecipeProxy.SynthesizeFromTerrariaRecipes();
 		BlockBridgedRecipesFromMagicStorageRecursion();
+		GateSubstitutedIngotShimmer();
+	}
+
+	private void GateSubstitutedIngotShimmer()
+	{
+		var bars = VanillaItemMap.SubstitutedVanillaIngotBars();
+		if (bars.Count == 0) return;
+
+		var desc = Terraria.Localization.Language.GetOrRegister(
+			"Mods.GregTechCEuTerraria.Condition.ShimmerDupesAllowed",
+			() => "Shimmer duplication allowed");
+
+		int gated = 0;
+		for (int i = 0; i < Terraria.Recipe.numRecipes; i++)
+		{
+			var r = Terraria.Main.recipe[i];
+			if (r is null || r.createItem.type == ItemID.None || !bars.Contains(r.createItem.type)) continue;
+			if (VanillaCraftingBridge.BridgeRegistered.Contains(r)) continue;
+			r.AddDecraftCondition(desc, () => Config.GTConfig.Instance.AllowShimmerDupes);
+			gated++;
+		}
+		Mod.Logger.Info($"[shimmer] gated {gated} vanilla bar recipe(s) behind AllowShimmerDupes");
 	}
 
 	private void BlockBridgedRecipesFromMagicStorageRecursion()
@@ -48,42 +78,44 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		if (Mod.TryFind<ModItem>("wood_rod", out var rod))
 			Terraria.Recipe.Create(rod.Type, 4)
 				.AddRecipeGroup(RecipeGroupID.Wood, 1)
+				.DisableDecraft()
 				.Register();
 
 		if (Mod.TryFind<ModItem>("wood_plate", out var plate))
 			Terraria.Recipe.Create(plate.Type, 2)
 				.AddRecipeGroup(RecipeGroupID.Wood, 1)
+				.DisableDecraft()
 				.Register();
 
 		if (Items.MaterialItemRegistry.TryGetByUpstreamId("gtceu:clay_gem", out var clayBall))
 			Terraria.Recipe.Create(clayBall, 4)
 				.AddIngredient(ItemID.ClayBlock, 1)
+				.DisableDecraft()
 				.Register();
 
-		// ItemID.Coal is the Christmas Lump of Coal (maxStack=1, gag item)
 		if (Items.MaterialItemRegistry.TryGetByUpstreamId("gtceu:coal_gem", out var coalGem))
 			Terraria.Recipe.Create(coalGem, 1)
 				.AddIngredient(ItemID.Coal, 1)
 				.AddTile(TileID.WorkBenches)
+				.DisableDecraft()
 				.Register();
 
 		AddVanillaOreToRawOreRecipes();
 	}
 
-	// TODO better ore substitution
 	private void AddVanillaOreToRawOreRecipes()
 	{
 		void Add(string materialId, string prefix, int vanillaItemId)
 		{
 			int? type = Items.MaterialItemRegistry.Get(materialId, prefix);
 			if (type is null || type <= 0) return;
-			// Forward: 1 vanilla ore -> 16 raw_X
 			Terraria.Recipe.Create(type.Value, Tiles.OreTileRegistry.RawOrePerBlock)
 				.AddIngredient(vanillaItemId, 1)
+				.DisableDecraft()
 				.Register();
-			// Backward: 16 raw_X -> 1 vanilla ore
 			Terraria.Recipe.Create(vanillaItemId, 1)
 				.AddIngredient(type.Value, Tiles.OreTileRegistry.RawOrePerBlock)
+				.DisableDecraft()
 				.Register();
 		}
 

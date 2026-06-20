@@ -10,9 +10,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items;
 
-// Paired with SteamAgeSkipBag - drops the iron-tier crafting catalysts
-// (hammer / wrench / wire cutter / file / screwdriver / saw / mortar / crowbar
-// / knife) so the player has them without burning the LV bootstrap stash.
 public sealed class GregTechIronToolsBag : ModItem, ITextureWarmUp
 {
 	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsItem";
@@ -27,7 +24,7 @@ public sealed class GregTechIronToolsBag : ModItem, ITextureWarmUp
 			() => "Starter Bag: Iron Tools");
 		Terraria.Localization.Language.GetOrRegister(
 			$"Mods.GregTechCEuTerraria.Items.{Name}.Tooltip",
-			() => "Right-click to open. Drops the iron-tier crafting catalysts:\nhammer, wrench, wire cutter, file, screwdriver, saw, mortar, crowbar, knife.");
+			() => "Right-click to open. Drops the iron-tier crafting catalysts:\nhammer, wrench, wire cutter, file, screwdriver, saw, mortar, crowbar, knife,\nplus a GregTech Multitool.");
 	}
 
 	public override void SetDefaults()
@@ -57,6 +54,7 @@ public sealed class GregTechIronToolsBag : ModItem, ITextureWarmUp
 		Give(src, player, "gtceu:iron_mortar",       1);
 		Give(src, player, "gtceu:iron_crowbar",      1);
 		Give(src, player, "gtceu:iron_knife",        1);
+		GiveByName(src, player, nameof(Tools.GregTechMultitool), 1);
 	}
 
 	private static void Give(IEntitySource src, Player player, string upstreamId, int stack)
@@ -64,5 +62,12 @@ public sealed class GregTechIronToolsBag : ModItem, ITextureWarmUp
 		int type = IngredientResolverImpl.Instance.ResolveItemType(upstreamId);
 		if (type <= 0) return;
 		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(player, src, type, stack);
+	}
+
+	private static void GiveByName(IEntitySource src, Player player, string name, int stack)
+	{
+		if (!ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(name, out var mi))
+			return;
+		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(player, src, mi.Type, stack);
 	}
 }

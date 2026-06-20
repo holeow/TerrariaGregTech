@@ -9,7 +9,7 @@ namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
 // IIngredientResolver - consumed by IngredientJson / GTRecipeSerializer when
 // materializing runData JSON. Delegates to existing static surfaces
-// (VanillaItemMap, MaterialItemRegistry, RegistryItemLoader, FluidRegistry).
+// (VanillaItemMap, MaterialItemRegistry, RegistryItemLoader, FluidRegistry)
 public sealed class IngredientResolverImpl : IIngredientResolver
 {
 	public static readonly IngredientResolverImpl Instance = new();
@@ -29,27 +29,26 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 				return mi.Type;
 		}
 
-		// 1. Hand-curated mappings.
 		if (VanillaItemMap.TryGet(upstreamId, out var v)) return v;
 
-		// 2. Inert GT items from the registry dump + fluid cells / tools / armor.
 		if (Items.Registry.RegistryItemLoader.TryGet(upstreamId, out var reg)) return reg;
 		if (Items.Tools.ToolItemLoader.TryGet(upstreamId, out var tool)) return tool;
 		if (Items.Armor.ArmorItemLoader.TryGet(upstreamId, out var armor)) return armor;
 
-		// Programmed circuit - dedicated IntCircuitBehaviour port.
+		if (upstreamId == "gtceu:treated_wood_plate" &&
+		    Terraria.ModLoader.ModContent.TryFind<Terraria.ModLoader.ModItem>(
+			    "GregTechCEuTerraria", "treated_wood_planks", out var twp))
+			return twp.Type;
+
 		if (upstreamId == "gtceu:programmed_circuit")
 			return Terraria.ModLoader.ModContent.ItemType<IntCircuitItem>();
 		if (TryStripGtceuPrefix(upstreamId, out var bare) &&
 		    Items.Fluids.FluidCellRegistry.TryGet(bare, out var cell))
 			return cell;
 
-		// 3. Dynamic material x prefix items.
 		if (MaterialItemRegistry.TryGetByUpstreamId(upstreamId, out var matItem))
 			return matItem;
 
-		// 4. Last resort - hand-registered ModItems whose Name is the bare id
-		//    (e.g. boss-summon items). Only gtceu:* ids reach here.
 		if (TryStripGtceuPrefix(upstreamId, out var modBare) &&
 		    Terraria.ModLoader.ModContent.TryFind<Terraria.ModLoader.ModItem>("GregTechCEuTerraria", modBare, out var custom))
 			return custom.Type;
@@ -69,17 +68,13 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 	{
 		if (string.IsNullOrEmpty(tagName)) return Array.Empty<int>();
 
-		// Crafting-catalyst tool tags (h/f/w/... resolved by ToolItemLoader).
 		if (Items.Tools.ToolItemLoader.CraftingTagItems.TryGetValue(tagName, out var catalystItems))
 			return catalystItems;
 
 		var types = new List<int>();
 
-		// Vanilla tag substitution first so the Terraria item lands even when
-		// the upstream tag dump also lists gtceu:* members (e.g. rubber_log).
 		if (VanillaItemMap.TryGetTagItem(tagName, out var vt))
 			types.Add(vt);
-		// multi-item mappings (forge:marble -> only Marble Block, minecraft:fishes -> 8 species)
 		bool exclusive = false;
 		if (VanillaItemMap.TryGetTagItems(tagName, out var multi))
 		{
@@ -97,7 +92,6 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 			}
 		}
 
-		// MaterialItemRegistry - forge:ingots/iron, c:dusts/copper, etc.
 		if (types.Count == 0 && MaterialItemRegistry.TryGetByTagPath(tagName, out var matItem))
 			types.Add(matItem);
 
@@ -107,7 +101,6 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 	public FluidType? ResolveFluidType(string upstreamId)
 	{
 		if (string.IsNullOrEmpty(upstreamId)) return null;
-		// FluidRegistry keys are bare - strip the namespace.
 		int colon = upstreamId.IndexOf(':');
 		string id = colon >= 0 ? upstreamId[(colon + 1)..] : upstreamId;
 		return Api.Fluids.FluidRegistry.TryGet(id, out var f) ? f : null;
@@ -115,8 +108,6 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 
 	public IReadOnlyList<FluidType> ResolveFluidTag(string tagName)
 	{
-		// Naked-id fallback (forge:fluids/water -> water -> FluidRegistry entry).
-		// Real tag-set semantics deferred until a recipe needs multi-fluid tags.
 		var t = ResolveFluidType(tagName);
 		return t is null ? Array.Empty<FluidType>() : new[] { t };
 	}

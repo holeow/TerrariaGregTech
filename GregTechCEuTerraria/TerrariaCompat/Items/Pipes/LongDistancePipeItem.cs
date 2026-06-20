@@ -44,6 +44,7 @@ public abstract class LongDistancePipeItem : ModItem, ITextureWarmUp
 			"[c/AAAAAA:3. Screwdriver an endpoint to set it as Input or Output.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeUse5",
 			"[c/888888:Cuts with a wrench or right-click while held. Endpoints must be far apart.]"));
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	public override bool? UseItem(Player player)

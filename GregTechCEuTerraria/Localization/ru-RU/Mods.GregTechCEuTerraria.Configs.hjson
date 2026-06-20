@@ -55,9 +55,19 @@ GTConfig: {
 		// Tooltip: ""
 		// Label: Enable Cleanroom
 	}
+
+	AllowShimmerDupes: {
+		// Tooltip: ""
+		// Label: Allow Shimmer Dupes
+	}
 }
 
 GTClientConfig: {
+	QuestbookEditMode: {
+		// Tooltip: ""
+		// Label: Questbook Edit Mode
+	}
+
 	ShowDiscordInvite: {
 		// Tooltip: ""
 		// Label: Show Discord Invite

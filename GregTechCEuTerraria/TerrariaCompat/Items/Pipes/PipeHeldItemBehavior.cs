@@ -83,6 +83,7 @@ public static class PipeHeldItemBehavior
 
 	private static void HandleRmbCut(Player player, IGridLayerHandle layer, ref int removeCooldown, int useTime)
 	{
+		if (player.mouseInterface || Main.gameMenu) { removeCooldown = 0; return; }
 		if (!Main.mouseRight) { removeCooldown = 0; return; }
 		if (removeCooldown > 0) { removeCooldown--; return; }
 

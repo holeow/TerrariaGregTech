@@ -22,6 +22,10 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 
 	public PipeKind Kind => _kind;
 
+	internal string? MaterialId => _material?.Id;
+	internal PipeSize Size => Pipelike.PipeSizes.FromWord(_sizeWord);
+	internal bool Restrictive => _restrictive;
+
 	public PipeItem() { }
 	public PipeItem(string id, string label, Material material, string sizeWord, PipeKind kind, bool restrictive = false)
 	{
@@ -71,21 +75,23 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 		if (_kind == Pipelike.PipeKind.Fluid)
 		{
 			var c = BuildFluidCell();
-			if (c is null) return;
-			var f = c.Value;
-			tooltips.Add(new TooltipLine(Mod, "PipeThroughput",
-				$"[c/55FFFF:Transfer Rate:] {f.Throughput:N0} mB/t"));
-			tooltips.Add(new TooltipLine(Mod, "PipeMaxTemp",
-				$"[c/FF5555:Temperature Limit:] {f.MaxFluidTemperature} K"));
-			if (f.Channels > 1)
-				tooltips.Add(new TooltipLine(Mod, "PipeChannels",
-					$"[c/FFFF55:Channels:] {f.Channels}"));
-			tooltips.Add(f.GasProof
-				? new TooltipLine(Mod, "PipeGasProof",   "[c/FFAA00:Can handle Gases]")
-				: new TooltipLine(Mod, "PipeNotGasProof","[c/AA0000:Gases may leak!]"));
-			if (f.AcidProof)    tooltips.Add(new TooltipLine(Mod, "PipeAcidProof",   "[c/FFAA00:Can handle Acids]"));
-			if (f.CryoProof)    tooltips.Add(new TooltipLine(Mod, "PipeCryoProof",   "[c/FFAA00:Can handle Cryogenics]"));
-			if (f.PlasmaProof)  tooltips.Add(new TooltipLine(Mod, "PipePlasmaProof", "[c/FFAA00:Can handle all Plasmas]"));
+			if (c is not null)
+			{
+				var f = c.Value;
+				tooltips.Add(new TooltipLine(Mod, "PipeThroughput",
+					$"[c/55FFFF:Transfer Rate:] {f.Throughput:N0} mB/t"));
+				tooltips.Add(new TooltipLine(Mod, "PipeMaxTemp",
+					$"[c/FF5555:Temperature Limit:] {f.MaxFluidTemperature} K"));
+				if (f.Channels > 1)
+					tooltips.Add(new TooltipLine(Mod, "PipeChannels",
+						$"[c/FFFF55:Channels:] {f.Channels}"));
+				tooltips.Add(f.GasProof
+					? new TooltipLine(Mod, "PipeGasProof",   "[c/FFAA00:Can handle Gases]")
+					: new TooltipLine(Mod, "PipeNotGasProof","[c/AA0000:Gases may leak!]"));
+				if (f.AcidProof)    tooltips.Add(new TooltipLine(Mod, "PipeAcidProof",   "[c/FFAA00:Can handle Acids]"));
+				if (f.CryoProof)    tooltips.Add(new TooltipLine(Mod, "PipeCryoProof",   "[c/FFAA00:Can handle Cryogenics]"));
+				if (f.PlasmaProof)  tooltips.Add(new TooltipLine(Mod, "PipePlasmaProof", "[c/FFAA00:Can handle all Plasmas]"));
+			}
 		}
 		else
 		{
@@ -94,6 +100,8 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 			string rateLine = $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64) + 0.5f)} items/s";
 			tooltips.Add(new TooltipLine(Mod, "PipeTransferRate", rateLine));
 		}
+
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	private Api.Pipenet.IGridLayerHandle Layer => _kind == Pipelike.PipeKind.Fluid
@@ -129,8 +137,10 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 	}
 
 	private Pipelike.ItemPipe.ItemPipeCell BuildItemCell()
+		=> BuildItemCellForSize(Pipelike.PipeSizes.FromWord(_sizeWord));
+
+	internal Pipelike.ItemPipe.ItemPipeCell BuildItemCellForSize(PipeSize size)
 	{
-		var size = Pipelike.PipeSizes.FromWord(_sizeWord);
 		var basePriority = _material!.ItemPipe?.Priority     ?? 1;
 		var baseRate     = _material .ItemPipe?.TransferRate ?? 0.25f;
 		var mod = Pipelike.ItemPipe.ItemPipeSizeModifier.For(size, _restrictive);
@@ -145,10 +155,12 @@ public sealed class PipeItem : ModItem, ITextureWarmUp
 	}
 
 	private Pipelike.Fluid.FluidPipeCell? BuildFluidCell()
+		=> BuildFluidCellForSize(Pipelike.PipeSizes.FromWord(_sizeWord));
+
+	internal Pipelike.Fluid.FluidPipeCell? BuildFluidCellForSize(PipeSize size)
 	{
 		var props = _material!.FluidPipe;
 		if (props is null) return null;
-		var size = Pipelike.PipeSizes.FromWord(_sizeWord);
 		int throughput = props.Throughput * Pipelike.PipeSizes.FluidPipeCapacityMultiplier(size);
 		int channels   = Pipelike.PipeSizes.FluidPipeChannels(size);
 		return new Pipelike.Fluid.FluidPipeCell(

@@ -6,6 +6,7 @@ using System.Text;
 using GregTechCEuTerraria.Api.Fluids;
 using GregTechCEuTerraria.Common.Materials;
 using GregTechCEuTerraria.TerrariaCompat.Items.Fluids;
+using GregTechCEuTerraria.TerrariaCompat.Items.Tools;
 using Terraria;
 using Terraria.GameContent;
 using Terraria.GameContent.Bestiary;
@@ -103,13 +104,12 @@ public class EBFChanNPC : ModNPC
 		});
 	}
 
-	// Available from world start
 	public override bool CanTownNPCSpawn(int numTownNPCs) => true;
 
 	public override ITownNPCProfile TownNPCProfile() =>
 		new Profiles.DefaultNPCProfile(Texture, ModContent.GetModHeadSlot(HeadTexture));
 
-	private const int ChatLineBudget = 9; // panel hard-truncates at 10
+	private const int ChatLineBudget = 9;
 
 	private static string[] _chatPages = Array.Empty<string>();
 	private static int _chatPage;
@@ -188,6 +188,8 @@ public class EBFChanNPC : ModNPC
 	public override void AddShops()
 	{
 		var shop = new NPCShop(Type, ShopName);
+
+		shop.Add(new Item(ModContent.ItemType<GregTechMultitool>()) { shopCustomPrice = Item.buyPrice(gold: 1) });
 
 		AddHydrogenCell(shop, Item.buyPrice(gold: 2));
 

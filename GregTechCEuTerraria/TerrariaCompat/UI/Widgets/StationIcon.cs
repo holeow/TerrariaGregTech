@@ -8,16 +8,31 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Maps a recipe station id to the ItemType whose icon represents it, so a
-// recipe row draws a block icon instead of a `@station_id` text chip
 public static class StationIcon
 {
 	private static readonly Dictionary<string, int> _cache = new();
 	private static readonly string[] _tiers = { "lv", "mv", "hv", "ev", "iv", "luv", "zpm", "uv", "uhv", "ulv" };
 
+	private static readonly Dictionary<string, int> _explicit = new();
+	public static void RegisterExplicit(string stationId, int itemType)
+	{
+		if (!string.IsNullOrEmpty(stationId) && itemType > 0)
+			_explicit[stationId] = itemType;
+	}
+
+	private static readonly Dictionary<string, string> _displayNames = new();
+	public static void RegisterDisplayName(string stationId, string name)
+	{
+		if (!string.IsNullOrEmpty(stationId) && !string.IsNullOrEmpty(name))
+			_displayNames[stationId] = name;
+	}
+	public static bool TryGetDisplayName(string stationId, out string name) =>
+		_displayNames.TryGetValue(stationId, out name!);
+
 	public static int ItemTypeFor(string stationId, Mod? mod)
 	{
 		if (string.IsNullOrEmpty(stationId)) return 0;
+		if (_explicit.TryGetValue(stationId, out int ex)) return ex;
 		if (_cache.TryGetValue(stationId, out int cached)) return cached;
 
 		if (VanillaCraftingBridge.IsHandStation(stationId))
@@ -36,16 +51,13 @@ public static class StationIcon
 
 		if (mod is not null)
 		{
-			// 1. Tiered machine
 			foreach (var t in _tiers)
 				if (mod.TryFind<ModItem>($"{t}_{stationId}", out var item)) { found = item.Type; break; }
 
-			// 2. Bare station name (drum, crate, coke_oven, ...)
 			if (found == 0 && mod.TryFind<ModItem>(stationId, out var bare))
 				found = bare.Type;
 		}
 
-		// 3. Vanilla tile reverse-lookup
 		if (found == 0)
 		{
 			string pascal = SnakeToPascal(stationId);

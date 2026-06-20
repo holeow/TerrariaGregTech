@@ -15,7 +15,7 @@ tModLoader.targets
 __pycache__/
 *.pyc
 
-# Weak-dep DLLs - cloners drop QuestBooks.dll here themselves
+# weak dependencies like MagicStorage.dll
 GregTechCEuTerraria/lib/
 
 # IDE

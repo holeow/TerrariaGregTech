@@ -12,9 +12,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Virtualized loot rows mirroring UIRecipeList. Row shape:
-//   [source-icon] [source-label] -> [target-icon] [target-name] (detail)
-// Two hit zones (source / target icons) each route through BrowserSlotInteraction.
 public sealed class UILootList : UIElement
 {
 	private readonly Func<IReadOnlyList<LootRegistry.LootEntry>> _sourceProvider;
@@ -26,7 +23,9 @@ public sealed class UILootList : UIElement
 	private bool _dragging;
 	private int  _dragAnchorOffsetPx;
 
-	private const int ScrollbarWidth = 18;
+	public int ScrollBottomInset;
+
+	private const int ScrollbarWidth = VanillaScrollbar.Width;
 	private const int Margin = 6;
 	private const int MinThumbHeight = 28;
 	private const int RowHeight = 30;
@@ -45,7 +44,7 @@ public sealed class UILootList : UIElement
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
-		_scrollOffsetPx -= evt.ScrollWheelValue / 6;
+		_scrollOffsetPx -= evt.ScrollWheelValue;
 		_scrollOffsetPx = Math.Max(0, _scrollOffsetPx);
 	}
 
@@ -83,23 +82,23 @@ public sealed class UILootList : UIElement
 		int maxOffset = Math.Max(0, totalH - viewH);
 		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
 
-		int firstRow = (_scrollOffsetPx + rowH - 1) / rowH;
-		int lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH) / rowH - 1);
+		int firstRow = _scrollOffsetPx / rowH;
+		int lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = GlobalRecipeBrowserState.BrowserCursor();
 
-		// Scrollbar interaction first (UIRecipeList pattern).
 		bool draggingThisFrame = false;
 		Rectangle trackRect = Rectangle.Empty;
 		Rectangle thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
-			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, content.Height);
+			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
+			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
 
 			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(content.Height * frac));
-			int travel = content.Height - thumbH;
+			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
+			int travel = barH - thumbH;
 			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
 			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
 
@@ -112,7 +111,7 @@ public sealed class UILootList : UIElement
 			if (_dragging && Main.mouseLeft)
 			{
 				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax   = Math.Max(1, content.Height - thumbH);
+				int travelMax   = Math.Max(1, barH - thumbH);
 				int clampedTop  = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
 				_scrollOffsetPx = (int)((float)clampedTop / travelMax * maxOffset);
 				draggingThisFrame = true;
@@ -126,12 +125,14 @@ public sealed class UILootList : UIElement
 			{
 				thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
 				thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-				firstRow = (_scrollOffsetPx + rowH - 1) / rowH;
-				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH) / rowH - 1);
+				firstRow = _scrollOffsetPx / rowH;
+				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 			}
 		}
 
 		int hoveredRow = -1;
+		ScissorDraw.Draw(spriteBatch, ScissorDraw.DeviceClip(content), () =>
+		{
 		for (int i = firstRow; i <= lastRow; i++)
 		{
 			int yTop = content.Y - _scrollOffsetPx + i * rowH;
@@ -146,6 +147,7 @@ public sealed class UILootList : UIElement
 
 			DrawRow(spriteBatch, rowBounds, src[i]);
 		}
+		});
 
 		if (hoveredRow >= 0)
 		{
@@ -156,11 +158,8 @@ public sealed class UILootList : UIElement
 			bool overSource = sourceRect.Width > 0 && sourceRect.Contains(mouse);
 			bool overTarget = targetRect.Width > 0 && targetRect.Contains(mouse);
 
-			// Loot rows are "about" the target - push to BrowserHover regardless
-			// of which zone the cursor is in, so R/U scopes to the target.
 			if (entry.TargetItem > 0) BrowserHover.SetItem(entry.TargetItem);
 
-			// Source zone tooltips the source NPC/item; target zone the target item.
 			if (overSource && entry.SourceNpcType > 0)
 			{
 				Main.instance.MouseText(entry.SourceLabel);
@@ -201,7 +200,6 @@ public sealed class UILootList : UIElement
 				}
 				else if (entry.TargetItem > 0)
 				{
-					// Middle-of-row click -> pivot to target.
 					if (click.Lmb || click.Rmb)
 						BrowserSlotInteraction.HandleItem(click, entry.TargetItem,
 							inFavoritesPane: false);
@@ -213,17 +211,8 @@ public sealed class UILootList : UIElement
 
 		if (totalH > viewH)
 		{
-			spriteBatch.Draw(px, trackRect, new Color(10, 12, 30) * 0.7f);
-			spriteBatch.Draw(px, new Rectangle(trackRect.X, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
-			spriteBatch.Draw(px, new Rectangle(trackRect.Right - 1, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
-
 			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			var thumbColor = thumbHot ? new Color(180, 200, 240) : new Color(140, 160, 220);
-			spriteBatch.Draw(px, thumbRect, thumbColor);
-
-			spriteBatch.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, thumbRect.Width, 1), Color.White * 0.5f);
-			spriteBatch.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, 1, thumbRect.Height), Color.White * 0.5f);
-
+			VanillaScrollbar.Draw(spriteBatch, trackRect, thumbRect, thumbHot);
 			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
 		}
 	}
@@ -233,7 +222,6 @@ public sealed class UILootList : UIElement
 		int y = bounds.Y + (bounds.Height - IconSize) / 2;
 		int x = bounds.X + 4;
 
-		// Town-NPC head for shops (no banner item); item icon otherwise.
 		if (entry.SourceHeadIndex > 0
 		    && entry.SourceHeadIndex < TextureAssets.NpcHead.Length)
 		{
@@ -269,7 +257,6 @@ public sealed class UILootList : UIElement
 		float tnameW = MeasureWidth(targetName, labelScale);
 		x = (int)(x + tnameW + 8);
 
-		// Detail (chance/price/conditions) - dim, right-trimmed.
 		if (!string.IsNullOrEmpty(entry.Detail) && x < bounds.Right - 4)
 		{
 			Terraria.Utils.DrawBorderString(sb, entry.Detail, new Vector2(x, labelPos.Y),
@@ -285,8 +272,6 @@ public sealed class UILootList : UIElement
 			: "?";
 	}
 
-	// Mirrors DrawRow's x walk so hit zones match the on-screen positions.
-	// Width==0 for an icon that isn't drawn.
 	private static void ComputeIconRects(Rectangle bounds, in LootRegistry.LootEntry entry,
 		out Rectangle sourceRect, out Rectangle targetRect)
 	{
@@ -298,7 +283,7 @@ public sealed class UILootList : UIElement
 
 		const float labelScale = 0.78f;
 		float srcLabelW = MeasureWidth(entry.SourceLabel, labelScale);
-		x = (int)(x + srcLabelW + 6 + 14);   // +6 gap to arrow, +14 arrow width
+		x = (int)(x + srcLabelW + 6 + 14);
 		targetRect = entry.TargetItem > 0
 			? new Rectangle(x, y, IconSize, IconSize)
 			: Rectangle.Empty;
@@ -315,7 +300,6 @@ public sealed class UILootList : UIElement
 		var asset = TextureAssets.NpcHead[headIndex];
 		if (asset is null || !asset.IsLoaded) return;
 		var tex = asset.Value;
-		// Aspect-fit centred (NPC heads are typically 30x30 / 38x40).
 		float scale = System.Math.Min(
 			(float)dest.Width / tex.Width,
 			(float)dest.Height / tex.Height);

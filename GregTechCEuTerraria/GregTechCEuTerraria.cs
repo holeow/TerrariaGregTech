@@ -68,6 +68,7 @@ public sealed class GregTechCEuTerraria : Mod
 		VeinJsonLoader.Load(this);
 		Stage("Registering wires & cables");
 		WireItemRegistry.Register(this);
+		TerrariaCompat.Items.Cables.SuperconductorWireLoader.Register(this);
 		Stage("Registering pipes");
 		TerrariaCompat.Items.Pipes.PipeItemRegistry.Register(this);
 		TerrariaCompat.Items.Pipes.SimplePipeRegistry.Register(this);
@@ -75,12 +76,16 @@ public sealed class GregTechCEuTerraria : Mod
 		TerrariaCompat.Items.Batteries.BatteryItemLoader.Register(this);
 		Stage("Registering item magnets");
 		TerrariaCompat.Items.Magnets.MagnetItemLoader.Register(this);
+		Stage("Registering ore scanners");
+		TerrariaCompat.Items.Prospectors.ProspectorItemLoader.Register(this);
 		Stage("Registering GregTech tools");
 		TerrariaCompat.Items.Tools.ToolItemLoader.Register(this);
 		Stage("Registering Gregith weapons");
 		TerrariaCompat.Items.Tools.GregithItemLoader.Register(this);
 		Stage("Registering power armor");
 		TerrariaCompat.Items.Armor.ArmorItemLoader.Register(this);
+		Stage("Registering wooden forms");
+		TerrariaCompat.Items.WoodenFormItemLoader.Register(this);
 		Stage("Registering inert components from dump");
 		TerrariaCompat.Items.Registry.RegistryItemLoader.Load(this);
 		Stage("Registering item tags");
@@ -97,19 +102,26 @@ public sealed class GregTechCEuTerraria : Mod
 		TerrariaCompat.Machine.Multiblock.MultiblockLocale.RegisterAll();
 		Stage("Registering machine tiles & items");
 		TieredMachineFactory.RegisterAll(this);
+		Stage("Registering wood-form items");
+		TerrariaCompat.Items.WoodFormItemLoader.Register(this);
 		Stage("Registering casing blocks");
 		TerrariaCompat.Tiles.Casings.CasingRegistry.Register(this);
+		Stage("Registering crafting stations");
+		TerrariaCompat.Tiles.CraftingStations.CraftingStationRegistry.RegisterAll(this);
 		Stage("Registering turbine rotors");
 		TerrariaCompat.Items.TurbineRotorItemLoader.Register(this);
 		TerrariaCompat.Pipelike.PipeIntersection.InstallHook();
 
 		var resolver = TerrariaCompat.Recipes.IngredientResolverImpl.Instance;
 		IIngredientResolver.Default = resolver;
+		Api.Recipe.Lookup.RecipeDB.Warn = msg => Logger.Warn(msg);
 
 		Stage("Loading recipes (~32k)");
 		RecipeJsonLoader.Load(this, resolver);
 		Stage("Synthesising biome world-I/O recipes");
 		TerrariaCompat.Machine.Multiblock.Electric.BiomeWorldIORecipeSynth.Register(this);
+		TerrariaCompat.Items.Tools.ToolWorldEffectRecipeSynth.Register(this);
+		TerrariaCompat.Worldgen.OreVeinRecipeSynth.Register(this);
 		Stage("Verifying recipe coverage");
 		TerrariaCompat.Recipes.RecipeCoverageCheck.Verify(this);
 		Stage("Registering multiblock bags");
@@ -120,7 +132,11 @@ public sealed class GregTechCEuTerraria : Mod
 		Stage("Ready");
 	}
 
-	// Multiplayer packet dispatch
+	public override void PostSetupContent()
+	{
+		TerrariaCompat.Machine.Multiblock.MultiblockStructureRecipeSynth.Register(this);
+	}
+
 	public override void HandlePacket(BinaryReader reader, int whoAmI)
 	{
 		NetRouter.Handle(reader, whoAmI);
@@ -132,6 +148,7 @@ public sealed class GregTechCEuTerraria : Mod
 
 		TerrariaCompat.Pipelike.PipeIntersection.UninstallHook();
 		IIngredientResolver.Default = null;
+		Api.Recipe.Lookup.RecipeDB.Warn = null;
 
 		TerrariaCompat.BossDrops.BossDropRegistry.Unload();
 		TerrariaCompat.BossDrops.MultiblockBag.MultiblockBagLoader.Unload();

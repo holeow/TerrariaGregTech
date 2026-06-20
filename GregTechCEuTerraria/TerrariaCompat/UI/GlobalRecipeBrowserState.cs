@@ -21,8 +21,7 @@ using UISearchBar = GregTechCEuTerraria.TerrariaCompat.UI.Widgets.UISearchBar;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Full-screen JEI-style recipe browser over RecipeRegistry
-public sealed class GlobalRecipeBrowserState : UIState
+public sealed class GlobalRecipeBrowserState : FreeModalWindow
 {
 	public enum BrowseFilter { None, Output, Input }
 	public enum BrowseMode { Recipes, Items, Loot, Equippable }
@@ -65,9 +64,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private UILootList? _loot;
 	private UISearchBar? _search;
 	private UIFavoritesPanel? _favorites;
-	private UITextButton? _haveOnlyToggle;
-	private UITextButton? _hideObviousToggle;
-	private UITextButton? _modeToggle;
+	private UICheckButton? _haveOnlyToggle;
+	private UICheckButton? _hideObviousToggle;
 	private BrowseMode _mode = BrowseMode.Recipes;
 	private bool _modeSwapPending;
 
@@ -82,7 +80,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private List<int> _filteredItems = new();
 	private List<int>? _allEquippable;
 	private List<int> _filteredEquippable = new();
-	private static EquipCat _hiddenEquip = EquipCat.None;
+	private static EquipCat _shownEquip = EquipCat.None;
 	private static readonly Dictionary<int, EquipCat> _equipCatCache = new();
 	private UIList? _equipList;
 	private UIScrollbar? _equipScroll;
@@ -94,8 +92,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private string _chipLabel = "";
 	private bool _haveOnly;
 	private bool _hideObvious;
-	private static bool _lastHideObvious = true;
-	private static readonly HashSet<string> _hiddenMods = new();
+	private static bool _lastHideObvious = false;
+	private static readonly HashSet<string> _shownMods = new();
 	private static List<string>? _modOrder;
 	private static bool _modOrderReady;
 	private static readonly Dictionary<GTRecipe, string> _recipeModCache = new();
@@ -104,6 +102,9 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private UIList? _modList;
 	private UIScrollbar? _modScroll;
 	private int _modBtnW;
+	private int _setBtnW;
+	private int _listTop;
+	private int _listH;
 	private int _haveOnlyTick;
 	private List<GTRecipe> _all = new();
 	private List<GTRecipe> _filtered = new();
@@ -128,6 +129,17 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private const int SearchH   = 26;
 	private const int ChipH     = 18;
 	private const int HintH     = 32;
+	private const int ResizeKnobSz = 32;
+	private const int MoveKnobW    = 20;
+	private const int MoveGap      = 6;
+
+	private static readonly Point OffScreen = new(-100000, -100000);
+	internal static Point BrowserCursor()
+		=> DragActive || GlobalRecipeBrowserSystem.CursorOverHigherModal
+			? OffScreen
+			: new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+
+	private float _baseMainLeft, _baseSetLeft, _baseFavLeft;
 	private const string CheatHintLine = "Ctrl+LMB: cheat 1 to inventory  *  Ctrl+RMB: a full stack (Journey Mode)";
 
 	private static string HintFor(BrowseMode mode) => mode switch
@@ -138,9 +150,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		_ => "Tip: hover an item and press R (how to obtain) or U (used as ingredient)\n" + CheatHintLine,
 	};
 
-	public override void OnInitialize() => BuildLayout();
-
-	private void BuildLayout()
+	protected override void RebuildWindow()
 	{
 		UIItemGrid.WarmVanillaItemTextures();
 		string preservedQuery = _search?.Text ?? "";
@@ -151,24 +161,34 @@ public sealed class GlobalRecipeBrowserState : UIState
 		const float SetGap   = 6f;
 		float FavWidth = UIFavoritesPanel.PanelWidth;
 		const float FavGap   = 6f;
-		float GroupSidePx = SetWidth + SetGap + FavGap + FavWidth;
 
-		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
-		float uiW = Main.screenWidth / uiScale;
-		float uiH = Main.screenHeight / uiScale;
-		float maxW = System.Math.Min(1024f, uiW - GroupSidePx - 24f);
-		float maxH = System.Math.Min(860f, uiH - 24f);
-		float w = System.Math.Clamp(uiW * 0.62f, System.Math.Min(560f, maxW), maxW);
-		float h = System.Math.Clamp(uiH * 0.82f, System.Math.Min(420f, maxH), maxH);
+		var root = RootSize();
+		float uiW = root.X, uiH = root.Y;
+
+		ResolveSize(uiW, uiH);
+		float w = CurW, h = CurH;
+
 		float mainLeft = (SetWidth + SetGap - FavGap - FavWidth) / 2f;
 		float setLeft  = -(SetGap + w + FavGap + FavWidth) / 2f;
 		float favLeft  =  (SetWidth + SetGap + w + FavGap) / 2f;
+
+		const float DragMargin = 8f;
+		float gLeft  = uiW / 2f + mainLeft - w / 2f;
+		float gRight = gLeft + w;
+		float gTop   = uiH / 2f - h / 2f;
+		float gBot   = gTop + h;
+		OffMinX = DragMargin - gLeft;   OffMaxX = (uiW - DragMargin) - gRight;
+		OffMinY = DragMargin - gTop;    OffMaxY = (uiH - DragMargin) - gBot;
+		_baseMainLeft = mainLeft; _baseSetLeft = setLeft; _baseFavLeft = favLeft;
+		OffsetX = ClampOffset(OffsetX, OffMinX, OffMaxX);
+		OffsetY = ClampOffset(OffsetY, OffMinY, OffMaxY);
 
 		_panel = new UITerrariaPanel
 		{
 			HAlign = 0.5f,
 			VAlign = 0.5f,
-			Left   = StyleDimension.FromPixels(mainLeft),
+			Left   = StyleDimension.FromPixels(mainLeft + OffsetX),
+			Top    = StyleDimension.FromPixels(OffsetY),
 			Width  = StyleDimension.FromPixels(w),
 			Height = StyleDimension.FromPixels(h),
 		};
@@ -178,41 +198,38 @@ public sealed class GlobalRecipeBrowserState : UIState
 		{
 			HAlign = 0.5f,
 			VAlign = 0.5f,
-			Left   = StyleDimension.FromPixels(favLeft),
+			Left   = StyleDimension.FromPixels(favLeft + OffsetX),
+			Top    = StyleDimension.FromPixels(OffsetY),
 		};
 		_favorites.SetHeight(h);
 		Append(_favorites);
-
-		const int CloseW = 24;
-		const int RowGap = 6;
 
 		_search = new UISearchBar(
 			placeholder: "Search...  |  RMB to clear",
 			onChanged: Refilter)
 		{
-			Left  = StyleDimension.FromPixels(HeaderPad),
+			Left  = StyleDimension.FromPixels(HeaderPad + MoveKnobW + MoveGap),
 			Top   = StyleDimension.FromPixels(HeaderPad),
-			Width = StyleDimension.FromPixels(w - HeaderPad * 2 - CloseW - RowGap),
+			Width = StyleDimension.FromPixels(w * 0.5f),
 			Height = StyleDimension.FromPixels(SearchH),
 		};
 		_panel.Append(_search);
 
-		var close = new UIText("X", 1.1f, large: false)
-		{
-			HAlign = 1f,
-			Left   = StyleDimension.FromPixels(-HeaderPad),
-			Top    = StyleDimension.FromPixels(HeaderPad + 2),
-			Width  = StyleDimension.FromPixels(CloseW),
-			Height = StyleDimension.FromPixels(SearchH),
-		};
-		close.OnLeftClick += (_, _) => GlobalRecipeBrowserSystem.Close();
-		_panel.Append(close);
+		var moveKnob = NewMoveKnob("Drag to move the browser");
+		moveKnob.Left   = StyleDimension.FromPixels(HeaderPad);
+		moveKnob.Top    = StyleDimension.FromPixels(HeaderPad);
+		moveKnob.Width  = StyleDimension.FromPixels(MoveKnobW);
+		moveKnob.Height = StyleDimension.FromPixels(SearchH);
+		_panel.Append(moveKnob);
+
+		LayoutHeaderButtons(_panel, w, HeaderPad, SearchH);
 
 		_settingsPanel = new UITerrariaPanel
 		{
 			HAlign = 0.5f,
 			VAlign = 0.5f,
-			Left   = StyleDimension.FromPixels(setLeft),
+			Left   = StyleDimension.FromPixels(setLeft + OffsetX),
+			Top    = StyleDimension.FromPixels(OffsetY),
 			Width  = StyleDimension.FromPixels(SetWidth),
 			Height = StyleDimension.FromPixels(h),
 		};
@@ -245,39 +262,50 @@ public sealed class GlobalRecipeBrowserState : UIState
 		};
 		_settingsPanel.Append(count);
 
-		_modeToggle = new UITextButton(
-			label:    ModeLabel,
-			onLeft:   ToggleMode,
-			tooltip:  "Switch between Recipes (search by recipe), Items (cheat into inventory), Loot (vanilla sources) and Equippable (wearables only)",
-			width:    setBtnW,
-			height:   SearchH)
+		// Mode selector
+		var modeRow = new (BrowseMode Mode, int Item, string Tip)[]
 		{
-			Left = StyleDimension.FromPixels(SetPad),
-			Top  = StyleDimension.FromPixels(setRow0),
+			(BrowseMode.Recipes,    ItemID.WorkBench,        "Recipes"),
+			(BrowseMode.Items,      ItemID.StoneBlock,       "Items"),
+			(BrowseMode.Loot,       ItemID.CopperShortsword, "Loot"),
+			(BrowseMode.Equippable, ItemID.IronHelmet,       "Equippable"),
 		};
-		_settingsPanel.Append(_modeToggle);
-
-		_hideObviousToggle = new UITextButton(
-			label:    HideObviousLabel,
-			onLeft:   ToggleHideObvious,
-			tooltip:  "Hide recycling recipes (machines, tools, covers -> dusts)",
-			width:    setBtnW,
-			height:   SearchH)
+		const int ModeIcon = 30;
+		const int ModeGap  = 6;
+		for (int i = 0; i < modeRow.Length; i++)
 		{
-			Left = StyleDimension.FromPixels(SetPad),
-			Top  = StyleDimension.FromPixels(setRow0 + setRowH),
+			var (m, item, tip) = modeRow[i];
+			var modeBtn = new UIIconButton(item, () => SetMode(m), () => _mode == m, tip, ModeIcon)
+			{
+				Left = StyleDimension.FromPixels(SetPad + i * (ModeIcon + ModeGap)),
+				Top  = StyleDimension.FromPixels(setRow0),
+			};
+			_settingsPanel.Append(modeBtn);
+		}
+
+		_hideObviousToggle = new UICheckButton(
+			label:     () => "Hide obvious",
+			isChecked: () => _hideObvious,
+			onClick:   ToggleHideObvious,
+			tooltip:   "Hide useless recipes (machines recycling, extracting, etc.)",
+			height:    SearchH)
+		{
+			Left  = StyleDimension.FromPixels(SetPad),
+			Top   = StyleDimension.FromPixels(setRow0 + setRowH),
+			Width = StyleDimension.FromPixels(setBtnW),
 		};
 		_settingsPanel.Append(_hideObviousToggle);
 
-		_haveOnlyToggle = new UITextButton(
-			label:    HaveLabel,
-			onLeft:   ToggleHaveOnly,
-			tooltip:  "Show only recipes you can craft from current inventory",
-			width:    setBtnW,
-			height:   SearchH)
+		_haveOnlyToggle = new UICheckButton(
+			label:     () => "Have ingredients",
+			isChecked: () => _haveOnly,
+			onClick:   ToggleHaveOnly,
+			tooltip:   "Show only recipes you can craft from current inventory",
+			height:    SearchH)
 		{
-			Left = StyleDimension.FromPixels(SetPad),
-			Top  = StyleDimension.FromPixels(setRow0 + setRowH * 2),
+			Left  = StyleDimension.FromPixels(SetPad),
+			Top   = StyleDimension.FromPixels(setRow0 + setRowH * 2),
+			Width = StyleDimension.FromPixels(setBtnW),
 		};
 		_settingsPanel.Append(_haveOnlyToggle);
 
@@ -285,6 +313,9 @@ public sealed class GlobalRecipeBrowserState : UIState
 		int modListTop    = setRow0 + setRowH * 3;
 		int modListH      = System.Math.Max(setRowH * 2, (int)h - modListTop - SetPad);
 		_modBtnW          = setBtnW - ScrollW - 2;
+		_setBtnW          = setBtnW;
+		_listTop          = modListTop;
+		_listH            = modListH;
 		_modList = new UIList
 		{
 			Left        = StyleDimension.FromPixels(SetPad),
@@ -358,6 +389,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		}
 
 		int listTop = HeaderPad + SearchH + 5 + HintH + 5;
+		int scrollInset = ResizeKnobSz;
 		_list = new UIRecipeList(() => _filtered, emptyHint: "No recipes match this search")
 		{
 			Left = StyleDimension.FromPixels(4),
@@ -365,6 +397,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			Width  = StyleDimension.FromPixels(w - 8),
 			Height = StyleDimension.FromPixels(h - listTop - 4),
 			OnStationFilter = s => _search?.SetText("@" + s),
+			ScrollBottomInset = scrollInset,
 		};
 		_grid = new UIItemGrid(() => _filteredItems)
 		{
@@ -372,6 +405,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			Top  = StyleDimension.FromPixels(listTop),
 			Width  = StyleDimension.FromPixels(w - 8),
 			Height = StyleDimension.FromPixels(h - listTop - 4),
+			ScrollBottomInset = scrollInset,
 		};
 		_equipGrid = new UIItemGrid(() => _filteredEquippable, emptyHint: "No equippable items match this search")
 		{
@@ -379,6 +413,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			Top  = StyleDimension.FromPixels(listTop),
 			Width  = StyleDimension.FromPixels(w - 8),
 			Height = StyleDimension.FromPixels(h - listTop - 4),
+			ScrollBottomInset = scrollInset,
 		};
 		_loot = new UILootList(() => _filteredLoot, emptyHint: "No loot matches this search")
 		{
@@ -386,44 +421,14 @@ public sealed class GlobalRecipeBrowserState : UIState
 			Top  = StyleDimension.FromPixels(listTop),
 			Width  = StyleDimension.FromPixels(w - 8),
 			Height = StyleDimension.FromPixels(h - listTop - 4),
+			ScrollBottomInset = scrollInset,
 		};
 		ApplyMode();
 		UpdateChip();
 
+		LayoutResizeKnob(_panel, w, h, ResizeKnobSz, "Drag to resize the browser");
+
 		if (preservedQuery.Length > 0) _search?.SetText(preservedQuery);
-
-		_builtScreenW = Main.screenWidth;
-		_builtScreenH = Main.screenHeight;
-		_builtUiScale = Main.UIScale;
-	}
-
-	private int   _builtScreenW = -1;
-	private int   _builtScreenH = -1;
-	private float _builtUiScale = -1f;
-
-	private bool ScreenChanged()
-		=> Main.screenWidth  != _builtScreenW
-		|| Main.screenHeight != _builtScreenH
-		|| System.Math.Abs(Main.UIScale - _builtUiScale) > 0.001f;
-
-	private string ModeLabel() => _mode switch
-	{
-		BrowseMode.Recipes    => "Mode: Recipes",
-		BrowseMode.Items      => "Mode: Items",
-		BrowseMode.Loot       => "Mode: Loot",
-		BrowseMode.Equippable => "Mode: Equippable",
-		_                     => "Mode",
-	};
-
-	private void ToggleMode()
-	{
-		SetMode(_mode switch
-		{
-			BrowseMode.Recipes => BrowseMode.Items,
-			BrowseMode.Items   => BrowseMode.Loot,
-			BrowseMode.Loot    => BrowseMode.Equippable,
-			_                  => BrowseMode.Recipes,
-		});
 	}
 
 	private void ApplyMode()
@@ -446,6 +451,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 		ApplySettingsForMode();
 		UpdateChip();
 		Refilter(_search?.Text ?? "");
+
+		RaiseResizeKnobToTop(_panel);
 	}
 
 	private void ApplySettingsForMode()
@@ -455,10 +462,13 @@ public sealed class GlobalRecipeBrowserState : UIState
 
 		void Detach(UIElement? e) { if (e is not null && e.Parent == _settingsPanel) _settingsPanel.RemoveChild(e); }
 
+		PositionSettingsLists();
+
+		if (_modList.Parent != _settingsPanel) _settingsPanel.Append(_modList);
+		UpdateModScrollVisibility();
+
 		if (equip)
 		{
-			Detach(_modList);
-			Detach(_modScroll);
 			if (_equipList.Parent != _settingsPanel) _settingsPanel.Append(_equipList);
 			UpdateEquipScrollVisibility();
 		}
@@ -466,8 +476,32 @@ public sealed class GlobalRecipeBrowserState : UIState
 		{
 			Detach(_equipList);
 			Detach(_equipScroll);
-			if (_modList.Parent != _settingsPanel) _settingsPanel.Append(_modList);
-			UpdateModScrollVisibility();
+		}
+	}
+
+	private void PositionSettingsLists()
+	{
+		if (_modList is null || _modScroll is null || _equipList is null || _equipScroll is null) return;
+
+		void Geom(UIElement list, UIElement scroll, int top, int height)
+		{
+			list.Top    = StyleDimension.FromPixels(top);
+			list.Height = StyleDimension.FromPixels(height);
+			scroll.Top    = StyleDimension.FromPixels(top);
+			scroll.Height = StyleDimension.FromPixels(height);
+		}
+
+		if (_mode == BrowseMode.Equippable)
+		{
+			const int Gap = 6;
+			int equipH = (int)((_listH - Gap) * 0.55f);
+			int modH   = _listH - Gap - equipH;
+			Geom(_equipList, _equipScroll, _listTop, equipH);
+			Geom(_modList,   _modScroll,   _listTop + equipH + Gap, modH);
+		}
+		else
+		{
+			Geom(_modList, _modScroll, _listTop, _listH);
 		}
 	}
 
@@ -589,7 +623,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 
 		var tokens = RecipeSearch.Tokenize(text);
 		bool needText = tokens.Length > 0;
-		bool needModFilter = _hiddenMods.Count > 0;
+		bool needModFilter = _shownMods.Count > 0;
 		bool needFilter = needText || _haveOnly || _hideObvious || needModFilter;
 
 		Dictionary<int, int>? inv  = _haveOnly ? BuildInventoryCounts() : null;
@@ -601,7 +635,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			foreach (var r in _all)
 			{
 				if (_hideObvious && IsObviousRecipe(r)) continue;
-				if (needModFilter && _hiddenMods.Contains(RecipeModName(r))) continue;
+				if (needModFilter && !_shownMods.Contains(RecipeModName(r))) continue;
 				if (needText && !RecipeSearch.Matches(r, tokens)) continue;
 				if (inv is not null && !RecipeCraftableNow(r, inv, fluids!)) continue;
 				_filtered.Add(r);
@@ -686,8 +720,6 @@ public sealed class GlobalRecipeBrowserState : UIState
 		return missing;
 	}
 
-	private string HaveLabel() => _haveOnly ? "[x] Have ingredients" : "[ ] Have ingredients";
-	private string HideObviousLabel() => _hideObvious ? "[x] Hide obvious" : "[ ] Hide obvious";
 
 	private static bool IsObviousRecipe(GTRecipe r)
 	{
@@ -697,6 +729,9 @@ public sealed class GlobalRecipeBrowserState : UIState
 
 		string id = r.Id;
 		if (id.Length == 0) return false;
+
+		if (id.StartsWith("crafting_shaped/compat_convert_legacy_", System.StringComparison.Ordinal))
+			return true;
 
 		// wiremill bundled-wire variants - ingot -> double/quadruple/octal/hex.
 		if (id.StartsWith("wiremill/mill_", System.StringComparison.Ordinal))
@@ -767,15 +802,26 @@ public sealed class GlobalRecipeBrowserState : UIState
 	{
 		if (_modList is null) return;
 		_modList.Clear();
+
+		var allBtn = new UICheckButton(
+			label:     () => "Show everything",
+			isChecked: () => _shownMods.Count == 0,
+			onClick:   () => { _shownMods.Clear(); Refilter(_search?.Text ?? ""); },
+			tooltip:   "",
+			height:    SearchH);
+		allBtn.Width = StyleDimension.FromPercent(1f);
+		_modList.Add(allBtn);
+
 		foreach (var modName in ModOrder())
 		{
 			string captured = modName;
-			var modBtn = new UITextButton(
-				label:   () => (_hiddenMods.Contains(captured) ? "[x] Hide " : "[ ] Hide ") + ModDisplayName(captured),
-				onLeft:  () => ToggleHideMod(captured),
-				tooltip: $"Hide {ModDisplayName(captured)} content - recipes, items and loot",
-				width:   _modBtnW,
-				height:  SearchH);
+			var modBtn = new UICheckButton(
+				label:     () => "Show " + ModDisplayName(captured),
+				isChecked: () => _shownMods.Contains(captured),
+				onClick:   () => ToggleShowMod(captured),
+				tooltip:   "",
+				height:    SearchH);
+			modBtn.Width = StyleDimension.FromPercent(1f);
 			_modList.Add(modBtn);
 		}
 		UpdateModScrollVisibility();
@@ -784,23 +830,20 @@ public sealed class GlobalRecipeBrowserState : UIState
 	private void UpdateModScrollVisibility()
 	{
 		if (_modList is null || _modScroll is null || _settingsPanel is null) return;
-		if (_mode == BrowseMode.Equippable)
-		{
-			if (_modScroll.Parent == _settingsPanel) _settingsPanel.RemoveChild(_modScroll);
-			return;
-		}
 		int count = _modList.Count;
 		const float ListPadding = 4f;
 		float contentH = count * SearchH + (count > 1 ? count * ListPadding : 0f);
 		bool need = contentH > _modList.Height.Pixels + 0.5f;
+		_modList.Width = StyleDimension.FromPixels(need ? _modBtnW : _setBtnW);
+		_modList.Recalculate();
 		bool attached = _modScroll.Parent == _settingsPanel;
 		if (need && !attached) _settingsPanel.Append(_modScroll);
 		else if (!need && attached) _settingsPanel.RemoveChild(_modScroll);
 	}
 
-	private void ToggleHideMod(string mod)
+	private void ToggleShowMod(string mod)
 	{
-		if (!_hiddenMods.Remove(mod)) _hiddenMods.Add(mod);
+		if (!_shownMods.Remove(mod)) _shownMods.Add(mod);
 		Refilter(_search?.Text ?? "");
 	}
 
@@ -859,7 +902,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		bool scopeByItem = _filter == BrowseFilter.Output && _filterItem > 0;
 		bool scopeByTag  = _filter == BrowseFilter.Output && _filterTagItems is not null;
 		bool scopeEmpty  = _filter == BrowseFilter.Input || _filterFluid is not null;
-		bool needMod     = _hiddenMods.Count > 0;
+		bool needMod     = _shownMods.Count > 0;
 
 		if (scopeEmpty) { _filteredLoot = new List<LootRegistry.LootEntry>(); return; }
 
@@ -872,7 +915,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		_filteredLoot = new List<LootRegistry.LootEntry>(all.Count);
 		foreach (var e in all)
 		{
-			if (needMod && _hiddenMods.Contains(ItemModName(e.TargetItem))) continue;
+			if (needMod && !_shownMods.Contains(ItemModName(e.TargetItem))) continue;
 			if (scopeByItem && e.TargetItem != _filterItem) continue;
 			if (scopeByTag  && !_filterTagItems!.Contains(e.TargetItem)) continue;
 			if (needText && !LootRegistry.Matches(e, tokens)) continue;
@@ -904,7 +947,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		var allItems = EnsureItemUniverse();
 		string[] tokens = RecipeSearch.Tokenize(text ?? string.Empty);
 		bool needText = tokens.Length > 0;
-		bool needMod  = _hiddenMods.Count > 0;
+		bool needMod  = _shownMods.Count > 0;
 		_filteredItems.Clear();
 		if (!needText && !needMod)
 		{
@@ -913,7 +956,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 		}
 		foreach (int type in allItems)
 		{
-			if (needMod && _hiddenMods.Contains(ItemModName(type))) continue;
+			if (needMod && !_shownMods.Contains(ItemModName(type))) continue;
 			if (needText)
 			{
 				string name = ItemNameLower(type);
@@ -1024,14 +1067,14 @@ public sealed class GlobalRecipeBrowserState : UIState
 		var allEquip = EnsureEquippableUniverse();
 		string[] tokens = RecipeSearch.Tokenize(text ?? string.Empty);
 		bool needText = tokens.Length > 0;
-		bool needMod  = _hiddenMods.Count > 0;
-		var hidden    = _hiddenEquip;
+		bool needMod  = _shownMods.Count > 0;
+		var shown     = _shownEquip;
 		_filteredEquippable.Clear();
 		foreach (int type in allEquip)
 		{
 			var cat = EquipCatOf(type);
-			if (hidden != EquipCat.None && (cat & ~hidden) == EquipCat.None) continue;
-			if (needMod && _hiddenMods.Contains(ItemModName(type))) continue;
+			if (shown != EquipCat.None && (cat & shown) == EquipCat.None) continue;
+			if (needMod && !_shownMods.Contains(ItemModName(type))) continue;
 			if (needText)
 			{
 				string name = ItemNameLower(type);
@@ -1045,23 +1088,34 @@ public sealed class GlobalRecipeBrowserState : UIState
 	{
 		if (_equipList is null) return;
 		_equipList.Clear();
+
+		var allBtn = new UICheckButton(
+			label:     () => "Show all types",
+			isChecked: () => _shownEquip == EquipCat.None,
+			onClick:   () => { _shownEquip = EquipCat.None; Refilter(_search?.Text ?? ""); },
+			tooltip:   "",
+			height:    SearchH);
+		allBtn.Width = StyleDimension.FromPercent(1f);
+		_equipList.Add(allBtn);
+
 		foreach (var (cat, name) in _equipCats)
 		{
 			var captured = cat;
 			string captName = name;
-			var btn = new UITextButton(
-				label:   () => ((_hiddenEquip & captured) != 0 ? "[x] Hide " : "[ ] Hide ") + captName,
-				onLeft:  () => ToggleHideEquip(captured),
-				tooltip: $"Hide {captName} in Equippable mode",
-				width:   _modBtnW,
-				height:  SearchH);
+			var btn = new UICheckButton(
+				label:     () => "Show " + captName,
+				isChecked: () => (_shownEquip & captured) != 0,
+				onClick:   () => ToggleShowEquip(captured),
+				tooltip:   "",
+				height:    SearchH);
+			btn.Width = StyleDimension.FromPercent(1f);
 			_equipList.Add(btn);
 		}
 	}
 
-	private void ToggleHideEquip(EquipCat cat)
+	private void ToggleShowEquip(EquipCat cat)
 	{
-		_hiddenEquip ^= cat;
+		_shownEquip ^= cat;
 		Refilter(_search?.Text ?? "");
 	}
 
@@ -1077,6 +1131,8 @@ public sealed class GlobalRecipeBrowserState : UIState
 		const float ListPadding = 4f;
 		float contentH = count * SearchH + (count > 1 ? count * ListPadding : 0f);
 		bool need = contentH > _equipList.Height.Pixels + 0.5f;
+		_equipList.Width = StyleDimension.FromPixels(need ? _modBtnW : _setBtnW);
+		_equipList.Recalculate();
 		bool attached = _equipScroll.Parent == _settingsPanel;
 		if (need && !attached) _settingsPanel.Append(_equipScroll);
 		else if (!need && attached) _settingsPanel.RemoveChild(_equipScroll);
@@ -1169,6 +1225,7 @@ public sealed class GlobalRecipeBrowserState : UIState
 			{
 				int needed = CountFor(content);
 				if (needed <= 0) continue;
+				if (Inner((Ingredient)content.Payload) is IntCircuitIngredient) continue;
 				hasAnyInput = true;
 				if (!HasAny(content, needed, inv)) return false;
 			}
@@ -1410,10 +1467,26 @@ public sealed class GlobalRecipeBrowserState : UIState
 		_chipShown = _chipPending;
 	}
 
-	public override void Update(GameTime gameTime)
+	protected override void ApplyOffsetLive()
 	{
-		base.Update(gameTime);
-		if (ScreenChanged()) BuildLayout();
+		if (_panel is null) return;
+		_panel.Left = StyleDimension.FromPixels(_baseMainLeft + OffsetX);
+		_panel.Top  = StyleDimension.FromPixels(OffsetY);
+		if (_settingsPanel is not null)
+		{
+			_settingsPanel.Left = StyleDimension.FromPixels(_baseSetLeft + OffsetX);
+			_settingsPanel.Top  = StyleDimension.FromPixels(OffsetY);
+		}
+		if (_favorites is not null)
+		{
+			_favorites.Left = StyleDimension.FromPixels(_baseFavLeft + OffsetX);
+			_favorites.Top  = StyleDimension.FromPixels(OffsetY);
+		}
+		Recalculate();
+	}
+
+	protected override void OnModalUpdate(GameTime gameTime)
+	{
 		if (_modeSwapPending)
 		{
 			_modeSwapPending = false;

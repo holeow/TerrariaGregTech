@@ -41,6 +41,10 @@ OUT_MATERIALS = REPO / "GregTechCEuTerraria" / "Data" / "Materials" / "materials
 OUT_VEINS = REPO / "GregTechCEuTerraria" / "Data" / "Veins" / "veins.json"
 TAG_NAMESPACES = ("gtceu", "forge", "minecraft")
 
+REMOVED_ITEM_IDS = frozenset((
+    "gtceu:treated_wood_plate",
+))
+
 
 def load_lang() -> dict[str, str]:
     """item resource-id -> display name, from the generated en_us.json.
@@ -231,6 +235,13 @@ def main() -> None:
     items = json.loads(SRC_ITEMS.read_text(encoding="utf-8"))
     if not isinstance(items, list) or not items:
         raise SystemExit(f"Registry dump is empty or not a JSON array: {SRC_ITEMS}")
+
+    if REMOVED_ITEM_IDS:
+        before = len(items)
+        items = [it for it in items if it.get("id") not in REMOVED_ITEM_IDS]
+        dropped = before - len(items)
+        if dropped:
+            print(f"  dropped {dropped} removed item(s): {', '.join(sorted(REMOVED_ITEM_IDS))}")
 
     names = load_lang()
     named = 0

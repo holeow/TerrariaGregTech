@@ -10,9 +10,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items;
 
-// Single render path for every dump-driven item icon. Composites the upstream
-// layer stack with per-layer tint, 2x nearest-neighbour upscales, installs the
-// baked Texture2D into TextureAssets.Item[itemType]
 internal readonly record struct IconLayer(string TexturePath, Color Tint, float Scale = 1f)
 {
 	public IconLayer(string texturePath) : this(texturePath, Color.White, 1f) { }
@@ -40,7 +37,7 @@ internal static class ItemIconBaker
 			if (!ModContent.HasAsset(layer.TexturePath)) continue;
 			var tex = ModContent.Request<Texture2D>(layer.TexturePath, AssetRequestMode.ImmediateLoad).Value;
 			if (canvas == null) { w = tex.Width; h = tex.Height; canvas = new Color[w * h]; }
-			else if (tex.Width != w || tex.Height != h) continue; // size mismatch - skip layer
+			else if (tex.Width != w || tex.Height != h) continue;
 
 			var px = new Color[tex.Width * tex.Height];
 			tex.GetData(px);
@@ -54,19 +51,81 @@ internal static class ItemIconBaker
 		InstallPixels(itemType, canvas, w, h);
 	}
 
+	public static void InstallGreyscaleFromVanilla(int itemType, int vanillaItemId)
+	{
+		if (itemType <= 0 || vanillaItemId <= 0) return;
+		if (Main.dedServ) return;
+		if (!_done.Add(itemType)) return;
+		Main.instance.LoadItem(vanillaItemId);
+		if (TextureAssets.Item[vanillaItemId]?.Value is not { Width: > 0 } src) { _done.Remove(itemType); return; }
+		var px = new Color[src.Width * src.Height];
+		src.GetData(px);
+		Greyscale(px);
+		InstallPixels(itemType, px, src.Width, src.Height);
+	}
+
+	public static void InstallGreyscaleTintedFromVanilla(int itemType, int vanillaItemId, Color tint, bool upscale = true)
+	{
+		if (itemType <= 0 || vanillaItemId <= 0) return;
+		if (Main.dedServ) return;
+		if (!_done.Add(itemType)) return;
+		Main.instance.LoadItem(vanillaItemId);
+		if (TextureAssets.Item[vanillaItemId]?.Value is not { Width: > 0 } src) { _done.Remove(itemType); return; }
+		var px = new Color[src.Width * src.Height];
+		src.GetData(px);
+		Greyscale(px);
+		Tint(px, tint);
+		InstallPixels(itemType, px, src.Width, src.Height, upscale);
+	}
+
+	private static readonly Dictionary<string, Color> _avgCache = new();
+	public static Color AverageColor(string texturePath)
+	{
+		if (Main.dedServ) return Color.White;
+		if (_avgCache.TryGetValue(texturePath, out var c)) return c;
+		c = Color.White;
+		if (ModContent.HasAsset(texturePath))
+		{
+			var tex = ModContent.Request<Texture2D>(texturePath, AssetRequestMode.ImmediateLoad).Value;
+			var px = new Color[tex.Width * tex.Height];
+			tex.GetData(px);
+			long r = 0, g = 0, b = 0, n = 0;
+			foreach (var p in px)
+			{
+				if (p.A < 8) continue;
+				r += p.R; g += p.G; b += p.B; n++;
+			}
+			if (n > 0) c = new Color((byte)(r / n), (byte)(g / n), (byte)(b / n), (byte)255);
+		}
+		_avgCache[texturePath] = c;
+		return c;
+	}
+
 	public static void Install(int itemType, string texturePath, Color tint) =>
 		Install(itemType, new IconLayer(texturePath, tint));
 
 	public static void Install(int itemType, string texturePath) =>
 		Install(itemType, new IconLayer(texturePath, Color.White));
 
-	private static void InstallPixels(int itemType, Color[] px, int w, int h)
+	private static void InstallPixels(int itemType, Color[] px, int w, int h, bool upscale = true)
 	{
-		var up = Upscale(px, w, h);
-		int upW = w * UpscaleFactor, upH = h * UpscaleFactor;
-		var baked = RuntimeTextureRegistry.New(upW, upH);
-		baked.SetData(up);
+		var data = upscale ? Upscale(px, w, h) : px;
+		int outW = upscale ? w * UpscaleFactor : w;
+		int outH = upscale ? h * UpscaleFactor : h;
+		var baked = RuntimeTextureRegistry.New(outW, outH);
+		baked.SetData(data);
 		TextureAssets.Item[itemType] = MachineRenderer.WrapAsset(baked, $"gtceu_item_{itemType}");
+	}
+
+	private static void Greyscale(Color[] px)
+	{
+		for (int k = 0; k < px.Length; k++)
+		{
+			var p = px[k];
+			if (p.A == 0) continue;
+			byte y = (byte)((p.R * 299 + p.G * 587 + p.B * 114) / 1000);
+			px[k] = new Color(y, y, y, p.A);
+		}
 	}
 
 	private static void Tint(Color[] px, Color tint)

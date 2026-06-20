@@ -24,6 +24,9 @@ public sealed class MaterialItem : ModItem, ITextureWarmUp
 
 	private const int AnimFrameTicks = 5;
 	private const string TextureRoot = "GregTechCEuTerraria/Content/Textures/";
+	private const string NetherStarGemId = "nether_star_gem";
+	private const int NetherStarFrames = 8;
+	private const int NetherStarFrameTicks = 5;
 
 	public MaterialItem()
 	{
@@ -53,6 +56,12 @@ public sealed class MaterialItem : ModItem, ITextureWarmUp
 	{
 		base.SetStaticDefaults();
 		if (Main.dedServ) return;
+		if (_id == NetherStarGemId)
+		{
+			Main.RegisterItemAnimation(Item.type,
+				new Terraria.DataStructures.DrawAnimationVertical(NetherStarFrameTicks, NetherStarFrames) { PingPong = true });
+			return;
+		}
 		if (_layers.Count == 0) return;
 		string path = TextureRoot + _layers[0].Texture;
 		if (!ModContent.HasAsset(path)) return;
@@ -115,6 +124,11 @@ public sealed class MaterialItem : ModItem, ITextureWarmUp
 
 	private void EnsureTextureBaked()
 	{
+		if (_id == NetherStarGemId)
+		{
+			ItemIconBaker.InstallGreyscaleFromVanilla(Item.type, ItemID.FallenStar);
+			return;
+		}
 		if (_layers.Count == 0) return;
 		var iconLayers = new IconLayer[_layers.Count];
 		for (int i = 0; i < _layers.Count; i++)

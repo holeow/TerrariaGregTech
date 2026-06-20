@@ -15,25 +15,12 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Bosses.ImplosionPress;
 
-// The Implosion Press - the IV-age post-Plantera boss. A 3x3 industrial press
-// (top-vented + bottom-emitting, see ImplosionPressRenderer) that anchors above
-// the player and weaponises convergent-implosion mechanics rather than the
-// outward emissions every other GTCEu-T boss uses. The signature beat is
-// Diamond Forge in phase 2 - the entire arena outside a tiny safe vault implodes.
-//
-// State machine + background producers, mirroring CausticReactor's pattern:
+// The Implosion Press - the IV-age post-Plantera boss
 //   ai[0] = state          ai[1] = state timer
 //   ai[2] = last attack    ai[3] = phase (0 = pressurization, 1 = diamond forge)
-//
-// Named attacks (chosen randomly with one anti-repeat reroll) are layered on top
-// of ALWAYS-ON background producers (Crush Zone designations + Carbon Flak), so
-// even "quiet" moments still have hazards. The fight is multi-track: read the
-// named pattern + read the ambient countdowns + manage the slow-accumulating
-// carbon block floor.
 [AutoloadBossHead]
 public class ImplosionPress : ModNPC, IDebuggableBoss
 {
-	// ---- state machine -----------------------------------------------------
 	private const int S_Reposition   = 0;
 	private const int S_Hellblast    = 1;
 	private const int S_Mortar       = 2;
@@ -42,11 +29,9 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 	private const int S_Column       = 5;
 	private const int S_Tether       = 6;
 	private const int S_Slam         = 7;
-	private const int S_DiamondForge = 8; // phase 2 only
-	private const int S_ChainReaction = 9; // phase 2 only
+	private const int S_DiamondForge = 8;
+	private const int S_ChainReaction = 9;
 
-	// ---- tunables (combat) -------------------------------------------------
-	// Damages and HP - the single dial for "boss feels too easy / too hard".
 	public const int BaseLifeMax = 26000;
 	public const int CrushZoneDamage = 38;
 	public const int CarbonFlakDamage = 26;
@@ -63,56 +48,47 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 	public const int BaseDefense = 28;
 	public const int ContactDamage = 50;
 
-	// ---- tunables (timing) ------------------------------------------------
-	private const int RepositionGlideTicks = 100; // ~1.7s glide between anchors
-	private const float StandoffRadius = 360f;    // hover this far above player
+	private const int RepositionGlideTicks = 100;
+	private const float StandoffRadius = 360f;
 	private const float GlideSpeed = 6.0f;
 	private const float GlideAccel = 0.06f;
 
-	// Named-attack durations (after entry; state transitions to Reposition after).
 	private const int Dur_Hellblast    = (ImplosionPressAttacks.HellblastVolleyCount - 1) * ImplosionPressAttacks.HellblastVolleyInterval + 30;
 	private const int Dur_Mortar       = (ImplosionPressAttacks.MortarSalvoCount - 1) * ImplosionPressAttacks.MortarSalvoInterval + 40;
-	private const int Dur_Fuse         = 240; // line lays + flame traverses
-	private const int Dur_PressurePulse = 60;  // single spawn + recovery
-	private const int Dur_Column       = 280; // 3 columns + repositions
+	private const int Dur_Fuse         = 240;
+	private const int Dur_PressurePulse = 60;
+	private const int Dur_Column       = 280;
 	private const int Dur_Tether       = ImplosionPressTether.SustainTicks + 30;
-	private const int Dur_Slam         = 130; // windup + descend + impact + lift
+	private const int Dur_Slam         = 130;
 	private const int Dur_DiamondForge = 180;
 	private const int Dur_ChainReaction = (ImplosionPressAttacks.ChainCrushCount - 1) * ImplosionPressAttacks.ChainCrushStagger + 240;
 
-	// Background producer cadences (ticks).
-	private const int CrushZoneIntervalP1 = 240; // one zone every 4s
-	private const int CrushZoneIntervalP2 = 160; // tighter in phase 2
+	private const int CrushZoneIntervalP1 = 240;
+	private const int CrushZoneIntervalP2 = 160;
 	private const int CrushZoneMaxLiveP1 = 3;
 	private const int CrushZoneMaxLiveP2 = 4;
 	private const int CarbonFlakIntervalP1 = 200;
 	private const int CarbonFlakIntervalP2 = 130;
-	private const int CarbonBlockMaxLive = 12; // FIFO cap on stationary hazards
+	private const int CarbonBlockMaxLive = 12;
 
-	// Carbon storm: phase-2-only sustained shard rain triggered as a separate
-	// background ticker every X seconds, sustains for Y ticks.
-	private const int CarbonStormPeriod = 600; // every 10s in phase 2
-	private const int CarbonStormDuration = 480; // sustains for 8s
+	private const int CarbonStormPeriod = 600;
+	private const int CarbonStormDuration = 480;
 
-	// Slam attack internal sub-phases (ticks within Dur_Slam).
 	private const int SlamWindupTicks = 30;
 	private const int SlamLandTick = 60;
 	private const int SlamReturnTick = 90;
 
-	// Diamond Forge: phase-2 signature attack, re-fires periodically.
-	private const int DiamondForgePeriod = 1500; // 25s
+	private const int DiamondForgePeriod = 1500;
 
-	// ---- runtime state -----------------------------------------------------
 	private static bool _headSwapped;
-	private float _anchorAngle;      // current anchor angle around player (drift)
-	private float _crushZoneTimer;   // ticks until next background CrushZone
+	private float _anchorAngle;
+	private float _crushZoneTimer;
 	private float _carbonFlakTimer;
-	private float _carbonStormTimer; // ticks until next carbon storm period (phase 2)
-	private int _carbonStormActive;  // ticks remaining in current storm sustain
+	private float _carbonStormTimer;
+	private int _carbonStormActive;
 	private float _diamondForgeTimer;
-	private Vector2 _preSlamAnchor;  // saved anchor to lift back to after slam
+	private Vector2 _preSlamAnchor;
 
-	// Rolling history of the last N attacks picked (debug overlay reads this).
 	private readonly int[] _attackHistory = new int[5];
 	private int _attackHistoryCount;
 
@@ -125,7 +101,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		NPCID.Sets.MPAllowedEnemies[Type] = true;
 		NPCID.Sets.BossBestiaryPriority.Add(Type);
 
-		// Industrial press shrugs off burn / poison / confusion.
 		NPCID.Sets.SpecificDebuffImmunity[Type] ??= new bool?[BuffLoader.BuffCount];
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.OnFire] = true;
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.Poisoned] = true;
@@ -135,7 +110,7 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.ImplosionPress.DisplayName",
 			() => "Implosion Press");
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.ImplosionPress.Bestiary",
-			() => "A runaway implosion compressor venting overpressure through its muffler. It doesn't strike from afar - it CONVERGES, dragging space inward until the gaps close and the air implodes. In its final phase it forges diamonds from the arena itself.");
+			() => "get some bullet hell");
 	}
 
 	public override void SetDefaults()
@@ -173,15 +148,9 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 
 	public override void ModifyNPCLoot(NPCLoot npcLoot)
 	{
-		// Signature reward: 15 solid-steel machine casings - enough to start your
-		// first Implosion Compressor multiblock. Always drops.
 		if (Mod.TryFind<ModItem>("solid_machine_casing", out var casing))
 			npcLoot.Add(ItemDropRule.Common(casing.Type, 1, 15, 15));
 
-		// 1x diamond - thematic "forged in the fight" drop.
-		npcLoot.Add(ItemDropRule.Common(ItemID.Diamond, 1, 1, 1));
-
-		// Plus IV-tier "age loot" (tier 5 + components), gated by EnableBossDrops.
 		var condition = new BossDrops.BossDropCondition();
 		foreach (var d in BossDrops.BossDropRegistry.GetTierDrops(5, withComponents: true))
 			npcLoot.Add(new ItemDropWithConditionRule(d.ItemType, chanceDenominator: 1,
@@ -193,8 +162,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 			ImplosionPressWorld.MarkDowned();
 	}
-
-	// ---- AI ----------------------------------------------------------------
 
 	public override void AI()
 	{
@@ -235,13 +202,10 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 			case S_ChainReaction: RunChainReaction(player, phase2);      break;
 		}
 
-		// Background producers run on top of every state EXCEPT during the Slam
-		// descent (the boss is busy diving) and Diamond Forge (the screen-wide
-		// implosion is the only thing happening).
 		if ((int)NPC.ai[0] != S_DiamondForge && !IsSlamDescentActive())
 			TickBackground(player, phase2);
 
-		BossAI.SmoothTilt(NPC, perVelocity: 0.005f, maxTilt: 0.03f); // heavy press barely tilts
+		BossAI.SmoothTilt(NPC, perVelocity: 0.005f, maxTilt: 0.03f);
 	}
 
 	private bool IsSlamDescentActive()
@@ -251,13 +215,10 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		return t >= SlamWindupTicks && t <= SlamReturnTick;
 	}
 
-	// ----- background producers (always-on hazard layer) --------------------
-
 	private void TickBackground(Player player, bool phase2)
 	{
 		if (Main.netMode == NetmodeID.MultiplayerClient) return;
 
-		// Crush Zone background producer.
 		_crushZoneTimer -= 1f;
 		if (_crushZoneTimer <= 0f)
 		{
@@ -267,8 +228,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 				ImplosionPressAttacks.SpawnCrushZone(NPC, player, CrushZoneDamage, phase2);
 		}
 
-		// Carbon Flak background producer (lob arcs of hazards toward random
-		// spots near the player). Respects FIFO cap on live carbon hazards.
 		_carbonFlakTimer -= 1f;
 		if (_carbonFlakTimer <= 0f)
 		{
@@ -277,7 +236,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 				ImplosionPressAttacks.SpawnCarbonFlakBurst(NPC, player, CarbonFlakDamage, phase2);
 		}
 
-		// Carbon Storm phase-2 ticker.
 		if (phase2)
 		{
 			if (_carbonStormActive > 0)
@@ -297,9 +255,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 			}
 		}
 
-		// Diamond Forge ticker (phase 2 only) - re-fires the signature attack
-		// periodically. Interrupts whatever named attack is active by forcing the
-		// state to S_DiamondForge.
 		if (phase2 && (int)NPC.ai[0] != S_DiamondForge)
 		{
 			_diamondForgeTimer -= 1f;
@@ -320,14 +275,9 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		return n;
 	}
 
-	// ----- state handlers ---------------------------------------------------
-
-	// Glide toward a new anchor (slow heavy-press inertia). When arrived OR
-	// after RepositionGlideTicks, pick next attack.
 	private void DoReposition(Player player)
 	{
 		NPC.ai[1]++;
-		// Drift the anchor angle slightly each reposition.
 		Vector2 anchor = player.Center + new Vector2(
 			MathF.Cos(_anchorAngle), MathF.Sin(_anchorAngle)) * StandoffRadius;
 		BossAI.MoveToward(NPC, anchor, GlideSpeed, GlideAccel, easeRadius: 180f);
@@ -349,7 +299,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 
 	private void PushAttackHistory(int attack)
 	{
-		// FIFO shift: drop oldest, append newest at end.
 		for (int i = 0; i < _attackHistory.Length - 1; i++)
 			_attackHistory[i] = _attackHistory[i + 1];
 		_attackHistory[_attackHistory.Length - 1] = attack;
@@ -389,23 +338,16 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		_ => 0,
 	};
 
-	// IDebuggableBoss gizmos: anchor crosshair + line from boss to anchor,
-	// plus state-specific extras (slam landing target during S_Slam, marker
-	// during S_Tether is drawn by the tether projectile itself).
 	public void DrawDebugGizmos(Microsoft.Xna.Framework.Graphics.SpriteBatch sb, Vector2 screenPos)
 	{
 		Player player = Main.player[NPC.target];
 		if (player is null || !player.active) return;
 
-		// Anchor = current target hover point. Crosshair only - the long line
-		// from boss -> anchor was a screen-spanning rectangle. Numeric values
-		// (StandoffRadius, _anchorAngle) live in the text panel.
 		Vector2 anchor = player.Center + new Vector2(
 			MathF.Cos(_anchorAngle), MathF.Sin(_anchorAngle)) * StandoffRadius;
 		DebugOverlaySystem.DrawCrosshair(sb, anchor, screenPos,
 			new Color(120, 220, 255), 10f, 1);
 
-		// State-specific extras.
 		int state = (int)NPC.ai[0];
 		if (state == S_Slam && (int)NPC.ai[1] >= SlamWindupTicks && (int)NPC.ai[1] < SlamLandTick)
 		{
@@ -415,9 +357,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// IDebuggableBoss implementation. Called every draw frame while
-	// GTConfig.DebugMobs is on; KEEP IT CHEAP - everything here just reads
-	// already-tracked runtime state.
 	public void BuildDebugLines(List<string> lines)
 	{
 		bool phase2 = NPC.ai[3] >= 1f;
@@ -440,7 +379,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 			lines.Add($"BG  DiamondForge in {(int)_diamondForgeTimer}t");
 		}
 
-		// Live projectile counts - lets you spot density issues at a glance.
 		int crushLive = CountLive<CrushZoneProjectile>();
 		int carbonLive = CountLive<CarbonBlockHazard>();
 		int shardLive = CountLive<CarbonShardProjectile>();
@@ -452,8 +390,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		lines.Add($"Live  Crush={crushLive}  Carbon={carbonLive}  Shard={shardLive}  Hell={hellLive}  Mort={mortarLive}");
 		lines.Add($"Live  Ring={ringLive}  Col={colLive}  Fuse={fuseLive}");
 
-		// Recent attack history (oldest -> newest), so you can spot
-		// "it picked Slam three times in a row" patterns.
 		if (_attackHistoryCount > 0)
 		{
 			var hist = new System.Text.StringBuilder("History: ");
@@ -469,29 +405,23 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 
 	private int PickAttack(bool phase2, int last)
 	{
-		// Phase 1 pool: 7 named attacks.
-		// Phase 2 pool: + ChainReaction. (DiamondForge is force-fired, not in pool.)
 		ReadOnlySpan<int> pool = phase2
 			? stackalloc int[] { S_Hellblast, S_Mortar, S_Fuse, S_PressurePulse, S_Column, S_Tether, S_Slam, S_ChainReaction }
 			: stackalloc int[] { S_Hellblast, S_Mortar, S_Fuse, S_PressurePulse, S_Column, S_Tether, S_Slam };
 		int pick = pool[Main.rand.Next(pool.Length)];
-		if (pick == last) pick = pool[Main.rand.Next(pool.Length)]; // one reroll
+		if (pick == last) pick = pool[Main.rand.Next(pool.Length)];
 		return pick;
 	}
 
 	private void ReturnToReposition()
 	{
-		// Drift the anchor angle by ~60deg for the next reposition so the boss
-		// moves visibly between attacks.
 		_anchorAngle += Main.rand.NextFloat(-1.0f, 1.0f);
-		// Bias the anchor to remain in the upper hemisphere (boss above player).
 		_anchorAngle = MathHelper.Clamp(_anchorAngle, -MathHelper.Pi + 0.4f, -0.4f);
 		NPC.ai[0] = S_Reposition;
 		NPC.ai[1] = 0f;
 		NPC.netUpdate = true;
 	}
 
-	// ---- 1: HELLBLAST VOLLEY -----------------------------------------------
 	private void RunHellblast(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -500,7 +430,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 		{
-			// 3 volleys at HellblastVolleyInterval spacing, starting at t=0.
 			if (t % ImplosionPressAttacks.HellblastVolleyInterval == 0
 			    && t / ImplosionPressAttacks.HellblastVolleyInterval < ImplosionPressAttacks.HellblastVolleyCount)
 			{
@@ -512,7 +441,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_Hellblast) ReturnToReposition();
 	}
 
-	// ---- 2: MORTAR SALVO ---------------------------------------------------
 	private void RunMortar(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -533,13 +461,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_Mortar) ReturnToReposition();
 	}
 
-	// ---- 3: FUSE-LINE CASCADE ----------------------------------------------
 	private void RunFuse(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
 		HoldAtAnchor(player);
 
-		// Single-tick spawn at t=20 (after a short telegraph hold).
 		if (NPC.ai[1] == 20f && Main.netMode != NetmodeID.MultiplayerClient)
 		{
 			ImplosionPressAttacks.SpawnFuseLine(NPC, player, FuseChargeDamage, phase2);
@@ -549,13 +475,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_Fuse) ReturnToReposition();
 	}
 
-	// ---- 4: PRESSURE PULSE -------------------------------------------------
 	private void RunPressurePulse(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
 		HoldAtAnchor(player);
 
-		// Charge up: brighter glow for 30 ticks, then fire.
 		if (NPC.ai[1] < 30f) FlashController(0.3f);
 
 		if (NPC.ai[1] == 30f && Main.netMode != NetmodeID.MultiplayerClient)
@@ -567,15 +491,13 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_PressurePulse) ReturnToReposition();
 	}
 
-	// ---- 5: COMPRESSION COLUMN --------------------------------------------
-	// Three columns; boss repositions 2 tiles between each.
 	private void RunColumn(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
 		HoldAtAnchor(player, easeRadius: 60f);
 		int t = (int)NPC.ai[1];
 
-		const int columnSpacing = 90; // ticks between column spawns
+		const int columnSpacing = 90;
 		const int columnsToFire = 3;
 
 		if (Main.netMode != NetmodeID.MultiplayerClient && t % columnSpacing == 0
@@ -583,14 +505,12 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		{
 			ImplosionPressAttacks.SpawnCompressionColumn(NPC, player, ColumnDamage);
 			FlashController(0.6f);
-			// Nudge anchor 60 px sideways for the next column.
 			_anchorAngle += 0.18f * (Main.rand.NextBool() ? 1f : -1f);
 		}
 
 		if (NPC.ai[1] >= Dur_Column) ReturnToReposition();
 	}
 
-	// ---- 6: IMPLOSION TETHER ----------------------------------------------
 	private void RunTether(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -605,8 +525,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_Tether) ReturnToReposition();
 	}
 
-	// ---- 7: DETONATOR PRESS (SLAM) ----------------------------------------
-	// Boss rapid-drops to ground, releases triple shockwave, lifts back.
 	private void RunSlam(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -618,20 +536,17 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 		else if (t < SlamWindupTicks)
 		{
-			// Windup: anchor in place + charge glow.
 			HoldAtAnchor(player, easeRadius: 60f);
 			FlashController(0.6f);
 		}
 		else if (t < SlamLandTick)
 		{
-			// Descend: aim for player.Center.Y, snap downward.
 			float dropY = player.Center.Y + 80f;
 			Vector2 dest = new(player.Center.X, dropY);
 			BossAI.MoveToward(NPC, dest, 28f, 0.5f, easeRadius: 80f);
 		}
 		else if (t == SlamLandTick)
 		{
-			// Impact!
 			NPC.velocity = Vector2.Zero;
 			if (Main.netMode != NetmodeID.MultiplayerClient)
 				ImplosionPressAttacks.SpawnDetonatorImpact(NPC, SlamDamage, phase2);
@@ -639,7 +554,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 		else if (t < SlamReturnTick)
 		{
-			// Pause + smoke.
 			NPC.velocity *= 0.6f;
 			if (!Main.dedServ && Main.rand.NextBool(2))
 			{
@@ -650,18 +564,15 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 		else
 		{
-			// Lift back to pre-slam anchor.
 			BossAI.MoveToward(NPC, _preSlamAnchor, 8f, 0.1f, easeRadius: 100f);
 		}
 
 		if (NPC.ai[1] >= Dur_Slam) ReturnToReposition();
 	}
 
-	// ---- 8: DIAMOND FORGE (phase 2 signature) -----------------------------
 	private void RunDiamondForge(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
-		// Boss anchors at arena centre during the forge.
 		HoldAtAnchor(player, easeRadius: 30f);
 		FlashController(0.9f);
 
@@ -673,7 +584,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_DiamondForge) ReturnToReposition();
 	}
 
-	// ---- 9: CHAIN REACTION (phase 2) --------------------------------------
 	private void RunChainReaction(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -688,13 +598,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (NPC.ai[1] >= Dur_ChainReaction) ReturnToReposition();
 	}
 
-	// ----- transitions -----------------------------------------------------
-
 	private void EnterPhase2(Player player)
 	{
 		NPC.ai[3] = 1f;
 		SoundEngine.PlaySound(SoundID.Item62 with { Pitch = -0.5f, Volume = 1.2f }, NPC.Center);
-		NPC.localAI[3] = 1.2f; // big glow flash
+		NPC.localAI[3] = 1.2f;
 
 		if (!Main.dedServ)
 			for (int i = 0; i < 32; i++)
@@ -705,12 +613,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 				d.velocity *= 2.5f;
 			}
 
-		// One-time nova ring on phase enter + immediate Carbon Storm + reset timers.
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 		{
 			ImplosionPressAttacks.SpawnPressurePulse(NPC, PressureRingDamage);
 			_carbonStormActive = CarbonStormDuration;
-			_diamondForgeTimer = DiamondForgePeriod * 0.4f; // first forge ~10s in
+			_diamondForgeTimer = DiamondForgePeriod * 0.4f;
 		}
 	}
 
@@ -731,8 +638,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// ----- helpers ---------------------------------------------------------
-
 	private void HoldAtAnchor(Player player, float easeRadius = 140f)
 	{
 		Vector2 anchor = player.Center + new Vector2(
@@ -745,14 +650,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		NPC.localAI[3] = Math.Max(NPC.localAI[3], boost);
 	}
 
-	// ---- visuals ----------------------------------------------------------
-
 	private void UpdateVisuals()
 	{
 		NPC.localAI[0]++;
 		bool phase2 = NPC.ai[3] >= 1f;
 
-		// Controller-face glow pulse, brighter (and whiter) in phase 2.
 		float baseG = phase2 ? 0.80f : 0.50f;
 		float pulse = baseG + 0.10f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 2.5f);
 		if (NPC.localAI[3] > 0f)
@@ -763,7 +665,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		}
 		NPC.localAI[2] = MathHelper.Clamp(pulse, 0f, 1.8f);
 
-		// Constant muffler smoke from top-centre.
 		if (!Main.dedServ && Main.rand.NextBool(phase2 ? 1 : 2))
 			EmitMufflerSmoke(1);
 	}
@@ -800,7 +701,7 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		BossHeadHelper.SwapBakedHead(NPC, ImplosionPressRenderer.BossHeadAsset, ref _headSwapped);
 
 		var body = ImplosionPressRenderer.Body;
-		if (body is null) return true; // composite failed -> placeholder sprite
+		if (body is null) return true;
 
 		Vector2 pos = NPC.Center - screenPos;
 		float scale = NPC.scale;
@@ -812,12 +713,11 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		if (glow is not null)
 		{
 			bool phase2 = NPC.ai[3] >= 1f;
-			// Hue-shift the emissive controller face by phase: warm orange -> white-hot.
 			Color hue = phase2 ? new Color(255, 230, 200) : new Color(255, 140, 90);
 			float g = NPC.localAI[2];
 			spriteBatch.Draw(glow, pos, null, hue * MathHelper.Clamp(g, 0f, 1f),
 				NPC.rotation, origin, scale, SpriteEffects.None, 0f);
-			if (g > 1f) // telegraph / phase 2 / slam: extra bright pass
+			if (g > 1f)
 				spriteBatch.Draw(glow, pos, null, hue * (g - 1f),
 					NPC.rotation, origin, scale, SpriteEffects.None, 0f);
 		}
@@ -826,9 +726,6 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 	}
 }
 
-// Type-existence helper so Dur_Tether can read a const at compile time without
-// forward-referencing the projectile class member directly (the SustainTicks
-// const is on ImplosionTetherProjectile, in the Projectiles namespace).
 internal static class ImplosionPressTether
 {
 	public const int SustainTicks = ImplosionTetherProjectile.SustainTicks;

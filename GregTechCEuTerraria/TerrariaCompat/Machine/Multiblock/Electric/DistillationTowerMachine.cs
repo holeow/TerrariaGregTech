@@ -13,15 +13,10 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Port of DistillationTowerMachine. distillation_tower (per-layer fluid output)
-// + large_distillery (same column + distillery recipes). layer i -> hatch at
-// layer i; missing layers void (upstream VoidFluidHandler parity). distillery
-// recipes fall through to base. Layer = (controllerY - hatchY) / 2 - 1.
 public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 {
 	protected override string Label => Definition?.Label ?? "Distillation Tower";
 
-	// Missing layers = void sink (upstream parity).
 	private readonly Dictionary<int, NotifiableFluidTank> _layerHatches = new();
 
 	public DistillationTowerMachine() : base() { }
@@ -56,14 +51,12 @@ public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 
 			int diff = controllerY - fh.Position.Y;
 			if (diff <= 0 || (diff & 1) != 0) continue;
-			int layer = diff / 2 - 1;
+			int layer = diff / 2 - 2;
 			if (layer < 0) continue;
-			// Pattern's setMaxLayerLimited(1) handles uniqueness; safety last-write.
 			_layerHatches[layer] = fh.Tank;
 		}
 	}
 
-	// Tower recipes route per-layer; distillery recipes fall through to base.
 	private static bool IsTowerRecipe(GTRecipe recipe) =>
 		recipe.RecipeType.RegistryName == "distillation_tower";
 
@@ -75,7 +68,6 @@ public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 		if (!IsTowerRecipe(recipe))
 			return base.HasOutputRoomContents(recipe, items, fluids);
 
-		// Items + EU base; fluids per-layer.
 		var itemResult = base.HasOutputRoomContents(recipe, items, System.Array.Empty<Content>());
 		if (!itemResult.IsSuccess) return itemResult;
 		return SimulateFluidsPerLayer(fluids);
@@ -102,7 +94,7 @@ public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 			var stack = ResolveOutputStack(fluids[i]);
 			if (stack.IsEmpty) continue;
 			if (!_layerHatches.TryGetValue(i, out var tank))
-				continue; // void layer (upstream parity)
+				continue;
 			int accepted = tank.FillInternal(stack, simulate: true);
 			if (accepted < stack.Amount)
 				return ActionResult.Fail(null, FluidRecipeCapability.CAP, IO.OUT);
@@ -117,13 +109,12 @@ public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 			var stack = ResolveOutputStack(fluids[i]);
 			if (stack.IsEmpty) continue;
 			if (!_layerHatches.TryGetValue(i, out var tank))
-				continue; // void
+				continue;
 			tank.FillInternal(stack, simulate: false);
 		}
 		return ActionResult.SUCCESS;
 	}
 
-	// Output FluidIngredient is exact-type; multi-fluid splits across Content entries.
 	private static FluidStack ResolveOutputStack(Content content)
 	{
 		if (content.Payload is not FluidIngredient fi || fi.IsEmpty)

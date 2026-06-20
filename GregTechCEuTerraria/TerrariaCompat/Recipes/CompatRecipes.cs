@@ -2,9 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using GregTechCEuTerraria.Api.Capability.Recipe;
 using GregTechCEuTerraria.Api.Recipe;
 using GregTechCEuTerraria.Api.Recipe.Ingredient;
+using GregTechCEuTerraria.Common.Energy;
+using GregTechCEuTerraria.TerrariaCompat.Items.Cables;
 using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
@@ -13,27 +16,8 @@ namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 // JSON shape goes through the same GTRecipeSerializer + IngredientResolver as the bundle
 public static class CompatRecipes
 {
-	public static readonly System.Collections.Generic.HashSet<string> OverriddenIds = new()
-	{
-		// --- Overrides (replaced in Json below) ---
-		"shaped/steam_miner_bronze",
-		"shaped/steam_miner_steel",
-		"shaped/steam_macerator_bronze",
+	public static readonly System.Collections.Generic.HashSet<string> OverriddenIds = new();
 
-		// --- Removal ---
-		"cutter/cut_stone_into_slab",
-		"cutter/cut_stone_into_slab_water",
-		"cutter/cut_stone_into_slab_distilled_water",
-	};
-
-
-	// additional compat recipes:
-	//
-
-	//
-	// -
-	//
-	// -
 
 	// compat_{ulv,lv}_{input,output}_{hatch,bus} - make ULV/LV hatches/buses in hand.
 	private const string HatchesAndBuses = """
@@ -137,47 +121,6 @@ public static class CompatRecipes
 	      { "content": { "tag": "gtceu:tools/crafting_hammers" } }
 	    ] },
 	    "outputs": { "item": [ { "content": { "item": "gtceu:rubber_plate" } } ] } }
-	]
-	""";
-
-	// Steam miners + LP steam macerator - remove diamond from the recipe
-	private const string SteamMachineOverrides = """
-	[
-	  { "id": "crafting_shaped/compat_steam_miner_bronze", "type": "minecraft:crafting_shaped",
-	    "inputs":  { "item": [
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "item": "gtceu:bronze_rod" } } },
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "tag": "forge:small_gears/bronze" } } },
-	      { "content": { "item": "gtceu:bronze_brick_casing" } },
-	      { "content": { "type": "gtceu:sized", "count": 4,
-	        "ingredient": { "item": "gtceu:bronze_normal_fluid_pipe" } } }
-	    ] },
-	    "outputs": { "item": [ { "content": { "item": "gtceu:lp_steam_miner" } } ] } },
-
-	  { "id": "crafting_shaped/compat_steam_macerator_bronze", "type": "minecraft:crafting_shaped",
-	    "inputs":  { "item": [
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "item": "gtceu:bronze_rod" } } },
-	      { "content": { "type": "gtceu:sized", "count": 4,
-	        "ingredient": { "item": "gtceu:bronze_small_fluid_pipe" } } },
-	      { "content": { "item": "gtceu:bronze_machine_casing" } },
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "tag": "forge:pistons" } } }
-	    ] },
-	    "outputs": { "item": [ { "content": { "item": "gtceu:lp_steam_macerator" } } ] } },
-
-	  { "id": "crafting_shaped/compat_steam_miner_steel", "type": "minecraft:crafting_shaped",
-	    "inputs":  { "item": [
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "item": "gtceu:steel_rod" } } },
-	      { "content": { "type": "gtceu:sized", "count": 2,
-	        "ingredient": { "tag": "forge:small_gears/steel" } } },
-	      { "content": { "item": "gtceu:lp_steam_miner" } },
-	      { "content": { "type": "gtceu:sized", "count": 4,
-	        "ingredient": { "item": "gtceu:tin_alloy_normal_fluid_pipe" } } }
-	    ] },
-	    "outputs": { "item": [ { "content": { "item": "gtceu:hp_steam_miner" } } ] } }
 	]
 	""";
 
@@ -437,10 +380,168 @@ public static class CompatRecipes
 	]
 	""";
 
+	private const string LegacyConversions = """
+	[
+	  { "id": "crafting_shaped/compat_convert_legacy_platinum_ingot", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/platinum_ingot" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:PlatinumBar" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_silver_ingot", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/silver_ingot" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:SilverBar" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_tin_ingot", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/tin_ingot" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:TinBar" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_lead_ingot", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/lead_ingot" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:LeadBar" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_amethyst_gem", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/amethyst_gem" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Amethyst" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_ruby_gem", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/ruby_gem" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Ruby" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_sapphire_gem", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/sapphire_gem" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Sapphire" } } ] } },
+
+	  { "id": "crafting_shaped/compat_convert_legacy_topaz_gem", "type": "minecraft:crafting_shaped",
+	    "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/topaz_gem" } } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Topaz" } } ] } }
+	]
+	""";
+
 	private static readonly string[] JsonGroups =
 	{
-		HatchesAndBuses, Bootstrap, SteamMachineOverrides, Misc, SimplePipes, Casings, Clay,
-		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins,
+		HatchesAndBuses, Bootstrap, Misc, SimplePipes, Casings, Clay,
+		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins, LegacyConversions,
+	};
+
+	public sealed record RecipePatch(string BaseId, string NewId, string MergeJson)
+	{
+		public bool IsOverride => NewId == BaseId;
+	}
+
+	private static RecipePatch Override(string baseId, string mergeJson) => new(baseId, baseId, mergeJson);
+	private static RecipePatch Derive(string baseId, string newId, string mergeJson) => new(baseId, newId, mergeJson);
+
+	public static readonly List<RecipePatch> Patches = new()
+	{
+		// Steam miners, steam macerator remove diamond ingredient
+		Override("shaped/steam_miner_bronze", """
+			{ "key": { "D": { "tag": null, "item": "gtceu:bronze_rod" } } }
+			"""),
+
+		Override("shaped/steam_miner_steel", """
+			{ "key": { "D": { "tag": null, "item": "gtceu:steel_rod" } } }
+			"""),
+
+		Override("shaped/steam_macerator_bronze", """
+			{ "key": { "D": { "tag": null, "item": "gtceu:bronze_rod" } } }
+			"""),
+
+		// raw_rubber_dust processing buff
+		Override("extractor/raw_rubber_from_resin", """
+			{ "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 8,
+			  "ingredient": { "item": "gtceu:raw_rubber_dust" } } } ] } }
+			"""),
+
+		Override("centrifuge/sticky_resin_separation", """
+			{ "outputs": { "item": [
+			  { "content": { "type": "gtceu:sized", "count": 8, "ingredient": { "item": "gtceu:raw_rubber_dust" } } },
+			  { "chance": 1500, "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "item": "gtceu:plant_ball" } } }
+			] } }
+			"""),
+
+		Override("extractor/raw_rubber_from_slime", """
+			{ "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 5,
+			  "ingredient": { "item": "gtceu:raw_rubber_dust" } } } ] } }
+			"""),
+
+		// Nether star alternative
+		Derive("implosion_compressor/implode_dust_nether_star_dynamite",
+			"implosion_compressor/compat_implode_mana_crystal_nether_star_dynamite", """
+			{ "inputs": { "item": [
+			  { "content": { "type": "gtceu:sized", "count": 5, "ingredient": { "item": "terraria:ManaCrystal" } } },
+			  { "content": { "type": "gtceu:sized", "count": 2, "ingredient": { "item": "gtceu:dynamite" } } }
+			] } }
+			"""),
+
+		Derive("implosion_compressor/implode_dust_nether_star_powderbarrel",
+			"implosion_compressor/compat_implode_mana_crystal_nether_star_powderbarrel", """
+			{ "inputs": { "item": [
+			  { "content": { "type": "gtceu:sized", "count": 5, "ingredient": { "item": "terraria:ManaCrystal" } } },
+			  { "content": { "type": "gtceu:sized", "count": 8, "ingredient": { "item": "gtceu:powderbarrel" } } }
+			] } }
+			"""),
+
+		Derive("implosion_compressor/implode_dust_nether_star_tnt",
+			"implosion_compressor/compat_implode_mana_crystal_nether_star_tnt", """
+			{ "inputs": { "item": [
+			  { "content": { "type": "gtceu:sized", "count": 5, "ingredient": { "item": "terraria:ManaCrystal" } } },
+			  { "content": { "type": "gtceu:sized", "count": 4, "ingredient": { "item": "minecraft:tnt" } } }
+			] } }
+			"""),
+
+		// Terraria bottomless bucket infinite liquid
+		Derive("extractor/extract_iron_ingot",
+			"extractor/compat_extract_bottomless_water", """
+			{ "inputs":  { "item":  [ { "chance": 0, "content": { "item": "terraria:BottomlessBucket" } } ] },
+			  "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:water" } } } ] } }
+			"""),
+
+		Derive("extractor/extract_steel_ingot",
+			"extractor/compat_extract_bottomless_honey", """
+			{ "inputs":  { "item":  [ { "chance": 0, "content": { "item": "terraria:BottomlessHoneyBucket" } } ] },
+			  "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:honey" } } } ] } }
+			"""),
+
+		Derive("extractor/extract_hssg_ingot",
+			"extractor/compat_extract_bottomless_lava", """
+			{ "inputs":  { "item":  [ { "chance": 0, "content": { "item": "terraria:BottomlessLavaBucket" } } ] },
+			  "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:lava" } } } ] } }
+			"""),
+
+		Derive("extractor/extract_hsse_ingot",
+			"extractor/compat_extract_bottomless_shimmer", """
+			{ "inputs":     { "item":  [ { "chance": 0, "content": { "item": "terraria:BottomlessShimmerBucket" } } ] },
+			  "outputs":    { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:shimmer" } } } ] },
+			  "tickInputs": { "eu":    [ { "content": 1920 } ] } }
+			"""),
+
+		// Get liquid shimmer
+		Derive("extractor/extract_hssg_ingot",
+			"extractor/compat_extract_shimmer_block", """
+			{ "inputs":  { "item":  [ { "content": { "item": "terraria:ShimmerBlock" } } ] },
+			  "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:shimmer" } } } ] } }
+			"""),
+
+		// Chum Bucket - fermented biomass
+		Derive("canner/spray_can_white_dye",
+			"extractor/compat_extract_chum_bucket", """
+			{ "type": "gtceu:extractor", "category": "gtceu:extractor",
+			  "inputs":  { "fluid": null,
+			               "item":  [ { "content": { "item": "terraria:ChumBucket" } } ] },
+			  "outputs": { "item":  [ { "content": { "item": "terraria:EmptyBucket" } } ],
+			               "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:fermented_biomass" } } } ] } }
+			"""),
+
+		Derive("canner/spray_can_white_dye",
+			"canner/compat_can_chum_bucket", """
+			{ "inputs":  { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:fermented_biomass" } } } ],
+			               "item":  [ { "content": { "item": "terraria:EmptyBucket" } } ] },
+			  "outputs": { "item":  [ { "content": { "item": "terraria:ChumBucket" } } ] } }
+			"""),
+
+		// Ultimate Manual Crafting Station
+		Derive("electric_blast_furnace/aluminium_from_ruby_dust",
+			"electric_blast_furnace/compat_ultimate_manual_station",
+			"""{ "inputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/manual_hammer" } }, { "content": { "item": "GregTechCEuTerraria/manual_mallet" } }, { "content": { "item": "GregTechCEuTerraria/manual_knife" } }, { "content": { "item": "GregTechCEuTerraria/manual_file" } }, { "content": { "item": "GregTechCEuTerraria/manual_saw" } }, { "content": { "item": "GregTechCEuTerraria/manual_wrench" } }, { "content": { "item": "GregTechCEuTerraria/manual_screwdriver" } }, { "content": { "item": "GregTechCEuTerraria/manual_wire_cutter" } }, { "content": { "item": "GregTechCEuTerraria/manual_mortar" } }, { "content": { "item": "GregTechCEuTerraria/manual_crowbar" } }, { "content": { "item": "gtceu:nether_star" } } ] }, "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/ultimate_manual" } } ] } }"""),
 	};
 
 	// Per-tier crafting recipes for our custom-block machines
@@ -473,6 +574,40 @@ public static class CompatRecipes
 		  "outputs": { "item": [ { "content": { "item": "gtceu:{{tier}}_solar_panel_machine" } } ] } }
 		""";
 
+	// Terraria superconductors
+	private static readonly (byte Size, int Circuit, int InCount, int OutCount, int DurMult)[] WireLadder =
+	{
+		(1,  1,  1, 2, 1),
+		(2,  2,  1, 1, 1),
+		(4,  4,  2, 1, 2),
+		(8,  8,  4, 1, 4),
+		(16, 16, 8, 1, 8),
+	};
+
+	private const int SuperconductorBaseDuration = 100;
+
+	private static string SuperconductorWireRecipe(
+		SuperconductorWireLoader.ScTier tier,
+		(byte Size, int Circuit, int InCount, int OutCount, int DurMult) rung,
+		string barItemName, string idSuffix)
+	{
+		string wireId = SuperconductorWireLoader.WireItemName(tier, rung.Size);
+		string sizeWord = WireItem.WireSizeWord(rung.Size);
+		int eut = VoltageTiers.VA((int)tier.Tier);
+		int dur = SuperconductorBaseDuration * rung.DurMult;
+		return $$"""
+		{ "id": "wiremill/compat_sc_{{tier.MetalId}}_{{sizeWord}}{{idSuffix}}", "type": "gtceu:wiremill", "duration": {{dur}},
+		  "inputs": { "item": [
+		    { "content": { "type": "gtceu:sized", "count": {{rung.InCount}}, "ingredient": { "item": "terraria:{{barItemName}}" } } },
+		    { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": {{rung.Circuit}} } }
+		  ] },
+		  "tickInputs": { "eu": [ { "content": {{eut}} } ] },
+		  "outputs": { "item": [
+		    { "content": { "type": "gtceu:sized", "count": {{rung.OutCount}}, "ingredient": { "item": "GregTechCEuTerraria/{{wireId}}" } } }
+		  ] } }
+		""";
+	}
+
 	public static List<(string Station, GTRecipe Recipe)> Build(IIngredientResolver resolver)
 	{
 		var result = new List<(string, GTRecipe)>();
@@ -482,6 +617,18 @@ public static class CompatRecipes
 			ParseOne(LampRecipe(tier), resolver, result);
 		foreach (var tier in SolarPanelTiers)
 			ParseOne(SolarPanelRecipe(tier), resolver, result);
+
+		foreach (var scTier in SuperconductorWireLoader.Tiers)
+			foreach (var rung in WireLadder)
+			{
+				bool multiBar = scTier.BarItemNames.Length > 1;
+				foreach (var bar in scTier.BarItemNames)
+				{
+					string suffix = multiBar ? "_" + bar.ToLowerInvariant() : "";
+					ParseOne(SuperconductorWireRecipe(scTier, rung, bar, suffix), resolver, result);
+				}
+			}
+
 		return result;
 	}
 
@@ -505,10 +652,35 @@ public static class CompatRecipes
 		result.Add((recipe.RecipeType.RegistryName, recipe));
 	}
 
-	// (vanilla ore, GT material) - mirrors AddVanillaOreToRawOreRecipes so the
-	// "1 vanilla ore -> 16 raw -> macerate" hand-chain stays in lock-step with
-	// the macerator shortcut emitted below. Tungsten ore folds to tungstate -
-	// no raw_tungsten exists.
+	public static (string Station, GTRecipe Recipe) MaterializePatch(
+		RecipePatch patch, string baseRawJson, IIngredientResolver resolver)
+	{
+		var merged = JsonNode.Parse(baseRawJson)!.AsObject();
+		var delta = JsonNode.Parse(patch.MergeJson)!.AsObject();
+		MergeInto(merged, delta);
+		merged["id"] = patch.NewId;
+
+		using var doc = JsonDocument.Parse(merged.ToJsonString());
+		var el = doc.RootElement;
+		var recipe = VanillaRecipeJson.IsVanillaShape(el)
+			? VanillaRecipeJson.Read(el, resolver, patch.NewId)
+			: GTRecipeSerializer.Read(el, resolver, patch.NewId);
+		return (recipe.RecipeType.RegistryName, recipe);
+	}
+
+	// JSON Merge Patch (RFC 7386)
+	private static void MergeInto(JsonObject target, JsonObject patch)
+	{
+		foreach (var (key, value) in patch)
+		{
+			if (value is null) { target.Remove(key); continue; }
+			if (value is JsonObject patchChild && target[key] is JsonObject targetChild)
+				MergeInto(targetChild, patchChild);
+			else
+				target[key] = value.DeepClone();
+		}
+	}
+
 	private static readonly (int VanillaItemId, string Material)[] VanillaOreMaterials =
 	{
 		(ItemID.IronOre,     "iron"),
@@ -521,9 +693,6 @@ public static class CompatRecipes
 		(ItemID.TungstenOre, "tungstate"),
 	};
 
-	// For each vanilla ore that has a raw_X -> crushed_X macerator recipe,
-	// emit a parallel recipe that consumes 1 vanilla ore directly and yields
-	// 16x the raw-recipe output at 2x EU/t (same duration)
 	public static List<GTRecipe> BuildVanillaOreMaceratorRecipes(
 		IReadOnlyDictionary<string, List<GTRecipe>> byStation)
 	{

@@ -6,26 +6,6 @@ using GregTechCEuTerraria.TerrariaCompat.Machine;
 
 namespace GregTechCEuTerraria.Common.Recipe.Condition;
 
-// LOCKED - Terraria-adapted port of
-// com.gregtechceu.gtceu.common.recipe.condition.DimensionCondition.
-//
-// Recipe runs only in the specified MC dimension. Terraria has no
-// dimension concept - instead we map MC's 3 vanilla dimensions to the
-// MACHINE'S altitude zone (NOT the player's zone - recipes evaluate
-// per-machine, not per-player; in MP the player might be elsewhere or
-// non-existent server-side).
-//
-//   minecraft:overworld  -> machine in overworld surface band
-//                          (between space and underworld)
-//   minecraft:the_nether -> machine in underworld zone (Hell - bottom of
-//                          world, lava lake)
-//   minecraft:the_end    -> machine in space zone (top of world, low
-//                          gravity, starry background) - the "extreme
-//                          altitude alien zone" analogue
-//   gtceu:dim_<X>        -> no mapping; returns true (recipe runs unconstrained)
-//
-// Modded dimensions (Twilight Forest, Aether, etc.) have no Terraria
-// equivalent and default to true.
 public sealed class DimensionCondition : RecipeCondition
 {
 	public string DimensionId { get; }
@@ -46,6 +26,12 @@ public sealed class DimensionCondition : RecipeCondition
 		};
 	}
 
-	public override string GetTooltips() => $"Requires dimension: {DimensionId}";
+	public override string GetTooltips() => DimensionId switch
+	{
+		"minecraft:overworld"  => "Requires zone: Surface",
+		"minecraft:the_nether" => "Requires zone: The Underworld",
+		"minecraft:the_end"    => "Requires zone: Space",
+		_ => "",
+	};
 	public override string GetTypeName() => "gtceu:dimension";
 }

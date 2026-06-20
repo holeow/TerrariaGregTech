@@ -55,7 +55,7 @@ public sealed class UIFluidSlot : UIElement
 			: TankFrame.BorderColor;
 		TankFrame.DrawBorder(spriteBatch, bounds, border);
 
-		if (IsMouseHovering && !MachineUISystem.IsOccludedByHigherModal)
+		if (IsMouseHovering)
 		{
 			Main.LocalPlayer.mouseInterface = true;
 			Main.LocalPlayer.cursorItemIconEnabled = false;

@@ -1,5 +1,5 @@
 active_transformer_0: "[c/AAAAAA:Transformadores: Lasers Disfarçados]"
-active_transformer_1: "[c/AAAAAA:Pode combinar qualquer número de][c/FFFFFF:Entradas][c/AAAAAA: de Energia em qualquer número de][c/FFFFFF:Saídas][c/AAAAAA: de Energia.]"
+active_transformer_1: "[c/AAAAAA:Pode combinar qualquer número de] [c/FFFFFF:Entradas][c/AAAAAA: de Energia em qualquer número de] [c/FFFFFF:Saídas][c/AAAAAA: de Energia.]"
 active_transformer_2: "[c/AAAAAA:Pode transmitir energia a distâncias incríveis com]"
 active_transformer_3: Lasers[c/AAAAAA:.]
 advanced_processing_array: Paralelize o Mundo
@@ -12,26 +12,26 @@ block_breaker: "[c/AAAAAA:Minera o bloco na face frontal e coleta seus drops]"
 buffer: Um Pequeno Buffer para armazenar Itens e Fluidos
 central_monitor: Mas roda Doom?
 charcoal_pile: Padaria de combustível subterrânea
-charcoal_pile_0: Transforma Toras em [c/55FF55:Carvão][c/AAAAAA: quando][c/FF5555:igniciado][c/AAAAAA:.]
+charcoal_pile_0: Transforma Toras em [c/55FF55:Carvão][c/AAAAAA: quando] [c/FF5555:igniciado][c/AAAAAA:.]
 charcoal_pile_1: Clique com o botão direito com itens que iniciam fogo para começar.
 charcoal_pile_2: A pirólise ocorre em um espaço de até [c/55FFFF:9x4x9][c/AAAAAA: abaixo.]
 charcoal_pile_3: As toras não devem ser expostas ao [c/FFFF55:Ar][c/AAAAAA:!]
 cleanroom: Mantendo aquelas partículas irritantes do lado de fora
 cleanroom_0: Coloque máquinas dentro para executar receitas de sala limpa.
-cleanroom_1: Usa [c/FFFFFF:30 EU/t][c/AAAAAA: quando suja,][c/FFFFFF:4 EU/t][c/AAAAAA: quando limpa.]
+cleanroom_1: Usa [c/FFFFFF:30 EU/t][c/AAAAAA: quando suja,] [c/FFFFFF:4 EU/t][c/AAAAAA: quando limpa.]
 cleanroom_2: O overclock aumenta a limpeza por ciclo.
-cleanroom_3: "[c/55FFFF:Tamanho:][c/FFFFFF:5x5x5 a 15x15x15]"
-cleanroom_4: Requer [c/FFFFFF:Revestimentos de Filtro][c/AAAAAA:no teto, excluindo as bordas.]
+cleanroom_3: "[c/55FFFF:Tamanho:] [c/FFFFFF:5x5x5 a 15x15x15]"
+cleanroom_4: Requer [c/FFFFFF:Revestimentos de Filtro] [c/AAAAAA:no teto, excluindo as bordas.]
 cleanroom_5: Aceita até [c/FFFFFF:4 Portas][c/AAAAAA:! Permanece limpa quando a porta está aberta.]
 cleanroom_6: Geradores, Silenciadores, Brocas e Máquinas Primitivas são muito sujos para a sala limpa!
-cleanroom_7: Envie energia através de [c/FFFFFF:Mecanismos][c/AAAAAA:ou][c/FFFFFF:Diodos][c/AAAAAA:nas paredes.]
+cleanroom_7: Envie energia através de [c/FFFFFF:Mecanismos] [c/AAAAAA:ou] [c/FFFFFF:Diodos] [c/AAAAAA:nas paredes.]
 coke_oven: Fazendo combustíveis melhores para Aço e Energia
 coke_oven_hatch: "[c/AAAAAA:Permite acesso de automação para o Forno de Coque.]"
 combustion: "[c/AAAAAA:Requer Líquidos inflamáveis]"
 computation_receiver_hatch: Entrada de Dados de Computação para Multiblocos
 computation_transmitter_hatch: Saída de Dados de Computação para Multiblocos
 cracker: Torna o Óleo útil
-cracker_1: Cada bobina após [c/FFAA00:Cuproníquel][c/AAAAAA: reduz o uso de energia em][c/FFFFFF:10%%][c/AAAAAA:.]
+cracker_1: Cada bobina após [c/FFAA00:Cuproníquel][c/AAAAAA: reduz o uso de energia em] [c/FFFFFF:10%%][c/AAAAAA:.]
 data_access_hatch_0: Acesso a Dados para Multiblocos
 data_access_hatch_1: Adiciona [c/55FF55:%s][c/AAAAAA: slots para Itens de Dados]
 data_bank_0: Seu NAS Pessoal
@@ -43,11 +43,11 @@ data_receiver_hatch: Entrada de Dados de Pesquisa para Multiblocos
 data_transmitter_hatch: Saída de Dados de Pesquisa para Multiblocos
 distillation_tower: Refinaria de Fluidos
 electric_blast_furnace: Onde está o defumador elétrico?
-electric_blast_furnace_0: Para cada [c/FFFFFF:900K][c/AAAAAA: acima da temperatura da receita, um multiplicador de energia multiplicativo de][c/FFFFFF:95%%][c/AAAAAA: é aplicado antes do overclock.]
-electric_blast_furnace_1: Para cada [c/FFFFFF:1800K][c/AAAAAA: acima da temperatura da receita, um overclock se torna][c/FFFFFF:100%% eficiente][c/AAAAAA: (overclock perfeito).]
-electric_blast_furnace_2: Para cada nível de voltagem acima de [c/55FFFF:MV][c/AAAAAA:, a temperatura é aumentada em][c/FFFFFF:100K][c/AAAAAA:.]
+electric_blast_furnace_0: Para cada [c/FFFFFF:900K][c/AAAAAA: acima da temperatura da receita, um multiplicador de energia multiplicativo de] [c/FFFFFF:95%%][c/AAAAAA: é aplicado antes do overclock.]
+electric_blast_furnace_1: Para cada [c/FFFFFF:1800K][c/AAAAAA: acima da temperatura da receita, um overclock se torna] [c/FFFFFF:100%% eficiente][c/AAAAAA: (overclock perfeito).]
+electric_blast_furnace_2: Para cada nível de voltagem acima de [c/55FFFF:MV][c/AAAAAA:, a temperatura é aumentada em] [c/FFFFFF:100K][c/AAAAAA:.]
 endpoint_0: Conecte com blocos de [c/FFFFFF:Tubo de Longa Distância][c/AAAAAA: para criar um gasoduto.]
-endpoint_1: Gasodutos devem ter exatamente [c/FFFFFF:1 Entrada][c/AAAAAA: e][c/FFFFFF:1 Saída][c/AAAAAA: de ponta.]
+endpoint_1: Gasodutos devem ter exatamente [c/FFFFFF:1 Entrada][c/AAAAAA: e] [c/FFFFFF:1 Saída][c/AAAAAA: de ponta.]
 endpoint_2: Apenas as pontas do gasoduto precisam estar em [c/FFFFFF:chunks carregados][c/AAAAAA:.]
 ev_alloy_smelter: "[c/AAAAAA:Fundição de combinação HighTech]"
 ev_arc_furnace: "[c/AAAAAA:Quem precisa de um Alto-forno?]"
@@ -105,7 +105,7 @@ hp_steam_macerator: "[c/AAAAAA:Macerando seus Minérios sem Subprodutos]"
 hp_steam_rock_crusher: "[c/AAAAAA:Coloque Água e Lava adjacentes horizontalmente]"
 hp_steam_solar_boiler: "[c/AAAAAA:Energia a Vapor pelo Sol]"
 hp_steam_solid_boiler: "[c/AAAAAA:Mais rápida que a Caldeira de Combustível Sólido a Vapor Pequena]"
-hull: "[c/AAAAAA:Você só precisa de][c/AA00AA:I][c/FF55FF:m][c/AA0000:a][c/FF5555:g][c/FFFF55:i][c/55FF55:n][c/55FFFF:a][c/00AAAA:ç][c/AAAAAA:ã][c/0000AA:o][c/AAAAAA:para usar isso]"
+hull: "[c/AAAAAA:Você só precisa de] [c/AA00AA:I][c/FF55FF:m][c/AA0000:a][c/FF5555:g][c/FFFF55:i][c/55FF55:n][c/55FFFF:a][c/00AAAA:ç][c/AAAAAA:ã][c/0000AA:o] [c/AAAAAA:para usar isso]"
 hv_alloy_smelter: "[c/AAAAAA:Fundição de combinação HighTech]"
 hv_arc_furnace: "[c/AAAAAA:Quem precisa de um Alto-forno?]"
 hv_assembler: "[c/AAAAAA:Vingadores, Montar!]"
@@ -290,7 +290,7 @@ maintenance_hatch_configurable_1: Começa sem problemas de Manutenção!
 maintenance_hatch_full_auto: Para manter automaticamente Multiblocos
 maintenance_hatch_tape_slot: Insira Fita para evitar problemas
 maintenance_hatch_tool_slot: Clique no slot com a mão vazia quando as ferramentas necessárias estiverem no inventário para resolver problemas
-miner: "[c/AAAAAA:Minera minérios abaixo do Minerador! Começa como área de][c/FFFFFF:%sx%s]"
+miner: "[c/AAAAAA:Minera minérios abaixo do Minerador! Começa como área de] [c/FFFFFF:%sx%s]"
 muffler_hatch_0: Recupera resíduos de máquinas
 muffler_hatch_1: NÃO OBSTRUA A SAÍDA!
 multi_furnace: Assim como o Forno em Casa
@@ -336,7 +336,7 @@ mv_thermal_centrifuge: "[c/AAAAAA:Separando Minérios com mais precisão]"
 mv_wiremill: "[c/AAAAAA:Produz Fios de forma mais eficiente]"
 network_switch_0: Hub Ethernet
 network_switch_1: Usado para rotear e distribuir [c/FFFFFF:Computação][c/AAAAAA:.]
-network_switch_2: Pode combinar qualquer número de [c/FFFFFF:Receptores][c/AAAAAA: de Computação em qualquer número de][c/FFFFFF:Transmissores][c/AAAAAA: de Computação.]
+network_switch_2: Pode combinar qualquer número de [c/FFFFFF:Receptores][c/AAAAAA: de Computação em qualquer número de] [c/FFFFFF:Transmissores][c/AAAAAA: de Computação.]
 network_switch_3: Usa [c/FFFFFF:%s EU/t][c/AAAAAA: por Escotilha de Dados de Computação.]
 object_holder: Mecanismo de Retenção Avançado para Estação de Pesquisa
 opv_gas_collector: "[c/AAAAAA:Coleta Gás do universo dependendo da dimensão]"
@@ -350,7 +350,7 @@ passthrough_hatch_item: Envia Itens de um Lado para o outro
 power_substation_0: O coração de uma rede de energia centralizada
 power_substation_1: "[c/FFFFFF:Capacitores][c/AAAAAA: não precisam ser todos do mesmo nível.]"
 power_substation_2: Permite até [c/FFFFFF:%d Camadas de Capacitores][c/AAAAAA:.]
-power_substation_3: Perde energia igual a [c/FFFFFF:1%%][c/AAAAAA: da capacidade total a cada][c/FFFFFF:24 horas][c/AAAAAA:.]
+power_substation_3: Perde energia igual a [c/FFFFFF:1%%][c/AAAAAA: da capacidade total a cada] [c/FFFFFF:24 horas][c/AAAAAA:.]
 power_substation_4: Limitado a [c/FFFFFF:%d kEU/t][c/AAAAAA: de perda passiva por Bloco de Capacitor.]
 power_substation_5: Pode usar
 power_substation_6: Escotilhas de Laser[c/AAAAAA:.]
@@ -359,11 +359,11 @@ processing_array: Quando algumas Máquinas simplesmente não dão conta
 pump: "[c/AAAAAA:A melhor maneira de esvaziar Oceanos!]"
 pump_hatch: Saída de Fluido Primitiva para Bomba de Água
 pyrolyse_oven: Forno de Coque Elétrico
-pyrolyse_oven_1: Bobinas de [c/FFAA00:Cuproníquel][c/AAAAAA:são][c/FFFFFF:25%%][c/AAAAAA: mais lentas. Cada bobina após][c/55FFFF:Kanthal][c/AAAAAA: aumenta a velocidade em][c/FFFFFF:50%%][c/AAAAAA:.]
+pyrolyse_oven_1: Bobinas de [c/FFAA00:Cuproníquel] [c/AAAAAA:são] [c/FFFFFF:25%%][c/AAAAAA: mais lentas. Cada bobina após] [c/55FFFF:Kanthal][c/AAAAAA: aumenta a velocidade em] [c/FFFFFF:50%%][c/AAAAAA:.]
 quantum_chest: "[c/AAAAAA:Melhor que Gavetas de Armazenamento]"
 quantum_tank: "[c/AAAAAA:Lugar compacto para armazenar todos os seus fluidos]"
 research_station_0: Mais do que apenas um Escâner Multibloco
-research_station_1: Usado para escanear em [c/FFFFFF:Orbes de Dados][c/AAAAAA: e][c/FFFFFF:Módulos de Dados][c/AAAAAA:.]
+research_station_1: Usado para escanear em [c/FFFFFF:Orbes de Dados][c/AAAAAA: e] [c/FFFFFF:Módulos de Dados][c/AAAAAA:.]
 research_station_2: Requer [c/FFFFFF:Computação][c/AAAAAA: para funcionar.]
 research_station_3: Fornecer mais Computação permite que a receita seja executada mais rápido.
 rotor_holder_0: Suporte de Rotor para Multiblocos
@@ -463,17 +463,17 @@ zpm_scanner: "[c/AAAAAA:Detector de Anomalias]"
 zpm_sifter: "[c/AAAAAA:Patrocinado por TFC]"
 zpm_thermal_centrifuge: "[c/AAAAAA:Fábrica de Suor de Blaze T-6352]"
 zpm_wiremill: "[c/AAAAAA:Alongador de Lingotes]"
-// long_distance_item_pipeline_endpoint_0: "[c/AAFFAA:Endpoint for a Long Distance Item Pipeline.]"
-// long_distance_item_pipeline_endpoint_1: "[c/AAFFAA:Teleports items to a far-away partner endpoint.]"
-// long_distance_item_pipeline_endpoint_2: "[c/AAAAAA:1. Connect to the end of a long-distance pipe run.]"
-// long_distance_item_pipeline_endpoint_3: "[c/AAAAAA:2. Place a matching endpoint at the far end.]"
-// long_distance_item_pipeline_endpoint_4: "[c/AAAAAA:3. Screwdriver one to Input, the other to Output.]"
-// long_distance_item_pipeline_endpoint_5: "[c/888888:Feed the Input from any side; it exits into a chest next to the Output.]"
-// long_distance_item_pipeline_endpoint_6: "[c/888888:Endpoints must be at least 50 blocks apart.]"
-// long_distance_fluid_pipeline_endpoint_0: "[c/AAFFAA:Endpoint for a Long Distance Fluid Pipeline.]"
-// long_distance_fluid_pipeline_endpoint_1: "[c/AAFFAA:Teleports fluids to a far-away partner endpoint.]"
-// long_distance_fluid_pipeline_endpoint_2: "[c/AAAAAA:1. Connect to the end of a long-distance pipe run.]"
-// long_distance_fluid_pipeline_endpoint_3: "[c/AAAAAA:2. Place a matching endpoint at the far end.]"
-// long_distance_fluid_pipeline_endpoint_4: "[c/AAAAAA:3. Screwdriver one to Input, the other to Output.]"
-// long_distance_fluid_pipeline_endpoint_5: "[c/888888:Feed the Input from any side; it exits into a chest next to the Output.]"
 // long_distance_fluid_pipeline_endpoint_6: "[c/888888:Endpoints must be at least 50 blocks apart.]"
+// long_distance_fluid_pipeline_endpoint_5: "[c/888888:Feed the Input from any side; it exits into a chest next to the Output.]"
+// long_distance_fluid_pipeline_endpoint_4: "[c/AAAAAA:3. Screwdriver one to Input, the other to Output.]"
+// long_distance_fluid_pipeline_endpoint_3: "[c/AAAAAA:2. Place a matching endpoint at the far end.]"
+// long_distance_fluid_pipeline_endpoint_2: "[c/AAAAAA:1. Connect to the end of a long-distance pipe run.]"
+// long_distance_fluid_pipeline_endpoint_1: "[c/AAFFAA:Teleports fluids to a far-away partner endpoint.]"
+// long_distance_fluid_pipeline_endpoint_0: "[c/AAFFAA:Endpoint for a Long Distance Fluid Pipeline.]"
+// long_distance_item_pipeline_endpoint_6: "[c/888888:Endpoints must be at least 50 blocks apart.]"
+// long_distance_item_pipeline_endpoint_5: "[c/888888:Feed the Input from any side; it exits into a chest next to the Output.]"
+// long_distance_item_pipeline_endpoint_4: "[c/AAAAAA:3. Screwdriver one to Input, the other to Output.]"
+// long_distance_item_pipeline_endpoint_3: "[c/AAAAAA:2. Place a matching endpoint at the far end.]"
+// long_distance_item_pipeline_endpoint_2: "[c/AAAAAA:1. Connect to the end of a long-distance pipe run.]"
+// long_distance_item_pipeline_endpoint_1: "[c/AAFFAA:Teleports items to a far-away partner endpoint.]"
+// long_distance_item_pipeline_endpoint_0: "[c/AAFFAA:Endpoint for a Long Distance Item Pipeline.]"

@@ -15,12 +15,12 @@ public sealed class ItemPipeLayerHandle : IGridLayerHandle
 
 	public bool Has(int x, int y) => ItemPipeLayerSystem.Pipes.Has(x, y);
 
-	public bool TryPlace(ItemPipeCell cell, int x, int y, Player placer)
+	public bool TryPlace(ItemPipeCell cell, int x, int y, Player placer, bool refundOverwrite = true)
 	{
 		if (PipeIntersection.BlocksPipeAt(x, y)) return false;
 		var existing = ItemPipeLayerSystem.Pipes.CellAt(x, y);
 		if (existing.HasValue && existing.Value.Equals(cell)) return false;
-		if (existing.HasValue) RefundAt(placer, existing.Value);
+		if (existing.HasValue && refundOverwrite) RefundAt(placer, existing.Value);
 		ItemPipeLayerSystem.Pipes.Set(x, y, cell);
 		ItemPipeLayerSystem.EnsureSides(x, y);
 		ItemPipeNetSystem.OnPipeAdded(x, y, cell);
@@ -29,7 +29,9 @@ public sealed class ItemPipeLayerHandle : IGridLayerHandle
 		return true;
 	}
 
-	public bool CutAt(int x, int y, Player remover)
+	public bool CutAt(int x, int y, Player remover) => CutAt(x, y, remover, true);
+
+	public bool CutAt(int x, int y, Player remover, bool refund)
 	{
 		var existing = ItemPipeLayerSystem.Pipes.CellAt(x, y);
 		if (existing is null) return false;
@@ -37,7 +39,7 @@ public sealed class ItemPipeLayerHandle : IGridLayerHandle
 		ItemPipeLayerSystem.DropSides(x, y);
 		ItemPipeNetSystem.OnPipeRemoved(x, y);
 		PipePackets.SendRemove(x, y, PipeKind.Item);
-		RefundAt(remover, existing.Value);
+		if (refund) RefundAt(remover, existing.Value);
 		NotifyAdjacentCoversNeighborChanged(x, y);
 		return true;
 	}

@@ -19,19 +19,12 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.PipeSettings;
 
-// Pipe settings UIState - 5 plus-shaped sub-panels (UP/LEFT/CENTER/RIGHT/DOWN).
-// Each side carries a neighbour header, the Off/Passive/Active mode row, and
-// the CoverSettingsUI panel for the cover currently installed there. CENTER
-// shows pipe + network stats. Mode -> PipeSideModePacket; cover edits -> CoverActions.
-public sealed class PipeSettingsState : UIState
+public sealed class PipeSettingsState : UIModalWindow
 {
 	private int _pipeX, _pipeY;
 	private PipeKind _layer;
 	private UIElement? _outer;
 
-	// Per-side render snapshot - the panel rebuilds when any field changes.
-	// Single source of truth; rebuild is deferred out of the mouse-down window
-	// so the click that caused the change isn't destroyed mid-press.
 	private readonly SideSignature[] _builtSig = new SideSignature[4];
 
 	private readonly struct SideSignature : System.IEquatable<SideSignature>
@@ -96,8 +89,6 @@ public sealed class PipeSettingsState : UIState
 	{
 		base.Update(gameTime);
 
-		// Rebuild on signature change, deferred until no mouse button is held
-		// so the rebuild doesn't destroy the widget that was just clicked.
 		if (Main.mouseLeft || Main.mouseRight) return;
 		if (!NeedsRebuild()) return;
 		Rebuild();
@@ -114,18 +105,14 @@ public sealed class PipeSettingsState : UIState
 		? FluidPipeLayerSystem.GetSides(_pipeX, _pipeY)
 		: ItemPipeLayerSystem .GetSides(_pipeX, _pipeY);
 
-	// True for Simple Item/Fluid pipes (sentinel MaterialId + IsSimple flag).
-	// Drives the 3-state OFF/INSERT/EXTRACT side row, no filter / robot-arm zones.
 	private bool IsSimpleCell() => _layer == PipeKind.Fluid
 		? (FluidPipeLayerSystem.Pipes.CellAt(_pipeX, _pipeY) is { } fc && fc.IsSimple)
 		: (ItemPipeLayerSystem .Pipes.CellAt(_pipeX, _pipeY) is { } ic && ic.IsSimple);
 
-	// Plus geometry - (col,row) in {0..2}^2, corners empty:
-	// (1,0)=UP, (0,1)=LEFT, (1,1)=CENTER, (2,1)=RIGHT, (1,2)=DOWN.
 	private const int CellW = 280;
 	private const int CellH = 210;
 	private const int CellPad = 8;
-	private const float OuterScale = 1.0f;  // cells already authored at target size
+	private const float OuterScale = 1.0f;
 
 	private void Rebuild()
 	{
@@ -134,9 +121,6 @@ public sealed class PipeSettingsState : UIState
 		int outerW = CellW * 3 + CellPad * 4;
 		int outerH = CellH * 3 + CellPad * 4;
 
-		// Transparent container - each cell brings its own panel. PlusHitElement
-		// reports a hit only when a child cell contains the point so the empty
-		// corner gaps don't swallow clicks via ModalEscape's ContainsPoint test.
 		_outer = new PlusHitElement
 		{
 			HAlign = 0.5f,
@@ -161,9 +145,6 @@ public sealed class PipeSettingsState : UIState
 
 	private void PlaceSideCell(CoverSide side, int col, int row, ICoverable? pcv)
 	{
-		// Only Inventory neighbours need configurable per-side state. Pipe-to-pipe
-		// is routed by the network; empty sides have nothing to configure. The
-		// signature tracks Kind so a fresh neighbour Rebuilds the cell.
 		if (ResolveSideKind(side) != SideNeighbourKind.Inventory) return;
 
 		var cell = BuildSideCell(side, pcv);
@@ -182,14 +163,12 @@ public sealed class PipeSettingsState : UIState
 
 	private UIElement BuildSideCell(CoverSide side, ICoverable? pcv)
 	{
-		// UITerrariaPanel chrome also claims mouseInterface over its rect.
 		var cell = new UITerrariaPanel
 		{
 			Width  = StyleDimension.FromPixels(CellW * OuterScale),
 			Height = StyleDimension.FromPixels(CellH * OuterScale),
 		};
 
-		// Header: "Up: <neighbour name>". Caller guards kind = Inventory.
 		string neighbourName = ResolveNeighbourName(side);
 		SideNeighbourKind kind = ResolveSideKind(side);
 		cell.Append(new UIText($"{SideWord(side)}: {neighbourName}", 0.75f)
@@ -198,13 +177,11 @@ public sealed class PipeSettingsState : UIState
 			Top  = StyleDimension.FromPixels(4),
 		});
 
-		// Mode row - 3 radio buttons.
 		const int btnH = 18, btnGap = 4;
 		int rowY = 26;
 		int rowX = 6;
 		int btnW = (CellW - rowX * 2 - btnGap * 2) / 3;
 
-		// Simple pipes: 3-state row only (see SimpleSideMode for the cover-state translation).
 		if (IsSimpleCell())
 		{
 			AppendSimpleModeButton(cell, side, SimpleSideMode.Off,     "Off",     kind, rowX + (btnW + btnGap) * 0, rowY, btnW, btnH);
@@ -221,8 +198,6 @@ public sealed class PipeSettingsState : UIState
 		var pipeCov = pcv as PipeCoverable;
 		if (mode != PipeSideMode.Off && pipeCov is not null)
 		{
-			// Filter editor reads/writes the active-side cover (filterCover in
-			// Passive, robotArm in Active) - both expose UiItemFilterHandler.
 			BuildFilterZone(cell, side, pipeCov, x: 6, y: 52, w: 130);
 
 			if (mode == PipeSideMode.Active)
@@ -232,7 +207,6 @@ public sealed class PipeSettingsState : UIState
 		return cell;
 	}
 
-	// Simple-pipe variant - writes via SimplePipeSideSetPacket / reads GetSimpleMode.
 	private void AppendSimpleModeButton(UIElement cell, CoverSide side, SimpleSideMode mode,
 		string label, SideNeighbourKind kind, int x, int y, int w, int h)
 	{
@@ -269,9 +243,6 @@ public sealed class PipeSettingsState : UIState
 	private void AppendModeButton(UIElement cell, CoverSide side, PipeSideMode mode,
 		string label, SideNeighbourKind kind, int x, int y, int w, int h)
 	{
-		// `Off` mode is always clickable (lets the player turn off a side
-		// regardless of what's on the other end). Other modes require an
-		// `Inventory` neighbour.
 		bool disabled = kind != SideNeighbourKind.Inventory && mode != PipeSideMode.Off;
 		string disabledTooltip = kind switch
 		{
@@ -302,7 +273,6 @@ public sealed class PipeSettingsState : UIState
 		_                    => "",
 	};
 
-	// 0=None / 1=Simple / 2=Tag - matches CoverFilterAction.Op.SetFilterType.
 	private const int FilterTypeNone   = 0;
 	private const int FilterTypeSimple = 1;
 	private const int FilterTypeTag    = 2;
@@ -324,8 +294,6 @@ public sealed class PipeSettingsState : UIState
 		AppendFilterTypeButton(cell, side, FilterTypeSimple, "Simple", x + (btnW + btnGap) * 1, y, btnW, btnH);
 		AppendFilterTypeButton(cell, side, FilterTypeTag,    "Tag",    x + (btnW + btnGap) * 2, y, btnW, btnH);
 
-		// Editor only renders when a filter is installed. Cover is read via
-		// GetCoverAtSide per frame; sub-panel rebuilds on cover-identity change.
 		int editorY = y + btnH + 4;
 		int curType = CurrentFilterType(side);
 		if (curType == FilterTypeSimple)
@@ -345,7 +313,7 @@ public sealed class PipeSettingsState : UIState
 
 			const int Slot = 28;
 			int gridY = editorY + btnH + 4;
-			int gridX = x + (w - Slot * 3) / 2;   // center the 3x28 grid in `w`
+			int gridX = x + (w - Slot * 3) / 2;
 			for (int i = 0; i < 9; i++)
 			{
 				int gx = gridX + (i % 3) * Slot;
@@ -362,7 +330,6 @@ public sealed class PipeSettingsState : UIState
 		}
 		else if (curType == FilterTypeTag)
 		{
-			// Tag expression - verbatim with CoverSettingsUI.BuildSimpleFilter.
 			cell.Append(new UITextField(
 				current: () =>
 				{
@@ -383,9 +350,6 @@ public sealed class PipeSettingsState : UIState
 			});
 		}
 
-		// FilterMode + ManualIOMode cycle - only on ItemFilterCover/FluidFilterCover
-		// (Passive). Fields 10 = FilterMode, 11 = ManualIOMode (verbatim with
-		// CoverSettingsUI.BuildSimpleFilter).
 		if (TryReadFilterModeAllowFlow(pcv.GetCoverAtSide(side), out _, out _))
 		{
 			const int SimpleSlot = 28;
@@ -449,8 +413,6 @@ public sealed class PipeSettingsState : UIState
 		             : (cover.UiItemFilter ?.IsBlackList ?? false);
 	}
 
-	// ItemFilterCover + FluidFilterCover both declare FilterMode + AllowFlow
-	// independently; CoverBehavior doesn't surface them - hence the switch.
 	private static bool TryReadFilterModeAllowFlow(CoverBehavior? cover, out FilterMode mode, out ManualIOMode flow)
 	{
 		switch (cover)
@@ -461,8 +423,6 @@ public sealed class PipeSettingsState : UIState
 		}
 	}
 
-	// Pipe-context wording - directional names instead of upstream's ambiguous
-	// Insert/Extract. Underlying enum is upstream-verbatim.
 	private static string FilterModeShort(FilterMode m) => m switch
 	{
 		FilterMode.FilterInsert  => "Inv->Pipe",
@@ -524,9 +484,6 @@ public sealed class PipeSettingsState : UIState
 		+ "Tags are 'namespace:tag/subtype' (forge: assumed by default).\n"
 		+ "Type, then press Enter (or click away) to set.";
 
-	// CoverConfigAction field numbers are layer-asymmetric: PumpCover claims
-	// field 4 for BucketMode, so FluidRegulatorCover's TransferMode + Limit
-	// slide up by one vs RobotArmCover's. Two helpers resolve the right field.
 	private static int ActiveTransferModeField(CoverBehavior? cover) => cover switch
 	{
 		RobotArmCover        => 4,
@@ -540,8 +497,6 @@ public sealed class PipeSettingsState : UIState
 		_                    => 5,
 	};
 
-	// Layer-neutral accessors over RobotArmCover (items) and FluidRegulatorCover
-	// (fluids). Io is read via PipeCoverable.ActiveIoAt (shared with the renderer).
 	private static TransferMode? ActiveTransferMode(CoverBehavior? cover) => cover switch
 	{
 		RobotArmCover r        => r.TransferMode,
@@ -563,7 +518,6 @@ public sealed class PipeSettingsState : UIState
 		bool isFluid = _layer == PipeKind.Fluid;
 		string itemOrFluid = isFluid ? "fluids" : "items";
 
-		// Push/Pull radio - field 1 (SetIo) on both ConveyorCover + PumpCover.
 		int dirBtnW = (w - btnGap) / 2;
 		cell.Append(new UITextButton(
 			label: () => "Pull",
@@ -586,7 +540,6 @@ public sealed class PipeSettingsState : UIState
 			IsActive = () => PipeCoverable.ActiveIoAt(pcv, side) == IO.OUT,
 		});
 
-		// Transfer rate stepper - field 3 = SetTransferRate.
 		rowY += btnH + rowGap;
 		cell.Append(new UITextButton(
 			label: () => "-",
@@ -623,15 +576,12 @@ public sealed class PipeSettingsState : UIState
 			Top  = StyleDimension.FromPixels(rowY),
 		});
 
-		// Transfer mode row - Any / Exact / Keep Exact. Field 4.
 		rowY += btnH + rowGap;
 		int tmBtnW = (w - btnGap * 2) / 3;
 		AppendTransferModeButton(cell, side, pcv, TransferMode.TransferAny,   "Any",   x + (tmBtnW + btnGap) * 0, rowY, tmBtnW, btnH);
 		AppendTransferModeButton(cell, side, pcv, TransferMode.TransferExact, "Exact", x + (tmBtnW + btnGap) * 1, rowY, tmBtnW, btnH);
 		AppendTransferModeButton(cell, side, pcv, TransferMode.KeepExact,     "Keep",  x + (tmBtnW + btnGap) * 2, rowY, tmBtnW, btnH);
 
-		// Amount field - visible only when transfer mode != Any. Field
-		// number layer-asymmetric (5 for item, 6 for fluid).
 		var activeCover = pcv.GetCoverAtSide(side);
 		var activeTm = ActiveTransferMode(activeCover);
 		if (activeTm is not null && activeTm.Value != TransferMode.TransferAny)
@@ -671,9 +621,6 @@ public sealed class PipeSettingsState : UIState
 	private void AppendTransferModeButton(UIElement cell, CoverSide side, PipeCoverable pcv,
 		TransferMode mode, string label, int x, int y, int w, int h)
 	{
-		// KEEP_EXACT is a no-op on pipe covers in PULL (the pipe-net target has
-		// no countable storage - upstream RobotArmCover.DoTransferItems guard).
-		// Disabled in this combo for UX clarity; PUSH keeps it enabled.
 		bool keepExactInPull = mode == TransferMode.KeepExact
 			&& PipeCoverable.ActiveIoAt(pcv, side) == IO.IN;
 
@@ -757,7 +704,6 @@ public sealed class PipeSettingsState : UIState
 		return probe[(int)side];
 	}
 
-	// Resolution: MetaMachine display name -> same-kind pipe -> ModTile name -> "Empty".
 	private string ResolveNeighbourName(CoverSide side)
 	{
 		(int dx, int dy) = side switch
@@ -782,7 +728,6 @@ public sealed class PipeSettingsState : UIState
 		var tile = Main.tile[nx, ny];
 		if (!tile.HasTile) return "Empty";
 
-		// Vanilla tiles have no cheaply-accessible display name -> fall back to "Tile".
 		var modTile = TileLoader.GetTile(tile.TileType);
 		if (modTile is not null) return modTile.Name;
 		return "Tile";
@@ -804,9 +749,6 @@ public sealed class PipeSettingsState : UIState
 
 	private string ResolveThroughputLabel()
 	{
-		// Sustained per-second cap at default SimulationSpeed. Items:
-		// ceil(TransferRate x 64) per 1-s window (matches ItemNetHandler).
-		// Fluids: static rating x 20 (net routing isn't ported yet).
 		if (_layer == PipeKind.Fluid)
 		{
 			var cell = FluidPipeLayerSystem.Pipes.CellAt(_pipeX, _pipeY);
@@ -835,7 +777,6 @@ public sealed class PipeSettingsState : UIState
 		}
 	}
 
-	// Item label = throughput counter (resets every 20t); fluid label = live tank.
 	private string TransferredLabelPrefix() =>
 		_layer == PipeKind.Fluid ? "Pipe contents: " : "Last 1s: ";
 
@@ -843,8 +784,6 @@ public sealed class PipeSettingsState : UIState
 	{
 		if (_layer == PipeKind.Fluid)
 		{
-			// MP client tank contents arrive via FluidPipeStatsPacket (the
-			// per-cell state isn't sync'd through PipeCoverSync).
 			global::GregTechCEuTerraria.Api.Fluids.FluidStack[]? fluids;
 			if (Main.netMode == NetmodeID.MultiplayerClient)
 			{
@@ -866,8 +805,6 @@ public sealed class PipeSettingsState : UIState
 			}
 			return total > 0 ? $"{total} mB {name}" : "empty";
 		}
-		// SP/server reads PipeCoverable; MP client reads the PipeStatsPacket
-		// cache (the counter is server-only state, bumped by ItemNetHandler).
 		if (Main.netMode == NetmodeID.MultiplayerClient)
 		{
 			return ItemPipeNetSystem.ClientTransferStats.TryGetValue((_pipeX, _pipeY), out int v)
@@ -879,8 +816,6 @@ public sealed class PipeSettingsState : UIState
 		return $"{pcv.TransferredItems} items";
 	}
 
-	// Plus-shape hit-test: only the 5 actual cells count, so corner gaps don't
-	// trigger ModalEscape clobbers on world/inventory clicks.
 	private sealed class PlusHitElement : UIElement
 	{
 		public override bool ContainsPoint(Microsoft.Xna.Framework.Vector2 point)

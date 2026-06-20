@@ -8,10 +8,7 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// Reads Data/Recipes/all.json (the runData snapshot produced by
-// snapshot-recipes.py) and materializes GTRecipe instances into RecipeRegistry.
-// Called from Mod.Load after MaterialRegistry + FluidRegistry + resolver ready.
-// Bundle = JSON array; per-entry shape matches GTRecipeSerializer.
+// Reads Data/Recipes/all.json
 public static class RecipeJsonLoader
 {
 	private const string BundlePath = "Data/Recipes/all.json";
@@ -37,6 +34,34 @@ public static class RecipeJsonLoader
 		var byStation = new Dictionary<string, List<GTRecipe>>();
 		int total = 0, skipped = 0;
 
+		var patches = CompatRecipes.Patches;
+		var patchBaseIds = new HashSet<string>(patches.Count);
+		var overrideIds = new HashSet<string>(patches.Count);
+		foreach (var p in patches)
+		{
+			patchBaseIds.Add(p.BaseId);
+			if (p.IsOverride) overrideIds.Add(p.BaseId);
+		}
+		var capturedBase = new Dictionary<string, string>(patches.Count);
+
+		void Register(GTRecipe recipe)
+		{
+			string station = recipe.RecipeType.RegistryName;
+			if (!byStation.TryGetValue(station, out var list))
+			{
+				list = new List<GTRecipe>();
+				byStation[station] = list;
+			}
+			list.Add(recipe);
+			total++;
+
+			foreach (var cond in recipe.Conditions)
+			{
+				if (cond is Common.Recipe.Condition.ResearchCondition rc && !string.IsNullOrEmpty(rc.ResearchId))
+					recipe.RecipeType.AddDataStickEntry(rc.ResearchId, recipe);
+			}
+		}
+
 		foreach (var el in doc.RootElement.EnumerateArray())
 		{
 			string id = el.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String
@@ -44,14 +69,15 @@ public static class RecipeJsonLoader
 				: "";
 			if (string.IsNullOrEmpty(id)) { skipped++; continue; }
 
-			// Non-destructive bundle override - tuned variant in CompatRecipes.Build.
+			if (patchBaseIds.Contains(id)) capturedBase[id] = el.GetRawText();
+
 			if (CompatRecipes.OverriddenIds.Contains(id)) { skipped++; continue; }
+
+			if (overrideIds.Contains(id)) { skipped++; continue; }
 
 			GTRecipe recipe;
 			try
 			{
-				// Vanilla MC recipes use the native shape (-> VanillaRecipeJson);
-				// GTCEu uses the capability-map shape (-> GTRecipeSerializer).
 				recipe = VanillaRecipeJson.IsVanillaShape(el)
 					? VanillaRecipeJson.Read(el, resolver, id)
 					: GTRecipeSerializer.Read(el, resolver, id);
@@ -63,26 +89,29 @@ public static class RecipeJsonLoader
 				continue;
 			}
 
-			string station = recipe.RecipeType.RegistryName;
-			if (!byStation.TryGetValue(station, out var list))
-			{
-				list = new List<GTRecipe>();
-				byStation[station] = list;
-			}
-			list.Add(recipe);
-			total++;
+			Register(recipe);
+		}
 
-			// Verbatim GTRecipeSerializer.fromJson:149-155 - a recipe with a
-			// ResearchCondition registers research_id -> recipe in the type's
-			// data-stick map (DataAccessHatch uses it to unlock recipes).
-			foreach (var cond in recipe.Conditions)
+		foreach (var p in patches)
+		{
+			if (!capturedBase.TryGetValue(p.BaseId, out var baseRaw))
 			{
-				if (cond is Common.Recipe.Condition.ResearchCondition rc && !string.IsNullOrEmpty(rc.ResearchId))
-					recipe.RecipeType.AddDataStickEntry(rc.ResearchId, recipe);
+				mod.Logger.Warn($"Recipe patch base not found in bundle: {p.BaseId} (patch {p.NewId} skipped)");
+				skipped++;
+				continue;
+			}
+			try
+			{
+				var (_, recipe) = CompatRecipes.MaterializePatch(p, baseRaw, resolver);
+				Register(recipe);
+			}
+			catch (System.Exception ex)
+			{
+				mod.Logger.Warn($"Skipping recipe patch {p.NewId}: {ex.Message}");
+				skipped++;
 			}
 		}
 
-		// Supplemental compat recipes parsed through the same serializer.
 		foreach (var (station, recipe) in CompatRecipes.Build(resolver))
 		{
 			if (!byStation.TryGetValue(station, out var compatList))
@@ -94,10 +123,6 @@ public static class RecipeJsonLoader
 			total++;
 		}
 
-		// Macerator shortcuts for vanilla Terraria ores: 1 ore = 16 raw_X (per
-		// the workbench hand recipe in VanillaCraftingBridgeSystem), so the
-		// macerator accepts vanilla ore directly at 16x output, 2x EU/t. Runs
-		// after the bundle pass to clone from the source raw_X recipes.
 		foreach (var derived in CompatRecipes.BuildVanillaOreMaceratorRecipes(byStation))
 		{
 			if (!byStation.TryGetValue("macerator", out var maceratorList))
@@ -109,8 +134,11 @@ public static class RecipeJsonLoader
 			total++;
 		}
 
-		// Pass A: smelting -> electric_furnace ULV proxy (see NativeRecipeProxy).
 		NativeRecipeProxy.SynthesizeFromSmelting(byStation);
+
+		int stationed = CraftingStationRecipeTransform.Apply(byStation);
+		if (stationed > 0)
+			mod.Logger.Info($"[recipes] {stationed} recipes converted to crafting-station requirements.");
 
 		var map = new Dictionary<string, IReadOnlyList<GTRecipe>>(byStation.Count);
 		foreach (var (station, list) in byStation) map[station] = list;

@@ -13,20 +13,7 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Bosses.VacuumFreezer;
 
-// The Vacuum Freezer - the HV-age custom boss, slotted around the mechanical
-// bosses difficulty-wise (Queen Slime tier). The frost inverse of the Fallen
-// EBF: a floating frost-proof freezer chamber (frostproof casing + freezer
-// intake/controller faces, see VacuumFreezerRenderer) on Frozen Wings.
-//
-// Movement is a deliberate HEAVY STANDOFF LOOM - low speed, high inertia, it
-// hangs at a standoff distance and never dashes. The thematic inversion of the
-// EBF: instead of closing distance with its body, it lets the SOFT VACUUM PULL
-// drag the player in. The difficulty is layered control loss - you're pulled
-// while Chilled (slowed) by coolant fog while threading frost-shard volleys - no
-// single attack is a punish; the overlap is.
-//
-// State is held entirely in ai[0..3] (synced) + localAI[0..3] (client visuals),
-// so no SendExtraAI is needed.
+// The Vacuum Freezer - the HV-age custom boss, slotted around Queen Slime
 //   ai[0] = attack state   ai[1] = state timer
 //   ai[2] = last attack (avoid repeats)   ai[3] = phase (0 = normal, 1 = supercooled)
 [AutoloadBossHead]
@@ -35,18 +22,11 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 	private const int S_Hover = 0, S_Pull = 1, S_Fan = 2, S_Coolant = 3,
 		S_Quench = 4, S_Stream = 5;
 
-	// Hostile shard damage (separate from the heavier contact damage).
 	private const int ShardDamage = 26;
 
 	private static bool _headSwapped;
 
-	// ModNPC needs a real autoloadable texture even though PreDraw draws a
-	// composite and returns false - point it at an existing upstream PNG.
 	public override string Texture => "GregTechCEuTerraria/Content/Textures/block/casings/solid/machine_casing_frost_proof";
-
-	// Register a boss head (enables the bottom HP bar + minimap/off-screen icon)
-	// without shipping custom art - point at an existing GregTech PNG as the
-	// load-time placeholder, then swap in the baked core on first draw.
 	public override string BossHeadTexture => "GregTechCEuTerraria/Content/Textures/block/casings/solid/machine_casing_frost_proof";
 
 	public override void SetStaticDefaults()
@@ -55,7 +35,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		NPCID.Sets.MPAllowedEnemies[Type] = true;
 		NPCID.Sets.BossBestiaryPriority.Add(Type);
 
-		// A freezer doesn't care about cold.
 		NPCID.Sets.SpecificDebuffImmunity[Type] ??= new bool?[BuffLoader.BuffCount];
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.Chilled] = true;
 		NPCID.Sets.SpecificDebuffImmunity[Type][BuffID.Frostburn] = true;
@@ -63,17 +42,11 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.VacuumFreezer.DisplayName", () => "Vacuum Freezer");
 		Language.GetOrRegister("Mods.GregTechCEuTerraria.NPCs.VacuumFreezer.Bestiary",
-			() => "A sealed freezing chamber that slipped its anchors and took to the air. It doesn't chase - it pulls, fogs the air with coolant, and lets the cold do the work while it vents shards of flash-frozen metal.");
+			() => "(9)");
 	}
 
 	public override void SetDefaults()
 	{
-		// 2x bigger for an imposing presence. The sprite is drawn in PreDraw at
-		// (renderer size * NPC.scale), INDEPENDENT of width/height, so the hitbox
-		// below only controls collision. Inset it well inside the sprite (~70%) -
-		// contact damage at the full bounding box feels too big; vanilla bosses
-		// use tighter hitboxes than their visual. Both sprite and hitbox stay
-		// centred on NPC.Center, so the inset box sits under the chamber core.
 		NPC.scale = 2f;
 		NPC.width = (int)(VacuumFreezerRenderer.Width * NPC.scale * 0.68f);   // ~130
 		NPC.height = (int)(VacuumFreezerRenderer.Height * NPC.scale * 0.72f); // ~184
@@ -107,21 +80,14 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 
 	public override void ModifyNPCLoot(NPCLoot npcLoot)
 	{
-		// Signature reward: 15 frost-proof machine casings - the casings for your
-		// first real Vacuum Freezer multiblock. Always drops (the boss's own loot,
-		// not the configurable "GregTech boss drops" feature).
 		if (Mod.TryFind<ModItem>("frostproof_machine_casing", out var casing))
 			npcLoot.Add(ItemDropRule.Common(casing.Type, 1, 15, 15));
 
-		// Plus HV-tier "age loot" (tier 3 + components), gated by the
-		// EnableBossDrops config flag like every other GregTech boss drop.
 		var condition = new BossDrops.BossDropCondition();
 		foreach (var d in BossDrops.BossDropRegistry.GetTierDrops(3, withComponents: true))
 			npcLoot.Add(new ItemDropWithConditionRule(d.ItemType, chanceDenominator: 1,
 				amountDroppedMinimum: d.Min, amountDroppedMaximum: d.Max, condition));
 	}
-
-	// ---- AI ----------------------------------------------------------------
 
 	public override void AI()
 	{
@@ -157,16 +123,13 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			case S_Stream:  Stream(player, phase2);  break;
 		}
 
-		BossAI.SmoothTilt(NPC, perVelocity: 0.012f, maxTilt: 0.10f); // heavier body = subtler tilt
+		BossAI.SmoothTilt(NPC, perVelocity: 0.012f, maxTilt: 0.10f);
 	}
 
-	// Heavy standoff loom: hang above the player at a standoff distance with high
-	// inertia (low speed, low accel) and a slow sway. It looms, it never dashes -
-	// the vacuum pull is what closes distance, not the body.
 	private void Hover(Player player, bool phase2)
 	{
 		float swayDir = ((int)NPC.ai[2] & 1) == 0 ? 1f : -1f;
-		float sway = (float)Math.Sin(NPC.ai[1] * 0.04f) * 300f * swayDir; // synced timer (MP-deterministic)
+		float sway = (float)Math.Sin(NPC.ai[1] * 0.04f) * 300f * swayDir;
 		Vector2 dest = player.Center + new Vector2(sway, -240f);
 		BossAI.MoveToward(NPC, dest, phase2 ? 5f : 3.8f, phase2 ? 0.045f : 0.03f, easeRadius: 200f);
 
@@ -188,28 +151,21 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 	{
 		ReadOnlySpan<int> pool = stackalloc int[] { S_Pull, S_Fan, S_Coolant, S_Quench, S_Stream };
 		int pick = pool[Main.rand.Next(pool.Length)];
-		if (pick == last) pick = pool[Main.rand.Next(pool.Length)]; // one reroll to reduce repeats
+		if (pick == last) pick = pool[Main.rand.Next(pool.Length)];
 		return pick;
 	}
 
-	// Soft vacuum pull - drags the player toward the chamber, NEVER a yank: a
-	// steady drift they can fight with wings/dashes. Always layered (fog + a few
-	// shards) so it's never the only pressure. The pull is applied per-client to
-	// the local player (each client moves its own player), so it's MP-correct
-	// with no packet - the same model as the vanilla treasure-magnet grab.
 	private void VacuumPull(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
 		const int windup = 30;
 
-		// The chamber holds roughly still and intakes - it doesn't move to you.
 		NPC.velocity *= 0.94f;
 		Telegraph();
 
 		if (NPC.ai[1] < windup)
-			return; // glow + vent intake tell before the pull engages
+			return;
 
-		// Soft, fightable acceleration toward the chamber on the local player.
 		if (!Main.dedServ)
 		{
 			Player lp = Main.player[Main.myPlayer];
@@ -222,7 +178,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			}
 		}
 
-		// Seed coolant fog around the player + light shard pressure during the pull.
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 		{
 			if ((int)NPC.ai[1] == windup)
@@ -254,7 +209,7 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		int sinceTel = (int)NPC.ai[1] - telegraph;
 		if (sinceTel % burstEvery == 0 && (sinceTel / burstEvery) < bursts)
 		{
-			SoundEngine.PlaySound(SoundID.Item27 with { Pitch = 0.5f }, NPC.Center); // all clients
+			SoundEngine.PlaySound(SoundID.Item27 with { Pitch = 0.5f }, NPC.Center);
 			if (Main.netMode != NetmodeID.MultiplayerClient)
 				FireFan(player, phase2, count: phase2 ? 8 : 6, spreadDeg: phase2 ? 56f : 42f, speed: phase2 ? 9.5f : 8f);
 		}
@@ -279,12 +234,9 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// The herding attack: lay down a wall of coolant fog around the player so the
-	// safe lane shrinks while the pull tugs and shards fly.
 	private void Coolant(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
-		// Drift to a standoff while venting.
 		float sway = (float)Math.Sin(NPC.ai[1] * 0.05f) * 160f;
 		BossAI.MoveToward(NPC, player.Center + new Vector2(sway, -260f), 4.5f, 0.05f);
 		Telegraph();
@@ -299,7 +251,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			if (sinceTel % every == 0)
 			{
 				int idx = sinceTel / every;
-				// Place clouds in a spread around the player (left, right, above lanes).
 				float x = idx % 2 == 0 ? -1f : 1f;
 				Vector2 at = player.Center + new Vector2(x * Main.rand.Next(160, 340), Main.rand.Next(-160, 60));
 				SpawnCoolantCloud(at);
@@ -311,8 +262,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			ReturnToHover();
 	}
 
-	// Lob supercooled ingots in arcs; each shatters into a frost-shard spray on
-	// landing, so the threat lingers where they fall.
 	private void Quench(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -326,12 +275,11 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		int every = phase2 ? 14 : 20;
 		if (((int)NPC.ai[1] - telegraph) % every == 0)
 		{
-			SoundEngine.PlaySound(SoundID.Item37 with { Pitch = -0.3f }, NPC.Center); // all clients
+			SoundEngine.PlaySound(SoundID.Item37 with { Pitch = -0.3f }, NPC.Center);
 			if (Main.netMode != NetmodeID.MultiplayerClient)
 			{
 				Vector2 muzzle = NPC.Center + new Vector2(Main.rand.Next(-30, 31), 16f);
 				Vector2 toP = player.Center - muzzle;
-				// Lob: aim partway, let gravity arc it down onto the player.
 				Vector2 vel = new(MathHelper.Clamp(toP.X * 0.018f, -7f, 7f), -3f + Main.rand.NextFloat(-1f, 1f));
 				SpawnSupercooledIngot(muzzle, vel);
 			}
@@ -340,7 +288,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			ReturnToHover();
 	}
 
-	// A rapid aimed stream of shards with slight jitter - "intake on full blast".
 	private void Stream(Player player, bool phase2)
 	{
 		NPC.ai[1]++;
@@ -379,7 +326,7 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		NPC.ai[3] = 1f;
 		NPC.netUpdate = true;
 		SoundEngine.PlaySound(SoundID.Item30, NPC.Center); // icy crack
-		NPC.localAI[3] = 0.9f; // big glow flash
+		NPC.localAI[3] = 0.9f;
 
 		if (!Main.dedServ)
 			for (int i = 0; i < 28; i++)
@@ -388,7 +335,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 				d.noGravity = true;
 			}
 
-		// One-time "supercool nova" - a ring of frost shards.
 		if (Main.netMode != NetmodeID.MultiplayerClient)
 		{
 			const int n = 16;
@@ -407,9 +353,7 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// ---- IDebuggableBoss (GTConfig.DebugMobs overlay) ---------------------
-
-	private const float DebugPullRadius = 600f; // approx vacuum pull range (visual only)
+	private const float DebugPullRadius = 600f;
 
 	public string CurrentAttackLabel() => StateName((int)NPC.ai[0]);
 	public int CurrentPhase() => (int)NPC.ai[3];
@@ -438,9 +382,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 	{
 		Player p = Main.player[NPC.target];
 		if (p is null || !p.active) return;
-		// Crosshair on the target only - no boss -> player line (screen-spanning
-		// diagonals were a screen-blocking rectangle); no pull-radius ring
-		// (huge). Numerics are in the text panel.
 		DebugOverlaySystem.DrawCrosshair(sb, p.Center, screenPos,
 			new Color(160, 230, 255), 10f, 1);
 	}
@@ -469,20 +410,15 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			ModContent.ProjectileType<CoolantCloudProjectile>(), 0, 0f, Main.myPlayer);
 	}
 
-	// Frost-bloom flash + a vent vapor burst - the "about to intake" tell.
 	private void Telegraph()
 	{
 		NPC.localAI[3] = Math.Max(NPC.localAI[3], 0.55f);
 		EmitVentVapor(2);
 	}
 
-	// Cold vapor spilling DOWNWARD from the intake/controller vents (cold air
-	// sinks - the inverse of the EBF's rising exhaust smoke). Client-side.
 	private void EmitVentVapor(int count)
 	{
 		if (Main.dedServ) return;
-		// Controller/intake vent sits at the centre of the 3x3 box; cold air sinks,
-		// so spill from just below centre.
 		Vector2 vent = NPC.Center + new Vector2(0f, VacuumFreezerRenderer.Height * 0.12f * NPC.scale);
 		for (int i = 0; i < count; i++)
 		{
@@ -494,13 +430,10 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		}
 	}
 
-	// ---- visuals (run on all clients) --------------------------------------
-
 	private void UpdateVisuals()
 	{
 		bool phase2 = NPC.ai[3] >= 1f;
 
-		// Wing frame cycle.
 		NPC.localAI[0]++;
 		float frameSpeed = phase2 ? 4f : 6f;
 		if (NPC.localAI[0] >= frameSpeed)
@@ -509,8 +442,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			NPC.localAI[1] = (NPC.localAI[1] + 1f) % 4f;
 		}
 
-		// Cold glow pulse: brighter when supercooled (phase 2), plus a decaying
-		// telegraph boost.
 		float baseG = phase2 ? 0.85f : 0.5f;
 		float pulse = baseG + 0.12f * (float)Math.Sin(Main.GlobalTimeWrappedHourly * 3f);
 		if (NPC.localAI[3] > 0f)
@@ -521,7 +452,6 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 		}
 		NPC.localAI[2] = MathHelper.Clamp(pulse, 0f, 1.5f);
 
-		// Constant cold vapor spilling from the vents - heavier when supercooled.
 		if (Main.rand.NextBool(phase2 ? 1 : 2))
 			EmitVentVapor(1);
 	}
@@ -539,11 +469,10 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 
 	public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
 	{
-		// Swap the load-time placeholder boss head for the baked core, once.
 		BossHeadHelper.SwapBakedHead(NPC, VacuumFreezerRenderer.BossHeadAsset, ref _headSwapped);
 
 		var body = VacuumFreezerRenderer.Body;
-		if (body is null) return true; // composite failed -> fall back to placeholder sprite
+		if (body is null) return true;
 
 		Vector2 pos = NPC.Center - screenPos;
 		float scale = NPC.scale;
@@ -560,7 +489,7 @@ public class VacuumFreezer : ModNPC, IDebuggableBoss
 			float g = NPC.localAI[2];
 			spriteBatch.Draw(glow, pos, null, Color.White * MathHelper.Clamp(g, 0f, 1f),
 				NPC.rotation, origin, scale, SpriteEffects.None, 0f);
-			if (g > 1f) // supercooled: extra bright pass
+			if (g > 1f)
 				spriteBatch.Draw(glow, pos, null, Color.White * (g - 1f),
 					NPC.rotation, origin, scale, SpriteEffects.None, 0f);
 		}

@@ -1,61 +1,50 @@
 Mods: {
 	GregTechCEuTerraria: {
 		Keybinds: {
+			// MultitoolEyedropper.DisplayName: Greg Multitool - eyedropper
+			// OpenRecipeBrowser.DisplayName: Open recipe browser
+			// OpenQuestbook.DisplayName: Open questbook
 			// RecipeBrowserHowToObtain.DisplayName: Recipe browser - how to obtain hovered item
 			// RecipeBrowserUsedAsIngredient.DisplayName: Recipe browser - recipes that use hovered item
 		}
 
 		ArmorSet: {
-			// Nano: Set bonus: chance to dodge attacks, +10% movement speed
-			// Quark: Set bonus: 12% damage reduction, +6 defense
+			// Nano: chance to dodge attacks, +10% movement speed, +10% damage
+			// Quark: +15% damage
 		}
 
 		NPCs: {
 			CausticReactor: {
 				// DisplayName: Caustic Reactor
-				// Bestiary: A sealed chemical reactor that broke containment and now hangs in the air, venting its reagents in blooming geometric sprays of acid. It doesn't give chase - it anchors, paints the arena with corrosive light, and dares you to find the gaps.
+				// Bestiary: they said LCR is OP
 			}
 
 			FallenEBF: {
 				// DisplayName: Fallen EBF
-				// Bestiary: A blast furnace that overheated, tore itself from its coils, and took flight. It fights by smelting - and pours the results at anything nearby.
+				// Bestiary: its overclocked too much
 			}
 
 			ImplosionPress: {
 				// DisplayName: Implosion Press
-				// Bestiary: A runaway implosion compressor venting overpressure through its muffler. It doesn't strike from afar - it CONVERGES, dragging space inward until the gaps close and the air implodes. In its final phase it forges diamonds from the arena itself.
+				// Bestiary: get some bullet hell
 			}
 
 			SoulDistiller: {
 				// DisplayName: Soul Distiller
-				// Bestiary: A distillation tower that drank too deep of the souls it refined and crawled free as a serpent of pipework. Cut it down and it simply distills into its fractions - and each one keeps fighting.
+				// Bestiary: totally not an EoW reskin, I guess
 			}
 
 			// SoulDistillerFraction.DisplayName: Soul Distiller
 
 			VacuumFreezer: {
 				// DisplayName: Vacuum Freezer
-				// Bestiary: A sealed freezing chamber that slipped its anchors and took to the air. It doesn't chase - it pulls, fogs the air with coolant, and lets the cold do the work while it vents shards of flash-frozen metal.
+				// Bestiary: (9)
 			}
 
 			EBFChanNPC: {
 				// DisplayName: EBF-chan
 				// Bestiary: The spirit of a Electric Blast Furnace, settled and friendly now that her Fallen shell is dealt with. She runs a little stall of heat-treated ingredients - and is always hot to the touch.
 				// DeathMessage: "{0} let her coils go cold..."
-				Census.SpawnCondition: "{$Census.SpawnConditions.Guide}"
-
-				TownNPCMood: {
-					// Content: I'm content.
-					// NoHome: I can't stand not having a home.
-					// FarFromHome: I'm too far from home.
-					// LoveSpace: I love having so much space.
-					// DislikeCrowded: I dislike how crowded it is here.
-					// HateCrowded: I hate how crowded it is here.
-					// LikeNPC_Princess: I like {NPCName}.
-					// Princess_LovesNPC: I like {NPCName}.
-				}
-
-				// MoreTips: More tips
 				/* Chat:
 					'''
 					V Theres MORE TIPS button V
@@ -88,6 +77,19 @@ Mods: {
 
 					How to get lots of resources - 1. steam/electric miner 2. Extractinator accepts pipes 3. Large Miner / Drilling Rig
 					''' */
+				// MoreTips: More tips
+				// Census.SpawnCondition: "{$Census.SpawnConditions.Guide}"
+
+				TownNPCMood: {
+					// Content: I am content.
+					// NoHome: I hate not having a home.
+					// FarFromHome: I am too far from home.
+					// LoveSpace: I love having so much space.
+					// DislikeCrowded: I dislike how crowded I am.
+					// HateCrowded: I hate how crowded I am.
+					// LikeNPC_Princess: I like {NPCName}.
+					// Princess_LovesNPC: I like {NPCName}.
+				}
 			}
 
 			// SoulDistillerBody.DisplayName: Soul Distiller Body
@@ -117,12 +119,13 @@ Mods: {
 			// CoolantCloudProjectile.DisplayName: Coolant Cloud Projectile
 			// FrostShardProjectile.DisplayName: Frost Shard Projectile
 			// SupercooledIngotProjectile.DisplayName: Supercooled Ingot Projectile
+			// RoundProjectile.DisplayName: Round Projectile
 			// ButcheryKnifeProjectile.DisplayName: Butchery Knife Projectile
 			// DrillHeldProjectile.DisplayName: Drill Held Projectile
 			// ToolPokeProjectile.DisplayName: Tool Poke Projectile
-			// RoundProjectile.DisplayName: Round Projectile
 		}
 
 		// RecipeConditions.FluidContainer: Requires the fluid held in a cell or bucket
+		// Condition.ShimmerDupesAllowed: Shimmer duplication allowed
 	}
 }

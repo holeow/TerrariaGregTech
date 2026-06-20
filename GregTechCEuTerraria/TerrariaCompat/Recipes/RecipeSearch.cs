@@ -10,10 +10,6 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// JEI-style AND-substring recipe search. Query splits into tokens; recipe
-// matches iff EVERY token is a substring of its searchable text (recipe id +
-// ingredient identifier tokens + resolved display names, lowercased).
-// Per-recipe text is cached; recipes are immutable after load.
 public static class RecipeSearch
 {
 	private static readonly Dictionary<GTRecipe, string> _textCache = new();
@@ -21,8 +17,6 @@ public static class RecipeSearch
 
 	public static void ClearCache() { _textCache.Clear(); _outputTextCache.Clear(); _stationLowerCache.Clear(); }
 
-	// Pre-warm at world load so the first keystroke doesn't stutter (lazy
-	// TextFor does Item.SetDefaults per ingredient x ~33k recipes).
 	public static void WarmCache()
 	{
 		foreach (var list in RecipeRegistry.ByStation.Values)
@@ -33,8 +27,6 @@ public static class RecipeSearch
 			}
 	}
 
-	// Output-only match - drives the browser's stable sort (producers above
-	// consumers). `@`-tokens ignored here (enforced by Matches).
 	public static bool MatchesOutputs(GTRecipe recipe, string[] tokens)
 	{
 		if (tokens.Length == 0) return true;
@@ -51,33 +43,37 @@ public static class RecipeSearch
 	{
 		if (tokens.Length == 0) return true;
 		string text = TextFor(recipe);
-		// Lazily resolved only when an `@station` token is actually present -
-		// the common (no-@) path must not allocate per recipe per keystroke.
 		string? station = null;
 		foreach (string token in tokens)
 		{
 			if (token.Length == 0) continue;
 
-			// `@station` substring filter on station id.
 			if (token[0] == '@')
 			{
 				string needle = token.Substring(1);
 				if (needle.Length == 0) continue;
-				// `@null` - undocumented diagnostic for unresolved-ingredient
-				// gaps in our substitution/prefix coverage.
 				if (needle == "null")
 				{
 					if (!HasUnresolvedIngredient(recipe)) return false;
 					continue;
 				}
 				station ??= StationLower(recipe.RecipeType);
-				if (!station.Contains(needle, System.StringComparison.OrdinalIgnoreCase)) return false;
-				continue;
+				if (station.Contains(needle, System.StringComparison.OrdinalIgnoreCase)) continue;
+				if (MatchesCraftStation(recipe, needle)) continue;
+				return false;
 			}
 
 			if (!text.Contains(token)) return false;
 		}
 		return true;
+	}
+
+	private static bool MatchesCraftStation(GTRecipe recipe, string needle)
+	{
+		var keys = Tiles.CraftingStations.CraftingStationRegistry.StationKeysFor(recipe);
+		foreach (var key in keys)
+			if (key.Contains(needle, System.StringComparison.OrdinalIgnoreCase)) return true;
+		return false;
 	}
 
 	private static readonly Dictionary<GTRecipeType, string> _stationLowerCache = new();
@@ -127,12 +123,6 @@ public static class RecipeSearch
 		return text;
 	}
 
-	// Recipe.Id is `<station>/<name>` for almost every loaded recipe - bare
-	// substring search over the full id would let "macerator" match every
-	// recipe whose station prefix happens to be `macerator/`, defeating the
-	// `@station` filter's purpose. Strip the leading station segment so only
-	// the recipe-specific name part is indexed; the station is reachable
-	// EXCLUSIVELY via the `@` token (handled in Matches).
 	private static string IdWithoutStation(GTRecipe recipe)
 	{
 		string id = recipe.Id ?? string.Empty;
@@ -161,7 +151,6 @@ public static class RecipeSearch
 			case TagIngredient tag:
 				string tagBare = StripNamespace(tag.TagName);
 				sb.Append(tagBare).Append(' ');
-				// Skip crafting tools to avoid bloat
 				if (!tagBare.StartsWith("tools/", System.StringComparison.Ordinal))
 					foreach (var t in tag.GetItems())
 						AppendItemDisplayName(sb, t.type);
@@ -175,8 +164,6 @@ public static class RecipeSearch
 				AppendIngredient(sb, ipi.Inner, isFluid);
 				break;
 
-			// IntCircuitIngredient (the programmed-circuit recipe selector) is
-			// deliberately NOT indexed
 			case IntCircuitIngredient:
 				break;
 
@@ -215,9 +202,6 @@ public static class RecipeSearch
 			sb.Append(probe.Name.ToLowerInvariant()).Append(' ');
 	}
 
-	// Undocumented @null support - walks every ingredient and returns true if
-	// any one fails to resolve. Cheap (only iterates when the user explicitly
-	// types @null).
 	private static bool HasUnresolvedIngredient(GTRecipe recipe)
 	{
 		foreach (var c in recipe.GetInputContents(ItemRecipeCapability.CAP))
@@ -231,13 +215,6 @@ public static class RecipeSearch
 		return false;
 	}
 
-	// Mirrors upstream's `!ingredient.isEmpty()`. Each Ingredient overrides
-	// IsEmpty correctly (ItemStack/NBT -> ItemType == 0, Tag -> no members,
-	// Fluid -> no fluids, the wrappers delegate to Inner). Deliberately NOT
-	// GetItems().Count - ItemStackIngredient.GetItems() always returns a
-	// 1-element example list (an air item when ItemType == 0), so an
-	// unresolved / unported item id would wrongly count as resolvable and
-	// `@null` would miss its recipe.
 	private static bool IsResolvable(Ingredient ing) => !ing.IsEmpty;
 
 	private static string StripNamespace(string id)

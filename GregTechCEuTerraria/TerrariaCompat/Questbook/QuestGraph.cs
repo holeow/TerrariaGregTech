@@ -10,40 +10,49 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Questbook;
 
-// Chapter nodes drawn at their FTB x/y, joined by dep lines. A node may come
-// from this chapter's quests OR an FTB quest_link (quest defined elsewhere,
-// placed here). Quest content is global (QuestbookSystem.QuestsById).
 public sealed class QuestGraph : UIElement
 {
-	private const float Grid = 62f;          // px per FTB grid unit at zoom 1
-	private const float NodeWorld = 38f;     // node size at zoom 1
+	private const float Grid = 62f;
+	private const float NodeWorld = 38f;
 
 	private readonly QuestbookUIState _owner;
 
 	private List<NodeData> _nodes = [];
-	// Dep lines draw only when both endpoints land in THIS chapter.
 	private readonly Dictionary<string, NodeData> _byQuestId = [];
 
-	private Vector2 _pan;                    // world point shown at canvas centre
+	private Vector2 _pan;
 	private float _zoom = 1f;
 	private bool _needsFit;
 
 	private bool _dragging;
 	private bool _dragMoved;
 	private Vector2 _dragLast;
+	private NodeData? _dragNode;
 
 	public QuestGraph(QuestbookUIState owner) => _owner = owner;
 
 	internal void LoadChapter(ChapterData chapter)
 	{
 		_nodes = chapter.Nodes;
-		_byQuestId.Clear();
-		foreach (NodeData n in _nodes)
-			_byQuestId[n.Quest] = n;
+		RefreshIndex();
 		_needsFit = true;
 	}
 
-	private float NodeSize => NodeWorld * _zoom;
+	internal void RefreshIndex()
+	{
+		_byQuestId.Clear();
+		foreach (NodeData n in _nodes)
+			_byQuestId[n.Quest] = n;
+	}
+
+	internal (float X, float Y) ViewCenterGrid() => (Snap(_pan.X / Grid), Snap(_pan.Y / Grid));
+
+	private static float Snap(float v) => MathF.Round(v * 2f) / 2f;
+
+	private float SizeOf(string questId)
+		=> QuestbookSystem.QuestsById.TryGetValue(questId, out QuestData? q) ? Math.Max(0.25f, q.Size) : 1f;
+
+	private float NodeSizeFor(NodeData n) => NodeWorld * SizeOf(n.Quest) * _zoom;
 
 	private Vector2 World(NodeData n) => new Vector2(n.X, n.Y) * Grid;
 
@@ -82,16 +91,29 @@ public sealed class QuestGraph : UIElement
 
 	private QuestData? HitTest(Vector2 mouse)
 	{
-		float half = NodeSize * 0.5f;
+		NodeData? n = HitTestNode(mouse);
+		return n != null && QuestbookSystem.QuestsById.TryGetValue(n.Quest, out QuestData? q) ? q : null;
+	}
+
+	private NodeData? HitTestNode(Vector2 mouse)
+	{
 		foreach (NodeData n in _nodes)
 		{
+			float half = NodeSizeFor(n) * 0.5f;
 			Vector2 c = ToScreen(World(n));
 			if (mouse.X >= c.X - half && mouse.X <= c.X + half
 				&& mouse.Y >= c.Y - half && mouse.Y <= c.Y + half
-				&& QuestbookSystem.QuestsById.TryGetValue(n.Quest, out QuestData? q))
-				return q;
+				&& QuestbookSystem.QuestsById.ContainsKey(n.Quest))
+				return n;
 		}
 		return null;
+	}
+
+	private Vector2 ScreenToWorld(Vector2 screen)
+	{
+		CalculatedStyle d = GetDimensions();
+		var centre = new Vector2(d.X + d.Width * 0.5f, d.Y + d.Height * 0.5f);
+		return _pan + (screen - centre) / _zoom;
 	}
 
 	public override void ScrollWheel(UIScrollWheelEvent evt)
@@ -113,14 +135,16 @@ public sealed class QuestGraph : UIElement
 			_needsFit = false;
 		}
 
-		if (!ContainsPoint(Main.MouseScreen))
+		if (!ContainsPoint(Main.MouseScreen) || _owner.IsPointerOverQuestPanel())
 		{
 			_dragging = false;
+			_dragNode = null;
 			return;
 		}
 
 		Main.LocalPlayer.mouseInterface = true;
 		Vector2 mouse = Main.MouseScreen;
+		bool edit = QuestbookEditor.Enabled;
 
 		if (Main.mouseLeft)
 		{
@@ -129,14 +153,27 @@ public sealed class QuestGraph : UIElement
 				_dragging = true;
 				_dragMoved = false;
 				_dragLast = mouse;
+				_dragNode = (edit && !QuestbookEditor.AwaitingDep) ? HitTestNode(mouse) : null;
 			}
 			else
 			{
 				Vector2 delta = mouse - _dragLast;
 				if (delta.LengthSquared() > 16f)
 					_dragMoved = true;
-				if (_zoom > 0f)
+
+				if (_dragNode != null)
+				{
+					if (_dragMoved)
+					{
+						Vector2 world = ScreenToWorld(mouse);
+						_dragNode.X = Snap(world.X / Grid);
+						_dragNode.Y = Snap(world.Y / Grid);
+					}
+				}
+				else if (_zoom > 0f)
+				{
 					_pan -= delta / _zoom;
+				}
 				_dragLast = mouse;
 			}
 		}
@@ -145,10 +182,34 @@ public sealed class QuestGraph : UIElement
 			if (_dragging && !_dragMoved)
 			{
 				QuestData? hit = HitTest(mouse);
-				if (hit != null)
+				if (edit && QuestbookEditor.AwaitingDep)
+				{
+					if (QuestbookEditor.DepPickArmed)
+					{
+						if (hit != null)
+						{
+							string? target = QuestbookEditor.OnDepPickClick(hit.Id);
+							if (target != null
+								&& QuestbookSystem.QuestsById.TryGetValue(target, out QuestData? tq))
+								_owner.RefreshDetail(tq);
+						}
+						else
+						{
+							QuestbookEditor.CancelAddDep();
+						}
+					}
+				}
+				else if (hit != null)
+				{
 					_owner.SelectQuest(hit);
+				}
+			}
+			else if (_dragNode != null && _dragMoved)
+			{
+				QuestbookEditor.OnNodeMoved();
 			}
 			_dragging = false;
+			_dragNode = null;
 		}
 	}
 
@@ -167,8 +228,6 @@ public sealed class QuestGraph : UIElement
 	{
 		Rectangle bounds = GetDimensions().ToRectangle();
 
-		// ScissorDraw clips partial segments so a line stays visible while
-		// panning even with one endpoint off-canvas.
 		foreach (NodeData n in _nodes)
 		{
 			if (!QuestbookSystem.QuestsById.TryGetValue(n.Quest, out QuestData? q))
@@ -183,22 +242,32 @@ public sealed class QuestGraph : UIElement
 						? new Color(120, 200, 120)
 						: new Color(90, 95, 120);
 					DrawLine(sb, from, to, color, 2f);
-					DrawArrowhead(sb, from, to, color);
+					DrawArrowhead(sb, from, to, color, NodeSizeFor(n));
 				}
 		}
 
-		// Nodes - bounds-culled.
-		QuestData? hovered = HitTest(Main.MouseScreen);
+		QuestData? hovered = ContainsPoint(Main.MouseScreen) && !_owner.IsPointerOverQuestPanel()
+			? HitTest(Main.MouseScreen) : null;
 		foreach (NodeData n in _nodes)
 		{
 			if (!QuestbookSystem.QuestsById.TryGetValue(n.Quest, out QuestData? q))
 				continue;
 			Vector2 c = ToScreen(World(n));
-			int size = (int)NodeSize;
+			int size = (int)NodeSizeFor(n);
 			var rect = new Rectangle((int)(c.X - size * 0.5f), (int)(c.Y - size * 0.5f), size, size);
 			if (!bounds.Intersects(rect))
 				continue;
 			DrawNode(sb, q, rect, q == hovered);
+		}
+
+		if (QuestbookEditor.AwaitingDep && QuestbookEditor.DepTarget is { } target
+			&& _byQuestId.TryGetValue(target, out NodeData? tNode))
+		{
+			Vector2 at = ToScreen(World(tNode));
+			DrawLine(sb, at, Main.MouseScreen, new Color(255, 180, 60), 2f);
+			int sz = (int)NodeSizeFor(tNode);
+			DrawBorder(sb, new Rectangle((int)(at.X - sz * 0.5f), (int)(at.Y - sz * 0.5f), sz, sz),
+				new Color(255, 180, 60), 3);
 		}
 
 		if (hovered != null)
@@ -226,14 +295,14 @@ public sealed class QuestGraph : UIElement
 		DrawBorder(sb, rect, border, complete || selected ? 3 : 2);
 	}
 
-	private void DrawArrowhead(SpriteBatch sb, Vector2 from, Vector2 to, Color color)
+	private void DrawArrowhead(SpriteBatch sb, Vector2 from, Vector2 to, Color color, float toNodeSize)
 	{
 		Vector2 dir = to - from;
 		if (dir.LengthSquared() < 1f)
 			return;
 		dir.Normalize();
 
-		Vector2 tip = to - dir * (NodeSize * 0.5f + 3f);
+		Vector2 tip = to - dir * (toNodeSize * 0.5f + 3f);
 		const float barb = 9f;
 		DrawLine(sb, tip, tip + (-dir).RotatedBy(0.5) * barb, color, 2f);
 		DrawLine(sb, tip, tip + (-dir).RotatedBy(-0.5) * barb, color, 2f);
@@ -245,8 +314,6 @@ public sealed class QuestGraph : UIElement
 		float length = diff.Length();
 		if (length < 0.5f)
 			return;
-		// Explicit 1x1 source rect so the rendered size = length x thickness
-		// (MagicPixel is NOT 1x1, so default sourceRect would mis-scale).
 		sb.Draw(TextureAssets.MagicPixel.Value, a, new Rectangle(0, 0, 1, 1), color, diff.ToRotation(),
 			new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
 	}

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
 using GregTechCEuTerraria.TerrariaCompat.Tiles;
@@ -6,20 +7,13 @@ using Terraria;
 using Terraria.DataStructures;
 using Terraria.GameContent.Creative;
 using Terraria.ID;
+using Terraria.Localization;
 using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items;
 
-// Starter bag handed with GregTechIronToolsBag (see StartingInventoryPlayer).
-// RMB -> kit to jump from stone-age straight into LV-age (LV solar / battery
-// buffer / hulls + components for ~5 LV machines + a stack of simple pipes).
-// Iron-tier hand-craft catalysts live in GregTechIronToolsBag - the two are
-// independent decisions. Item resolution through IngredientResolverImpl /
-// Mod.Find; any unresolved id is silently skipped (warns on load).
 public sealed class SteamAgeSkipBag : ModItem, ITextureWarmUp
 {
-	// Reuses the TMI logo-plate (committed PNG is the autoload fallback;
-	// TooManyItemsArt.Install overwrites it at runtime).
 	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsItem";
 
 	public void WarmUpTexture() => StarterBagArt.InstallFor(Item.type, "gtceu:steel_block");
@@ -32,7 +26,7 @@ public sealed class SteamAgeSkipBag : ModItem, ITextureWarmUp
 			() => "Starter Bag: Skip Steam Age");
 		Terraria.Localization.Language.GetOrRegister(
 			$"Mods.GregTechCEuTerraria.Items.{Name}.Tooltip",
-			() => "Right-click to open. Drops an LV-tier bootstrap kit so you can skip the Bronze / Steam age:\n4x LV solar panel + 4x LV lamp + LV 4x battery buffer + 1 sodium battery,\n4 LV machine hulls + circuits + plates + rods + wires for assembling LV machines,\nand a stack of simple item + fluid pipes.");
+			() => "Right-click to open. Gives a minimal LV bootstrap kit");
 	}
 
 	public override void SetDefaults()
@@ -52,45 +46,61 @@ public sealed class SteamAgeSkipBag : ModItem, ITextureWarmUp
 	public override void RightClick(Player player)
 	{
 		var src = new EntitySource_Gift(player, "GregTechCEuTerraria/SteamAgeSkipBag");
-
-		// Minimum LV power setup.
-		GiveMachine(src, player, "lv_solar_panel_machine", 4);
-		GiveMachine(src, player, "lv_lamp",                4);
-		GiveMachine(src, player, "lv_battery_buffer_4x",   1);
-		GiveMachine(src, player, "lv_sodium_battery",      1);
-
-		// Enough for a handful of LV machines (Macerator/Furnace/Bender/etc).
-		Give(src, player, "gtceu:lv_machine_hull",        4);
-		Give(src, player, "gtceu:basic_electronic_circuit", 8);
-		Give(src, player, "gtceu:vacuum_tube",           16);
-		Give(src, player, "gtceu:steel_ingot",           32);
-		Give(src, player, "gtceu:steel_plate",           64);
-		Give(src, player, "gtceu:copper_plate",          32);
-		Give(src, player, "gtceu:tin_plate",             32);
-		Give(src, player, "gtceu:iron_rod",              32);
-		Give(src, player, "gtceu:magnetic_iron_rod",     16);
-		Give(src, player, "gtceu:rubber_plate",          64);
-		Give(src, player, "gtceu:tin_single_wire",       32);
-		Give(src, player, "gtceu:copper_single_wire",    16);
-
-		// Simple pipes - mod-side ModItems (not in the dump), so Mod.Find by name.
-		GiveMachine(src, player, "simple_item_pipe",  100);
-		GiveMachine(src, player, "simple_fluid_pipe", 100);
-		GiveMachine(src, player, "pipe_intersection",  10);
+		foreach (var (type, count) in Contents())
+			global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(player, src, type, count);
 	}
 
-	private static void Give(IEntitySource src, Player player, string upstreamId, int stack)
+	public override void ModifyTooltips(List<TooltipLine> tooltips)
+	{
+		var contents = Contents();
+		if (contents.Count == 0) return;
+		tooltips.Add(new TooltipLine(Mod, "BagHeader", "[c/AAEEFF:Contents]"));
+		foreach (var (type, count) in contents)
+			tooltips.Add(new TooltipLine(Mod, $"BagItem_{type}",
+				$"  {count}x {Lang.GetItemName(type).Value}"));
+	}
+
+	private static List<(int Type, int Count)>? _contents;
+
+	private static List<(int Type, int Count)> Contents()
+	{
+		if (_contents != null) return _contents;
+		var list = new List<(int, int)>();
+
+		AddMachine(list, "lv_solar_panel_machine", 4);
+		AddMachine(list, "lv_lamp",                4);
+		AddMachine(list, "lv_battery_buffer_4x",   1);
+		AddMachine(list, "lv_sodium_battery",      1);
+		AddResolved(list, "gtceu:lv_machine_hull",        4);
+		AddResolved(list, "gtceu:basic_electronic_circuit", 8);
+		AddResolved(list, "gtceu:vacuum_tube",           16);
+		AddResolved(list, "gtceu:steel_ingot",           32);
+		AddResolved(list, "gtceu:steel_plate",           64);
+		AddResolved(list, "gtceu:copper_plate",          32);
+		AddResolved(list, "gtceu:tin_plate",             32);
+		AddResolved(list, "gtceu:iron_rod",              32);
+		AddResolved(list, "gtceu:magnetic_iron_rod",     16);
+		AddResolved(list, "gtceu:rubber_plate",          64);
+		AddResolved(list, "gtceu:rubber_ingot",         250);
+		AddResolved(list, "gtceu:tin_single_wire",       32);
+		AddResolved(list, "gtceu:copper_single_wire",    16);
+		AddMachine(list, "simple_item_pipe",  100);
+		AddMachine(list, "simple_fluid_pipe", 100);
+		AddMachine(list, "pipe_intersection",  10);
+
+		_contents = list;
+		return list;
+	}
+
+	private static void AddResolved(List<(int, int)> list, string upstreamId, int stack)
 	{
 		int type = IngredientResolverImpl.Instance.ResolveItemType(upstreamId);
-		if (type <= 0) return;
-		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(player, src, type, stack);
+		if (type > 0) list.Add((type, stack));
 	}
 
-	// Machine items aren't in the resolver tables - Mod.Find by MachineKey.
-	private static void GiveMachine(IEntitySource src, Player player, string machineKey, int stack)
+	private static void AddMachine(List<(int, int)> list, string machineKey, int stack)
 	{
-		if (!ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(machineKey, out var mi))
-			return;
-		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(player, src, mi.Type, stack);
+		if (ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(machineKey, out var mi))
+			list.Add((mi.Type, stack));
 	}
 }

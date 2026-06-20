@@ -139,6 +139,7 @@ UV Tritanium Yttrium-Barium-Cuprate Americium
 ### Building
 
 - Junction `GregTechCEuTerraria/` into `%USERPROFILE%\Documents\My Games\Terraria\tModLoader\ModSources\GregTechCEuTerraria` (mklink /J "%USERPROFILE%\Documents\My Games\Terraria\tModLoader\ModSources\GregTechCEuTerraria" "D:\NotWork\TerrariaGregTech\GregTechCEuTerraria")
+- Build Magic Storage (https://github.com/blushiemagic/MagicStorage) and put into `GregTechCEuTerraria/lib/MagicStorage.dll`
 - Build in tModLoader
 
 ## AI Usage
@@ -168,3 +169,5 @@ Source: https://github.com/GregTechCEu/GregTech-Modern-Community-Pack
 License: LGPL-2.1
 
 Credits: EBF-chan sprite by Qiuqiu, used with their permission
+
+Credits: Armor sprites by Flareguy, used with their permission

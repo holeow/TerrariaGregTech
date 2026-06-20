@@ -19,7 +19,7 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-public sealed class MachineUIState : UIState
+public sealed class MachineUIState : UIModalWindow
 {
 	private const float SlotGap = 1f;
 

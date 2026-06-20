@@ -43,7 +43,8 @@ public sealed class MachineHoverModPlayer : ModPlayer
 			_buffer.Clear();
 			MultiblockPreviewHover.AppendTooltip(_buffer, controller, predicate, x, y);
 			if (_buffer.Count == 0) return;
-			TerrariaCompat.UI.WorldHoverTooltip.Set(string.Join("\n", _buffer));
+			TerrariaCompat.UI.WorldHoverTooltip.Set(string.Join("\n", _buffer),
+				TerrariaCompat.UI.WorldHoverTooltip.HoverPriority.Multi);
 		}
 	}
 }

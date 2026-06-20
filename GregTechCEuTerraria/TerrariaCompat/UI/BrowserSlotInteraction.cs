@@ -13,24 +13,21 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Shared click matrix for browser slots (recipe rows, items grid, loot, favs).
-//   LMB / RMB      -> Recipes view, "how to obtain" / "used as ingredient"
-//   Alt+LMB        -> favorite (or unfavorite inside the favorites pane)
-//   Ctrl+LMB / RMB -> Journey cheat: one unit / a stack
-// Tag cells only honour LMB/RMB - favorite + cheat fall through (ambiguous set).
+// LMB / RMB -> how to obtain / used as ingredient
+// Alt+LMB -> favorite (unfavorite inside the favorites pane)
+// Ctrl+LMB / RMB -> Journey cheat
 public static class BrowserSlotInteraction
 {
 	public const int TungstenSteelFluidCellCapacity = 512_000;
 
 	public readonly struct Click
 	{
-		public bool Lmb  { get; init; }       // press-edge
+		public bool Lmb  { get; init; }
 		public bool Rmb  { get; init; }
 		public bool Alt  { get; init; }
 		public bool Ctrl { get; init; }
 	}
 
-	// Edge-tracked - caller passes previous frame's mouse-down state.
 	public static Click Poll(bool prevLeftDown, bool prevRightDown)
 	{
 		var k = Main.keyState;
@@ -43,8 +40,6 @@ public static class BrowserSlotInteraction
 		};
 	}
 
-	// Instance overload preserves per-stack data (research blob etc.) so cheat
-	// spawns AS DISPLAYED. Non-cheat paths key off display.type only.
 	public static void HandleItem(Click c, Item display, bool inFavoritesPane,
 		int? recipeAmount = null)
 	{
@@ -99,8 +94,6 @@ public static class BrowserSlotInteraction
 		}
 	}
 
-	// recipeAmountMb is the per-recipe content amount (e.g. 144 mB) when the
-	// slot is inside a recipe row; null elsewhere -> Ctrl+LMB gives a full cell.
 	public static void HandleFluid(Click c, FluidType? fluid, int? recipeAmountMb,
 		bool inFavoritesPane)
 	{
@@ -141,8 +134,6 @@ public static class BrowserSlotInteraction
 		}
 	}
 
-	// Loot-mode NPC source icon. Only Ctrl+click acts (NPCs aren't favoritable
-	// and have no recipe-pivot); both Ctrl+LMB and Ctrl+RMB spawn one.
 	public static void HandleNpc(Click c, int npcType)
 	{
 		if (npcType <= 0) return;
@@ -154,8 +145,7 @@ public static class BrowserSlotInteraction
 		int? recipeAmount = null)
 	{
 		if (members.Count == 0) return;
-		if (c.Alt) return;   // "favorite which member?" ambiguous
-		// Ctrl+click cheats the deterministic first member (lowest itemType).
+		if (c.Alt) return;
 		if (c.Ctrl)
 		{
 			if ((c.Lmb || c.Rmb) && Main.GameModeInfo.IsJourneyMode)
@@ -187,14 +177,14 @@ public static class BrowserSlotInteraction
 
 	private static void FavoriteItem(int itemType, bool inFavoritesPane)
 	{
-		if (inFavoritesPane) FavoritesRegistry.RemoveItem(itemType);
-		else                 FavoritesRegistry.BringItemToFront(itemType);
+		if (inFavoritesPane) FavoritesPlayer.Local.RemoveItem(itemType);
+		else                 FavoritesPlayer.Local.BringItemToFront(itemType);
 	}
 
 	private static void FavoriteFluid(string id, string label, bool inFavoritesPane)
 	{
-		if (inFavoritesPane) FavoritesRegistry.RemoveFluid(id);
-		else                 FavoritesRegistry.BringFluidToFront(id, label);
+		if (inFavoritesPane) FavoritesPlayer.Local.RemoveFluid(id);
+		else                 FavoritesPlayer.Local.BringFluidToFront(id, label);
 	}
 
 	private static int MaxStackFor(int itemType)
@@ -208,12 +198,9 @@ public static class BrowserSlotInteraction
 	{
 		if (stack <= 0) return;
 		var src = new EntitySource_DebugCommand("GTBrowserSlotInteraction");
-		// PlayerGive: instant local insert, not a world-drop with grab-tick latency.
 		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(Main.LocalPlayer, src, itemType, stack);
 	}
 
-	// Insert-by-reference - QuickSpawnItem / Item.Clone(Item) drops just-written
-	// per-stack data on some paths; GetItem hands the exact instance to a slot.
 	private static void SpawnItemStack(Item template, int stack)
 	{
 		if (stack <= 0 || template is null || template.IsAir) return;
@@ -222,8 +209,6 @@ public static class BrowserSlotInteraction
 		global::GregTechCEuTerraria.TerrariaCompat.Utils.PlayerGive.Give(Main.LocalPlayer, src, template);
 	}
 
-	// Tungsten-steel cell pre-filled with up to `amountMb`. Insert-by-reference
-	// via GetItem since Item.Clone drops the just-Filled _fluidTag.
 	private static void SpawnFluidCell(FluidType fluid, int amountMb)
 	{
 		if (amountMb <= 0) return;
@@ -246,7 +231,6 @@ public static class BrowserSlotInteraction
 	{
 		var p = Main.LocalPlayer;
 		var src = new EntitySource_DebugCommand("GTBrowserSlotInteraction");
-		// Spawn just above the player so the NPC drops into view (bestiary parity).
 		int worldX = (int)p.Center.X;
 		int worldY = (int)p.Center.Y - 32;
 		NPC.NewNPC(src, worldX, worldY, npcType);

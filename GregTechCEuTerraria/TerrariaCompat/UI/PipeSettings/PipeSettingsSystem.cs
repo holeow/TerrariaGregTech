@@ -15,74 +15,69 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.PipeSettings;
 
-// Host for the pipe per-side settings panel. Lifecycle mirrors MachineUISystem
-// (Esc/inventory close, IsInTileInteractionRange auto-close, ModalEscape during
-// PostUpdateInput). Open trigger = non-layer-item RMB on a pipe cell with at
-// least one cardinal capability-holder neighbour.
-public sealed class PipeSettingsSystem : ModSystem
+public sealed class PipeSettingsSystem : ModalUISystem
 {
-	private UserInterface? _ui;
 	private PipeSettingsState? _state;
 
-	private const string LayerName = "GregTechCEuTerraria: Pipe Settings";
+	private const string LayerNameStr = "GregTechCEuTerraria: Pipe Settings";
+	protected override string LayerName => LayerNameStr;
+	protected override bool CloseOnEscape => false;
 
 	public override void Load()
 	{
-		if (Main.dedServ) return;
-		_state = new PipeSettingsState();
-		_state.Activate();
-		_ui = new UserInterface();
-		UILayers.RegisterModal(LayerName, () => IsOpen);
+		base.Load();
+		if (!Main.dedServ)
+		{
+			_state = new PipeSettingsState();
+			_state.Activate();
+		}
 	}
 
 	public override void Unload()
 	{
 		_state = null;
-		_ui = null;
+		base.Unload();
 	}
 
 	public static bool IsOpen
-	{
-		get
-		{
-			var sys = ModContent.GetInstance<PipeSettingsSystem>();
-			return sys?._ui?.CurrentState != null;
-		}
-	}
+		=> ModContent.GetInstance<PipeSettingsSystem>()?.IsOpenInternal ?? false;
 
 	public static void OpenFor(int x, int y, PipeKind layer)
 	{
 		var sys = ModContent.GetInstance<PipeSettingsSystem>();
-		if (sys?._ui is null || sys._state is null) return;
-		ModUIRegistry.OnOpen(Close); // close any other mod-side modal first
-		// One state handles regular + simple pipes (BuildSideCell branches).
+		if (sys?.Ui is null || sys._state is null) return;
+		ModUIRegistry.OnOpen(Close);
 		sys._state.Bind(x, y, layer);
-		sys._ui.SetState(sys._state);
-		// Open inventory so Esc -> inventory close -> us close (MachineUISystem pattern).
+		sys.Ui.SetState(sys._state);
+		sys.PushModal();
 		Main.playerInventory = true;
 		SoundEngine.PlaySound(SoundID.MenuOpen);
 	}
 
-	public static void Close()
+	public static void Close() => ModContent.GetInstance<PipeSettingsSystem>()?.CloseInternal();
+
+	protected override void OnClose()
 	{
-		var sys = ModContent.GetInstance<PipeSettingsSystem>();
-		if (sys?._ui is null || sys._state is null) return;
-		if (sys._ui.CurrentState == null) return;
-		sys._state.Unbind();
-		sys._ui.SetState(null);
+		_state?.Unbind();
 		ModUIRegistry.OnClose(Close);
 		SoundEngine.PlaySound(SoundID.MenuClose);
 	}
 
-	// "Cursor over an openable pipe" probe - PostUpdateInput writes, UpdateUI
-	// reads for the tooltip. Once per frame keeps the late MouseText call
-	// safe from intermediate clobbers.
+	protected override bool ShouldAutoClose()
+	{
+		if (_state is null) return false;
+		bool stillThere = _state.Layer == PipeKind.Fluid
+			? FluidPipeLayerSystem.Pipes.Has(_state.PipeX, _state.PipeY)
+			: ItemPipeLayerSystem.Pipes.Has(_state.PipeX, _state.PipeY);
+		if (!stillThere) return true;
+		return !Main.LocalPlayer.IsInTileInteractionRange(
+			_state.PipeX, _state.PipeY, TileReachCheckSettings.Simple);
+	}
+
 	private static int _hoverX, _hoverY;
 	private static PipeKind? _hoverLayer;
 	private static bool _hoverHasOpenable;
 
-	// Layer-owning items (wires / pipes / wire cutter) have their own RMB
-	// behaviour and must take priority over the panel-open trigger.
 	private static bool IsLayerAffectingItem(Item item)
 	{
 		if (item.IsAir) return false;
@@ -95,18 +90,14 @@ public sealed class PipeSettingsSystem : ModSystem
 		return false;
 	}
 
-	// Runs whether or not a panel is already open, so RMB on another openable
-	// pipe swaps the panel (vanilla chest behaviour).
 	public override void PostUpdateInput()
 	{
 		_hoverLayer = null;
 		if (Main.dedServ) return;
-		if (IsOpen && _state is not null) ModalEscape.SuppressItemUse(_state);
+		base.PostUpdateInput();
 
 		var p = Main.LocalPlayer;
 		if (p is null) return;
-		// Layer-affecting items handle their own RMB; suppress vanilla's
-		// LookForTileInteractions so a chest near the wire run doesn't open.
 		if (IsLayerAffectingItem(p.HeldItem))
 		{
 			if (Main.mouseRight)
@@ -117,15 +108,6 @@ public sealed class PipeSettingsSystem : ModSystem
 			return;
 		}
 
-		// Two-stage cursor: raw screen->world cell first (bypasses smart-cursor
-		// retarget, which steers AWAY from pipes), then Player.tileTargetX/Y
-		// as fallback for non-pipe cursors.
-		//
-		// Inverse of vanilla PlayerInput.SetZoom_MouseInWorld - the world view
-		// zoom pivots around the SCREEN CENTRE, not the origin:
-		//   world = screenPosition + half + (rawMouse - half) / renderZoom.
-		// Use ZoomMatrix.M11/M22 = the 1/128-snapped RenderZoom (SpriteViewMatrix
-		// .RenderZoom isn't exposed by tML's assembly).
 		var zoomMatrix = Main.GameViewMatrix.ZoomMatrix;
 		float zoomX = zoomMatrix.M11;
 		float zoomY = zoomMatrix.M22;
@@ -156,23 +138,15 @@ public sealed class PipeSettingsSystem : ModSystem
 		}
 		else return;
 
-		// Same vanilla tile-interaction reach the auto-close uses.
 		if (!p.IsInTileInteractionRange(x, y, TileReachCheckSettings.Simple)) return;
 
-		// Laser + optical pipes have no settings panel; force-false suppresses
-		// click-to-open AND avoids the unsupported-PipeKind branch in the probe.
 		bool hasLiveNeighbour = layer.Value != PipeKind.Laser && layer.Value != PipeKind.Optical
 			&& PipeNeighborProbe.HasAnyLive(x, y, layer.Value);
 
-		// Record hover for EVERY pipe (mid-run pipes get the debug breakdown,
-		// just without the RMB hint). Skipped on the already-bound pipe.
 		bool sameAsBound = IsOpen && _state is not null
 			&& _state.PipeX == x && _state.PipeY == y && _state.Layer == layer.Value;
 		if (!sameAsBound) { _hoverX = x; _hoverY = y; _hoverLayer = layer; _hoverHasOpenable = hasLiveNeighbour; }
 
-		// Press-edge open + swap. Swallow RMB + clear BOTH controlUseTile and
-		// releaseUseTile (the smart-cursor branch in LookForTileInteractions
-		// checks releaseUseTile separately on press-edge).
 		if (hasLiveNeighbour && Main.mouseRight && Main.mouseRightRelease && !sameAsBound)
 		{
 			OpenFor(x, y, layer.Value);
@@ -182,9 +156,6 @@ public sealed class PipeSettingsSystem : ModSystem
 		}
 		else if (hasLiveNeighbour && Main.mouseRight && !sameAsBound)
 		{
-			// Held-RMB suppression - the press-edge swallow above covers only
-			// the single mouseRightRelease frame; otherwise a next-frame
-			// releaseUseTile re-fire leaks through.
 			p.controlUseTile = false;
 			p.releaseUseTile = false;
 		}
@@ -192,44 +163,8 @@ public sealed class PipeSettingsSystem : ModSystem
 
 	public override void UpdateUI(GameTime gameTime)
 	{
-		if (_ui is null) return;
+		base.UpdateUI(gameTime);
 
-		if (IsOpen && _state != null) ModalEscape.SuppressVanillaUIClicks(_state);
-
-		if (_ui.CurrentState != null)
-		{
-			if (!Main.playerInventory)   // Esc-via-inventory -> close
-			{
-				Close();
-				return;
-			}
-
-			if (_state is not null)
-			{
-				bool stillThere = _state.Layer == PipeKind.Fluid
-					? FluidPipeLayerSystem.Pipes.Has(_state.PipeX, _state.PipeY)
-					: ItemPipeLayerSystem .Pipes.Has(_state.PipeX, _state.PipeY);
-				if (!stillThere)
-				{
-					Close();
-					return;
-				}
-
-				if (!Main.LocalPlayer.IsInTileInteractionRange(_state.PipeX, _state.PipeY, TileReachCheckSettings.Simple))
-				{
-					Close();
-					return;
-				}
-			}
-		}
-
-		// Skip widget updates when a higher-priority modal is on top (close
-		// checks above still run).
-		if (!UILayers.IsAnyHigherPriorityModalOpen(LayerName))
-			_ui.Update(gameTime);
-
-		// Route via WorldHoverTooltip's central "cursor over UI" gate - tooltip
-		// AND the openable-pipe highlight both suppress under a UI panel there.
 		if (_hoverLayer is not null)
 		{
 			WorldHoverTooltip.Set(BuildHoverTooltip(_hoverLayer.Value, _hoverX, _hoverY));
@@ -238,9 +173,6 @@ public sealed class PipeSettingsSystem : ModSystem
 		}
 	}
 
-	// Per-layer contents/throughput + stable net id + RMB hint. Per-channel
-	// breakdown surfaces cross-network leaks (water pipe carrying steam in
-	// channel 1); net id reveals merged networks.
 	private static string BuildHoverTooltip(PipeKind layer, int x, int y)
 	{
 		string contents = layer switch
@@ -262,8 +194,6 @@ public sealed class PipeSettingsSystem : ModSystem
 		return sb.ToString();
 	}
 
-	// "Active/Idle" + endpoint-reached hint (disconnected when neither axis
-	// resolves to an ILaserContainer).
 	private static string LaserStatusLine(int x, int y)
 	{
 		bool active = Pipelike.Laser.LaserPipeLayerSystem.IsActive(x, y);
@@ -283,7 +213,6 @@ public sealed class PipeSettingsSystem : ModSystem
 		return $"Laser Pipe: {state} * {ep}";
 	}
 
-	// Mirror of LaserStatusLine for optical pipes (data/computation endpoints).
 	private static string OpticalStatusLine(int x, int y)
 	{
 		bool active = Pipelike.Optical.OpticalPipeLayerSystem.IsActive(x, y);
@@ -344,16 +273,13 @@ public sealed class PipeSettingsSystem : ModSystem
 			if (f.IsEmpty) continue;
 			string name = f.Type?.DisplayName ?? f.Type?.Id ?? "?";
 			if (sb.Length > 0) sb.Append('\n');
-			if (channels > 1) sb.Append($"ch{i}: ");   // surface per-channel asymmetry
+			if (channels > 1) sb.Append($"ch{i}: ");
 			else              sb.Append("Pipe: ");
 			sb.Append(f.Amount); sb.Append(" mB "); sb.Append(name);
 		}
 		return sb.ToString();
 	}
 
-	// Hash of the lex-smallest node coord - stable per network. Reads the
-	// in-process net graph (host-and-play hits live server state; true
-	// dedicated client has an empty static and falls through to "").
 	private static string NetIdLine(PipeKind layer, int x, int y)
 	{
 		(int x, int y)? anchor = null;
@@ -398,17 +324,5 @@ public sealed class PipeSettingsSystem : ModSystem
 		uint h = 2166136261u;
 		unchecked { h ^= (uint)anchor.Value.x; h *= 16777619u; h ^= (uint)anchor.Value.y; h *= 16777619u; }
 		return $"Net #{(h & 0xFFFF):X4} ({nodeCount} pipes)";
-	}
-
-	public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
-	{
-		UILayers.InsertModal(layers,
-			LayerName,
-			() =>
-			{
-				if (_ui?.CurrentState != null) _ui.Draw(Main.spriteBatch, new GameTime());
-				return true;
-			});
-
 	}
 }

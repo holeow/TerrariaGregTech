@@ -57,6 +57,7 @@ public static class GTRecipeTypes
 	public static readonly GTRecipeType LARGE_MINER               = GTRecipeType.GetOrCreate("large_miner");
 	public static readonly GTRecipeType FLUID_DRILLING_RIG        = GTRecipeType.GetOrCreate("fluid_drilling_rig");
 	public static readonly GTRecipeType PRIMITIVE_PUMP            = GTRecipeType.GetOrCreate("primitive_pump");
+	public static readonly GTRecipeType MULTIBLOCK_STRUCTURE      = GTRecipeType.GetOrCreate("multiblock_structure");
 	public static readonly GTRecipeType FUSION_REACTOR            = GTRecipeType.GetOrCreate("fusion_reactor");
 	public static readonly GTRecipeType RESEARCH_STATION          = GTRecipeType.GetOrCreate("research_station");
 	public static readonly GTRecipeType BLAST_RECIPES             = GTRecipeType.GetOrCreate("electric_blast_furnace");

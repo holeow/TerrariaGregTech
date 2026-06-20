@@ -9,10 +9,7 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Item magnet's held-item filter panel. Port of ItemMagnetBehavior.createUI:
-// SIMPLE/TAG selector + the matching editor (3x3 grid or tag expression).
-// Rebuilds on filter-type change, deferred out of the mouse-down window.
-public sealed class MagnetUIState : UIState
+public sealed class MagnetUIState : UIModalWindow
 {
 	private const float Scale = 2f;
 
@@ -40,9 +37,6 @@ public sealed class MagnetUIState : UIState
 	{
 		base.Update(gameTime);
 
-		// Modal mouse capture lives in MagnetUISystem.PostUpdateInput.
-
-		// Rebuild on filter-type change, deferred until no mouse button is held.
 		var mi = Mi;
 		if (mi != null && mi.FilterOrdinal != _builtOrdinal && !Main.mouseLeft && !Main.mouseRight)
 			Rebuild();
@@ -184,7 +178,6 @@ public sealed class MagnetUIState : UIState
 	private void ToggleBlacklist()   { if (Mi is { } m) m.SimpleFilter.SetBlackList(!m.SimpleFilter.IsBlackList); }
 	private void ToggleIgnoreNbt()   { if (Mi is { } m) m.SimpleFilter.SetIgnoreNbt(!m.SimpleFilter.IgnoreNbt); }
 
-	// Verbatim from CoverSettingsUI (upstream lang cover.tag_filter.info.*).
 	private const string TagFilterInfo =
 		"Accepts complex expressions:\n"
 		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"

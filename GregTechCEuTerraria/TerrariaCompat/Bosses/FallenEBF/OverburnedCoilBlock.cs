@@ -9,16 +9,12 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Bosses.FallenEBF;
 
-// Summons the Fallen EBF. Made by over-stoking a single cupronickel coil block
-// in a furnace until it can't stop burning. Icon = the cupronickel coil block
-// texture composited with its bloom layer at white-hot intensity (no custom
-// art). Server-authoritative spawn via the standard tML boss-summon path.
+// Summons the Fallen EBF
 public class OverburnedCoilBlock : ModItem, ITextureWarmUp
 {
 	private const string CoilBase  = "GregTechCEuTerraria/Content/Textures/block/casings/coils/machine_coil_cupronickel";
 	private const string CoilBloom = "GregTechCEuTerraria/Content/Textures/block/casings/coils/machine_coil_cupronickel_bloom";
 
-	// Autoload placeholder; WarmUpTexture bakes the burning composite over it.
 	public override string Texture => CoilBase;
 
 	public override void SetStaticDefaults()
@@ -29,8 +25,6 @@ public class OverburnedCoilBlock : ModItem, ITextureWarmUp
 		ItemID.Sets.SortingPriorityBossSpawns[Type] = 12;
 	}
 
-	// Bake "cupronickel coil block, burning a lot": hot-tinted base + the bloom
-	// layer stacked (white + an extra orange pass) so the coils read molten.
 	void ITextureWarmUp.WarmUpTexture() => ItemIconBaker.Install(Item.type,
 		new IconLayer(CoilBase, new Color(255, 160, 110)),
 		new IconLayer(CoilBloom, Color.White),
@@ -50,7 +44,6 @@ public class OverburnedCoilBlock : ModItem, ITextureWarmUp
 		Item.value = Item.sellPrice(silver: 80);
 	}
 
-	// The server uses this same check when it receives the spawn message.
 	public override bool CanUseItem(Player player) => !NPC.AnyNPCs(ModContent.NPCType<FallenEBF>());
 
 	public override bool? UseItem(Player player)
@@ -68,7 +61,6 @@ public class OverburnedCoilBlock : ModItem, ITextureWarmUp
 
 	public override void AddRecipes()
 	{
-		// 1 cupronickel coil block, smelted at a furnace.
 		if (!Mod.TryFind<ModItem>("cupronickel_coil_block", out var coil))
 		{
 			Mod.Logger.Warn("[FallenEBF] OverburnedCoilBlock recipe skipped: cupronickel_coil_block not found.");
@@ -78,6 +70,7 @@ public class OverburnedCoilBlock : ModItem, ITextureWarmUp
 		CreateRecipe()
 			.AddIngredient(coil.Type, 1)
 			.AddTile(TileID.Furnaces)
+			.DisableDecraft()
 			.Register();
 	}
 }

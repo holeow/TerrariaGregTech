@@ -26,9 +26,25 @@ public static class WorldCapability
 		if (TerrariaCompat.Pipelike.ItemPipe.ItemPipeLayerSystem.Pipes.Has(x, y))
 			return TerrariaCompat.Pipelike.ItemPipe.ItemPipeLayerSystem
 				.EnsureSides(x, y).GetItemHandlerCap(arrivalSide, useCoverCapability: true);
-		return Handlers.VanillaChestItemHandler.At(x, y)
-			?? Handlers.ExtractinatorItemHandler.At(x, y);
+		return LeafInventoryAt(x, y);
 	}
+
+	public static IItemHandler? LeafInventoryAt(int x, int y)
+	{
+		var chest = Handlers.VanillaChestItemHandler.At(x, y);
+		if (chest != null) return chest;
+		var extractinator = Handlers.ExtractinatorItemHandler.At(x, y);
+		if (extractinator != null) return extractinator;
+		if (MagicStoragePresent)
+		{
+			var ms = Handlers.MagicStorageItemHandler.At(x, y);
+			if (ms != null) return ms;
+		}
+		return null;
+	}
+
+	internal static readonly bool MagicStoragePresent =
+		Terraria.ModLoader.ModLoader.HasMod("MagicStorage");
 
 	public static IFluidHandler? FluidHandlerAt(int x, int y, IODirection arrivalSide)
 	{

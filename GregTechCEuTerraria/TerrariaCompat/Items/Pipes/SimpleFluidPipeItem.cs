@@ -72,6 +72,7 @@ public sealed class SimpleFluidPipeItem : ModItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "PipePlasmaProof","[c/FFAA00:Can handle Acid]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimple", "[c/AAFFAA:Auto-connects to adjacent storage on placement.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimpleUI", "[c/AAFFAA:Right-click to toggle per-side mode (Off / Insert / Extract).]"));
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	public override bool? UseItem(Player player)

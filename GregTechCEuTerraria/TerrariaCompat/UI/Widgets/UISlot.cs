@@ -65,7 +65,7 @@ public sealed class UISlot : UIElement
 		Main.inventoryScale = bounds.Width / VanillaNativeSlotPixels;
 		try
 		{
-			if (IsMouseHovering && !MachineUISystem.IsOccludedByHigherModal)
+			if (IsMouseHovering)
 			{
 				Main.LocalPlayer.mouseInterface = true;
 				if (_temp[0].IsAir && EmptyHint is { } emptyHint)

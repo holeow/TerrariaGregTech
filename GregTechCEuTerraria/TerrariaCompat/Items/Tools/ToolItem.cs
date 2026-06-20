@@ -497,8 +497,8 @@ public sealed class ToolItem : ModItem, IElectricItem
 			case "scythe":         return "Wide auto-swinging weapon. Collects Vine while cutting plants.";
 			case "butchery_knife": return "Thrown like a knife and never consumed.";
 			case "screwdriver":    return "Pokes like a spear. Right-click a transformer/machine to reconfigure it.";
-			case "file":           return "Pokes like a spear (0.75x a screwdriver's power). Crafting tool.";
-			case "mortar":         return "Weak pickaxe - mined stone becomes Silt, dirt becomes Sand. Crafting tool.";
+			case "file":           return "Pokes like a spear (0.75x a screwdriver's power).";
+			case "mortar":         return "Weak pickaxe - grinds mined ground: stone -> silt -> dirt -> clay -> sand.";
 			case "wrench":         return "Dismantles machines and cuts item/fluid pipes.";
 			case "mallet":         return "Pauses or resumes a machine.";
 			case "wire_cutter":    return "Cuts cables and laser pipes.";

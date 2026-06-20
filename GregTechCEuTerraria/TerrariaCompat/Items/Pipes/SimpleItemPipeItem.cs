@@ -68,6 +68,7 @@ public sealed class SimpleItemPipeItem : ModItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "PipeRate", rateLine));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimple", "[c/AAFFAA:Auto-connects to adjacent storage on placement.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeSimpleUI", "[c/AAFFAA:Right-click to toggle per-side mode (Off / Insert / Extract).]"));
+		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 
 	public override bool? UseItem(Player player)

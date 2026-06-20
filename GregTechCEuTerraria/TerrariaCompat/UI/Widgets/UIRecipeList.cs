@@ -13,7 +13,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Virtualized recipe list - no per-row UIElements; only visible rows draw.
 public sealed class UIRecipeList : UIElement
 {
 	private readonly Func<IReadOnlyList<GTRecipe>> _sourceProvider;
@@ -30,11 +29,12 @@ public sealed class UIRecipeList : UIElement
 	private bool _leftDown;
 	private bool _rightDown;
 
-	// Scrollbar drag - _dragAnchorOffsetPx is the cursor's Y offset
+	public int ScrollBottomInset;
+
 	private bool _dragging;
 	private int  _dragAnchorOffsetPx;
 
-	private const int ScrollbarWidth = 18;
+	private const int ScrollbarWidth = VanillaScrollbar.Width;
 	private const int Margin = 6;
 	private const int MinThumbHeight = 28;
 	private const int SelectGutter = 44;
@@ -145,7 +145,7 @@ public sealed class UIRecipeList : UIElement
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
-		_scrollOffsetPx -= evt.ScrollWheelValue / 6;
+		_scrollOffsetPx -= evt.ScrollWheelValue;
 		_scrollOffsetPx = Math.Max(0, _scrollOffsetPx);
 	}
 
@@ -188,25 +188,23 @@ public sealed class UIRecipeList : UIElement
 		int maxOffset = Math.Max(0, totalH - viewH);
 		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
 
-		// Only draw fully-visible rows (avoids the mid-Draw scissor dance).
-		int firstRow = (_scrollOffsetPx + rowH - 1) / rowH;
-		int lastRow = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH) / rowH - 1);
+		int firstRow = _scrollOffsetPx / rowH;
+		int lastRow = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = GlobalRecipeBrowserState.BrowserCursor();
 
-		// Scrollbar interaction first - drag updates _scrollOffsetPx before row
-		// layout reads it (avoids 1-frame visual lag).
 		bool draggingThisFrame = false;
 		Rectangle trackRect = Rectangle.Empty;
 		Rectangle thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
-			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, content.Height);
+			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
+			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
 
 			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(content.Height * frac));
-			int travel = content.Height - thumbH;
+			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
+			int travel = barH - thumbH;
 			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
 			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
 
@@ -219,7 +217,7 @@ public sealed class UIRecipeList : UIElement
 			if (_dragging && Main.mouseLeft)
 			{
 				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax   = Math.Max(1, content.Height - thumbH);
+				int travelMax   = Math.Max(1, barH - thumbH);
 				int clampedTop  = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
 				_scrollOffsetPx = (int)((float)clampedTop / travelMax * maxOffset);
 				draggingThisFrame = true;
@@ -233,14 +231,16 @@ public sealed class UIRecipeList : UIElement
 			{
 				thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
 				thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-				firstRow = (_scrollOffsetPx + rowH - 1) / rowH;
-				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH) / rowH - 1);
+				firstRow = _scrollOffsetPx / rowH;
+				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 			}
 		}
 
 		int hoveredRow = -1;
 		bool picked = false;
 		int selGutter = OnSelectRecipe != null ? SelectGutter : 0;
+		ScissorDraw.Draw(spriteBatch, ScissorDraw.DeviceClip(content), () =>
+		{
 		for (int i = firstRow; i <= lastRow; i++)
 		{
 			int yTop = content.Y - _scrollOffsetPx + i * rowH;
@@ -276,6 +276,7 @@ public sealed class UIRecipeList : UIElement
 				}
 			}
 		}
+		});
 
 		if (hoveredRow >= 0 && !picked)
 		{
@@ -307,9 +308,6 @@ public sealed class UIRecipeList : UIElement
 							{ stillAvailable = true; break; }
 						if (!stillAvailable) break;
 
-						// tML's CraftItem CanStack early-return skips the
-						// destination.type==source.type check, so a non-matching
-						// cursor item gets duped. Block.
 						if (Main.mouseItem.stack > 0
 						    && Main.mouseItem.type != craftRecipe.createItem.type)
 							break;
@@ -322,8 +320,6 @@ public sealed class UIRecipeList : UIElement
 			{
 				RecipeRowRenderer.EmitTooltipFor(src[hoveredRow], rowBounds, mouse);
 
-				// Station chip click wins over the (non-overlapping) ingredient
-				// cells - LMB sets the search filter to this recipe's station.
 				string? chipStation = OnStationFilter == null
 					? null
 					: RecipeRowRenderer.StationChipAt(src[hoveredRow], rowBounds, mouse);
@@ -362,16 +358,8 @@ public sealed class UIRecipeList : UIElement
 
 		if (totalH > viewH)
 		{
-			spriteBatch.Draw(px, trackRect, new Color(10, 12, 30) * 0.7f);
-			spriteBatch.Draw(px, new Rectangle(trackRect.X, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
-			spriteBatch.Draw(px, new Rectangle(trackRect.Right - 1, trackRect.Y, 1, trackRect.Height), new Color(60, 70, 100));
-
 			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			var thumbColor = thumbHot ? new Color(180, 200, 240) : new Color(140, 160, 220);
-			spriteBatch.Draw(px, thumbRect, thumbColor);
-			spriteBatch.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, thumbRect.Width, 1), Color.White * 0.5f);
-			spriteBatch.Draw(px, new Rectangle(thumbRect.X, thumbRect.Y, 1, thumbRect.Height), Color.White * 0.5f);
-
+			VanillaScrollbar.Draw(spriteBatch, trackRect, thumbRect, thumbHot);
 			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
 		}
 	}

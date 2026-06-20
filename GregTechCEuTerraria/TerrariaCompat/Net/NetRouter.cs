@@ -25,46 +25,58 @@ public static class NetRouter
 			Profiler.Profiler.Count("net.in.count", typeName);
 			handleT0 = Stopwatch.GetTimestamp();
 		}
+		// Cases mirror the PacketType group order so the two tables read in lockstep.
 		switch (type)
 		{
+			// Machine GUI lifecycle
 			case PacketType.MachineViewBegin: MachineViewPacket.HandleBegin(reader, whoAmI); break;
 			case PacketType.MachineViewEnd:   MachineViewPacket.HandleEnd  (reader, whoAmI); break;
-			case PacketType.MachineStateSync: MachineStateSyncPacket.HandleOnClient(reader); break;
-			case PacketType.MachineEnergySync: MachineEnergySyncPacket.HandleOnClient(reader); break;
+
+			// Machine GUI mutations
+			case PacketType.SlotAction:       MachineActions.HandleIncoming<SlotAction>(reader, whoAmI); break;
+			case PacketType.FluidSlotAction:  MachineActions.HandleIncoming<FluidSlotAction>(reader, whoAmI); break;
+			case PacketType.CircuitSet:       MachineActions.HandleIncoming<CircuitSetAction>(reader, whoAmI); break;
+			case PacketType.IOConfigSet:      MachineActions.HandleIncoming<IOConfigSetAction>(reader, whoAmI); break;
 			case PacketType.PowerToggle:      MachineActions.HandleIncoming<PowerToggleAction>(reader, whoAmI); break;
+			case PacketType.TankConfigSet:    MachineActions.HandleIncoming<TankConfigSetAction>(reader, whoAmI); break;
+			case PacketType.ChestAction:      MachineActions.HandleIncoming<ChestAction>(reader, whoAmI); break;
 			case PacketType.PartIoDirection:  MachineActions.HandleIncoming<PartIoDirectionSetAction>(reader, whoAmI); break;
 			case PacketType.ParallelSet:      MachineActions.HandleIncoming<ParallelSetAction>(reader, whoAmI); break;
 			case PacketType.ActiveRecipeTypeSet: MachineActions.HandleIncoming<ActiveRecipeTypeSetAction>(reader, whoAmI); break;
 			case PacketType.BoilerThrottleSet: MachineActions.HandleIncoming<BoilerThrottleSetAction>(reader, whoAmI); break;
 			case PacketType.DistinctSet:      MachineActions.HandleIncoming<DistinctSetAction>(reader, whoAmI); break;
 			case PacketType.JunkToggle:       MachineActions.HandleIncoming<JunkToggleAction>(reader, whoAmI); break;
-			case PacketType.CircuitSet:       MachineActions.HandleIncoming<CircuitSetAction>(reader, whoAmI); break;
-			case PacketType.IOConfigSet:      MachineActions.HandleIncoming<IOConfigSetAction>(reader, whoAmI); break;
-			case PacketType.TankConfigSet:    MachineActions.HandleIncoming<TankConfigSetAction>(reader, whoAmI); break;
-			case PacketType.ChestAction:      MachineActions.HandleIncoming<ChestAction>(reader, whoAmI); break;
-			case PacketType.SlotAction:       MachineActions.HandleIncoming<SlotAction>(reader, whoAmI); break;
-			case PacketType.FluidSlotAction:  MachineActions.HandleIncoming<FluidSlotAction>(reader, whoAmI); break;
-			case PacketType.CableSet:         CablePackets.HandleSet(reader, whoAmI); break;
-			case PacketType.CableRemove:      CablePackets.HandleRemove(reader, whoAmI); break;
-			case PacketType.CableLayerRequest:CablePackets.HandleLayerRequest(reader, whoAmI); break;
-			case PacketType.CableLayerFull:   CablePackets.HandleLayerFull(reader); break;
-			case PacketType.MachinePlaced:    MachinePlacedPacket.Handle(reader, whoAmI); break;
-			case PacketType.CoverAction:      CoverActions.HandleIncoming<CoverAction>(reader, whoAmI); break;
-			case PacketType.CoverConfig:      CoverActions.HandleIncoming<CoverConfigAction>(reader, whoAmI); break;
-			case PacketType.CoverFilter:      CoverActions.HandleIncoming<CoverFilterAction>(reader, whoAmI); break;
 			case PacketType.MachineFilter:    MachineActions.HandleIncoming<MachineFilterAction>(reader, whoAmI); break;
 			case PacketType.CreativeChestSet: MachineActions.HandleIncoming<CreativeChestSetAction>(reader, whoAmI); break;
 			case PacketType.CreativeTankSet:  MachineActions.HandleIncoming<CreativeTankSetAction>(reader, whoAmI); break;
 			case PacketType.CreativeEnergySet:MachineActions.HandleIncoming<CreativeEnergySetAction>(reader, whoAmI); break;
+
+			// World right-click interactions
 			case PacketType.TransformerToggle:TransformerTogglePacket.Handle(reader, whoAmI); break;
 			case PacketType.LdEndpointToggle: LdEndpointTogglePacket.Handle(reader, whoAmI); break;
 			case PacketType.CrateTape:        CrateTapePacket.Handle(reader, whoAmI); break;
 			case PacketType.DrumScrewdriver:  DrumScrewdriverPacket.Handle(reader, whoAmI); break;
+
+			// Covers
+			case PacketType.CoverAction:      CoverActions.HandleIncoming<CoverAction>(reader, whoAmI); break;
+			case PacketType.CoverConfig:      CoverActions.HandleIncoming<CoverConfigAction>(reader, whoAmI); break;
+			case PacketType.CoverFilter:      CoverActions.HandleIncoming<CoverFilterAction>(reader, whoAmI); break;
+
+			// Machine placement + state sync
+			case PacketType.MachinePlaced:    MachinePlacedPacket.Handle(reader, whoAmI); break;
+			case PacketType.MachineStateSync: MachineStateSyncPacket.HandleOnClient(reader); break;
+			case PacketType.MachineEnergySync: MachineEnergySyncPacket.HandleOnClient(reader); break;
 			case PacketType.CursorUpdate:     CursorUpdatePacket.HandleOnClient(reader); break;
 			case PacketType.EnderChannelSync: EnderChannelSyncPacket.HandleOnClient(reader); break;
-			case PacketType.MultiblockFormed:    MultiblockFormedPacket.HandleSet(reader); break;
-			case PacketType.BlockExplosionEffect: BlockExplosionEffectPacket.HandleOnClient(reader); break;
-			case PacketType.EnergyNetStats:   EnergyNetStatsPacket.HandleOnClient(reader); break;
+			case PacketType.MultiblockFormed: MultiblockFormedPacket.HandleSet(reader); break;
+
+			// Cables
+			case PacketType.CableSet:         CablePackets.HandleSet(reader, whoAmI); break;
+			case PacketType.CableRemove:      CablePackets.HandleRemove(reader, whoAmI); break;
+			case PacketType.CableLayerRequest:CablePackets.HandleLayerRequest(reader, whoAmI); break;
+			case PacketType.CableLayerFull:   CablePackets.HandleLayerFull(reader); break;
+
+			// Pipes
 			case PacketType.PipePlaced:       PipePackets.HandlePlaced(reader, whoAmI); break;
 			case PacketType.PipeRemove:       PipePackets.HandleRemove(reader, whoAmI); break;
 			case PacketType.PipeLayerRequest: PipePackets.HandleLayerRequest(reader, whoAmI); break;
@@ -74,9 +86,21 @@ public static class NetRouter
 			case PacketType.SimplePipeSideSet: SimplePipeSideSetPacket.HandleSet(reader, whoAmI); break;
 			case PacketType.PipeStats:        PipeStatsPacket.HandleOnClient(reader); break;
 			case PacketType.FluidPipeStats:   FluidPipeStatsPacket.HandleOnClient(reader); break;
-			case PacketType.ProfilerSync:     ProfilerSyncPacket.HandleOnClient(reader); break;
-			case PacketType.ItemCollectEffect: ItemCollectEffectPacket.HandleOnClient(reader); break;
 			case PacketType.CrossoverChange:  Pipelike.PipeIntersection.HandleChange(reader, whoAmI); break;
+
+			// Energy net + world effects
+			case PacketType.EnergyNetStats:   EnergyNetStatsPacket.HandleOnClient(reader); break;
+			case PacketType.BlockExplosionEffect: BlockExplosionEffectPacket.HandleOnClient(reader); break;
+			case PacketType.ItemCollectEffect: ItemCollectEffectPacket.HandleOnClient(reader); break;
+
+			// Profiler
+			case PacketType.ProfilerSync:     ProfilerSyncPacket.HandleOnClient(reader); break;
+
+			// Questbook
+			case PacketType.QuestbookStateRequest: QuestbookPackets.HandleStateRequest(reader, whoAmI); break;
+			case PacketType.QuestbookSync:    QuestbookPackets.HandleSync(reader); break;
+			case PacketType.QuestbookComplete: QuestbookPackets.HandleCompleteRequest(reader, whoAmI); break;
+
 			default:
 				NetHelpers.LogBadPacket("dispatch", $"unknown PacketType={(byte)type} from whoAmI={whoAmI}");
 				break;

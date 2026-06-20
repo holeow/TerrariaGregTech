@@ -19588,11 +19588,6 @@ treated_wood_normal_fluid_pipe: {
 	// Tooltip: ""
 }
 
-treated_wood_plate: {
-	DisplayName: Обработанное дерево (Пластина)
-	// Tooltip: ""
-}
-
 treated_wood_rod: {
 	DisplayName: Обработанное дерево (Стержень)
 	// Tooltip: ""
@@ -25640,12 +25635,12 @@ active_transformer: {
 
 activity_detector_cover: {
 	DisplayName: Детектор активности (Улучшение)
-	Tooltip: "[c/AAAAAA:Выдает][c/FFFFFF:Прогресс Работы][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Выдает] [c/FFFFFF:Прогресс Работы][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 advanced_activity_detector_cover: {
 	DisplayName: Улучшенный детектор активности (Улучшение)
-	Tooltip: "[c/AAAAAA:Выдает][c/FFFFFF:Статус прогресса][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Выдает] [c/FFFFFF:Статус прогресса][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 advanced_computer_casing: {
@@ -25665,19 +25660,19 @@ advanced_electric_jetpack: {
 
 advanced_energy_detector_cover: {
 	DisplayName: Улучшенный детектор энергии (Улучшение)
-	Tooltip: "[c/AAAAAA:Даёт][c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за][c/FFFFFF:Уровнем энергии][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Даёт] [c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за] [c/FFFFFF:Уровнем энергии][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 advanced_fluid_detector_cover: {
 	DisplayName: Улучшенный детектор жидкости (Улучшение)
-	Tooltip: "[c/AAAAAA:Даёт][c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за][c/FFFFFF:Состоянием Хранилища жидкости][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Даёт] [c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за] [c/FFFFFF:Состоянием Хранилища жидкости][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 advanced_fluid_voiding_cover: {
 	DisplayName: Улучшенное удаление жидкостей (Улучшение)
 	Tooltip:
 		'''
-		[c/AAAAAA:Удаляет][c/FFFFFF:Жидкости][c/AAAAAA: с контролем количества как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		[c/AAAAAA:Удаляет] [c/FFFFFF:Жидкости][c/AAAAAA: с контролем количества как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
 		Требуется активация с помощью [c/FFFFFF:Киянки][c/AAAAAA: после установки.]
 		'''
 }
@@ -25693,14 +25688,14 @@ advanced_integrated_circuit: {
 
 advanced_item_detector_cover: {
 	DisplayName: Улучшенный детектор предметов (Улучшение)
-	Tooltip: "[c/AAAAAA:Даёт][c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за][c/FFFFFF:Состоянием Хранилища предметов][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Даёт] [c/FFFFFF:RS-триггеру контроль][c/AAAAAA: за] [c/FFFFFF:Состоянием Хранилища предметов][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 advanced_item_voiding_cover: {
 	DisplayName: Улучшенное удаление предметов (Улучшение)
 	Tooltip:
 		'''
-		[c/AAAAAA:Удаляет][c/FFFFFF:Предметы][c/AAAAAA: с контролем количества как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		[c/AAAAAA:Удаляет] [c/FFFFFF:Предметы][c/AAAAAA: с контролем количества как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
 		Требуется активация с помощью [c/FFFFFF:Киянки][c/AAAAAA: после установки.]
 		'''
 }
@@ -25904,7 +25899,7 @@ black_studs: {
 
 blacklight: {
 	DisplayName: Черный свет
-	Tooltip: "[c/AAAAAA:Источник длинноволнового][c/FF55FF:ультрафиолетового][c/AAAAAA: излучения]"
+	Tooltip: "[c/AAAAAA:Источник длинноволнового] [c/FF55FF:ультрафиолетового][c/AAAAAA: излучения]"
 }
 
 block_casting_mold: {
@@ -26284,7 +26279,7 @@ computer_heat_vent: {
 
 computer_monitor_cover: {
 	DisplayName: Компьютерный монитор (Улучшение)
-	Tooltip: "[c/AAAAAA:Отображает][c/FFFFFF:Данные][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Отображает] [c/FFFFFF:Данные][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 configurable_maintenance_hatch: {
@@ -26600,7 +26595,7 @@ empty_wooden_form: {
 
 ender_fluid_link_cover: {
 	DisplayName: Жидкостное Эндер соединение
-	Tooltip: "[c/AAAAAA:Переносит][c/FFFFFF:Жидкости][c/AAAAAA: с помощью][c/FFFFFF:Беспроводного][c/FF55FF:Эндер][c/FFFFFF: соединения][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Переносит] [c/FFFFFF:Жидкости][c/AAAAAA: с помощью] [c/FFFFFF:Беспроводного] [c/FF55FF:Эндер][c/FFFFFF: соединения][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 ender_item_link_cover: {
@@ -26630,7 +26625,7 @@ energy_crystal: {
 
 energy_detector_cover: {
 	DisplayName: Детектор энергии (Улучшение)
-	Tooltip: "[c/AAAAAA:Выдает][c/FFFFFF:Кол-во энергии][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Выдает] [c/FFFFFF:Кол-во энергии][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 energy_module: {
@@ -26725,7 +26720,7 @@ ev_battery_buffer_8x: {
 
 ev_battery_hull: {
 	DisplayName: Корпус маленькой ванадиевой батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/AA00AA:EV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/AA00AA:EV] [c/AAAAAA:корпус батареи]"
 }
 
 ev_bedrock_ore_miner: {
@@ -27229,15 +27224,15 @@ fluid_cell: {
 
 fluid_detector_cover: {
 	DisplayName: Детектор жидкости (Улучшение)
-	Tooltip: "[c/AAAAAA:Выдает][c/FFFFFF:Заполнение жидкостью][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Выдает] [c/FFFFFF:Заполнение жидкостью][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 fluid_filter: {
 	DisplayName: Жидкостный фильтр
 	Tooltip:
 		'''
-		[c/AAAAAA:Фильтрует][c/FFFFFF:Жидкость][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
-		Может использоваться как улучшение [c/FFFFFF:Помпы][c/AAAAAA: и][c/FFFFFF:Регулятора][c/AAAAAA:.]
+		[c/AAAAAA:Фильтрует] [c/FFFFFF:Жидкость][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Может использоваться как улучшение [c/FFFFFF:Помпы][c/AAAAAA: и] [c/FFFFFF:Регулятора][c/AAAAAA:.]
 		'''
 }
 
@@ -27245,8 +27240,8 @@ fluid_tag_filter: {
 	DisplayName: Жидкостный фильтр (Тэги)
 	Tooltip:
 		'''
-		[c/AAAAAA:Фильтрует][c/FFFFFF:Жидкости][c/AAAAAA: по][c/FFFFFF:Тэгам жидкостей][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
-		Может использоваться как улучшение [c/FFFFFF:Помпы][c/AAAAAA: и][c/FFFFFF:Регулятора][c/AAAAAA:.]
+		[c/AAAAAA:Фильтрует] [c/FFFFFF:Жидкости][c/AAAAAA: по] [c/FFFFFF:Тэгам жидкостей][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Может использоваться как улучшение [c/FFFFFF:Помпы][c/AAAAAA: и] [c/FFFFFF:Регулятора][c/AAAAAA:.]
 		'''
 }
 
@@ -27254,7 +27249,7 @@ fluid_voiding_cover: {
 	DisplayName: Удаление жидкостей (Улучшение)
 	Tooltip:
 		'''
-		[c/AAAAAA:Удаляет][c/FFFFFF:Жидкости][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		[c/AAAAAA:Удаляет] [c/FFFFFF:Жидкости][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
 		Требуется активация с помощью [c/FFFFFF:Киянки][c/AAAAAA: после установки.]
 		'''
 }
@@ -27694,7 +27689,7 @@ hv_battery_buffer_8x: {
 
 hv_battery_hull: {
 	DisplayName: Большой корпус батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/FFAA00:HV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/FFAA00:HV] [c/AAAAAA:корпус батареи]"
 }
 
 hv_bedrock_ore_miner: {
@@ -28149,7 +28144,7 @@ inert_machine_casing: {
 
 infinite_water_cover: {
 	DisplayName: Бесконечный источник воды (Улучшение)
-	Tooltip: "[c/AAAAAA:Заполняет прилегающие контейнеры][c/5555FF:Водой][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Заполняет прилегающие контейнеры] [c/5555FF:Водой][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 ingot_casting_mold: {
@@ -28174,15 +28169,15 @@ iron_minecart_wheels: {
 
 item_detector_cover: {
 	DisplayName: Детектор предметов (Улучшение)
-	Tooltip: "[c/AAAAAA:Выдает][c/FFFFFF:Кол-во предметов][c/AAAAAA: Сигналом Красного камня как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/AAAAAA:Выдает] [c/FFFFFF:Кол-во предметов][c/AAAAAA: Сигналом Красного камня как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 item_filter: {
 	DisplayName: Предметный фильтр
 	Tooltip:
 		'''
-		[c/AAAAAA:Фильтрует][c/FFFFFF:Предметы][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
-		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и][c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
+		[c/AAAAAA:Фильтрует] [c/FFFFFF:Предметы][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и] [c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
 		'''
 }
 
@@ -28190,8 +28185,8 @@ item_smart_filter: {
 	DisplayName: Умный предметный фильтр
 	Tooltip:
 		'''
-		[c/AAAAAA:Фильтрует][c/FFFFFF:Предметы][c/AAAAAA: на основе][c/FFFFFF:Рецептов машин][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
-		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и][c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
+		[c/AAAAAA:Фильтрует] [c/FFFFFF:Предметы][c/AAAAAA: на основе] [c/FFFFFF:Рецептов машин][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и] [c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
 		'''
 }
 
@@ -28199,8 +28194,8 @@ item_tag_filter: {
 	DisplayName: Предметный фильтр (Тэги)
 	Tooltip:
 		'''
-		[c/AAAAAA:Фильтрует][c/FFFFFF:Предметы][c/AAAAAA: по][c/FFFFFF:Тэгам предметов][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
-		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и][c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
+		[c/AAAAAA:Фильтрует] [c/FFFFFF:Предметы][c/AAAAAA: по] [c/FFFFFF:Тэгам предметов][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Может использоваться как улучшение [c/FFFFFF:Конвейера][c/AAAAAA: и] [c/FFFFFF:Робот. манипулятора][c/AAAAAA:.]
 		'''
 }
 
@@ -28208,7 +28203,7 @@ item_voiding_cover: {
 	DisplayName: Удаление предметов (Улучшение)
 	Tooltip:
 		'''
-		[c/AAAAAA:Удаляет][c/FFFFFF:Предметы][c/AAAAAA: как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		[c/AAAAAA:Удаляет] [c/FFFFFF:Предметы][c/AAAAAA: как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
 		Требуется активация с помощью [c/FFFFFF:Киянки][c/AAAAAA: после установки.]
 		'''
 }
@@ -28300,7 +28295,7 @@ iv_battery_buffer_8x: {
 
 iv_battery_hull: {
 	DisplayName: Корпус средней ванадиевой батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/5555FF:IV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/5555FF:IV] [c/AAAAAA:корпус батареи]"
 }
 
 iv_bender: {
@@ -29200,7 +29195,7 @@ luv_battery_buffer_8x: {
 
 luv_battery_hull: {
 	DisplayName: Корпус большой ванадиевой батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/FF55FF:LuV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/FF55FF:LuV] [c/AAAAAA:корпус батареи]"
 }
 
 luv_bender: {
@@ -30585,7 +30580,7 @@ mv_battery_buffer_8x: {
 
 mv_battery_hull: {
 	DisplayName: Средний корпус батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/55FFFF:MV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/55FFFF:MV] [c/AAAAAA:корпус батареи]"
 }
 
 mv_bedrock_ore_miner: {
@@ -31165,12 +31160,12 @@ normal_duct_pipe: {
 
 normal_laser_pipe: {
 	DisplayName: Передающий лазерный кабель
-	Tooltip: "[c/AAAAAA:Передача энергии][c/FFFFFF:без потерь][c/AAAAAA: по прямым линиям]"
+	Tooltip: "[c/AAAAAA:Передача энергии] [c/FFFFFF:без потерь][c/AAAAAA: по прямым линиям]"
 }
 
 normal_optical_pipe: {
 	DisplayName: Оптоволоконный кабель
-	Tooltip: "[c/AAAAAA:Передает данные][c/FFFFFF:Исследования][c/AAAAAA: или][c/FFFFFF:Вычислений]"
+	Tooltip: "[c/AAAAAA:Передает данные] [c/FFFFFF:Исследования][c/AAAAAA: или] [c/FFFFFF:Вычислений]"
 }
 
 normal_pipe_casting_mold: {
@@ -32299,7 +32294,7 @@ shock_proof_cutting_casing: {
 
 shutter_module_cover: {
 	DisplayName: Затвор (Улучшение)
-	Tooltip: "[c/FFFFFF:Предотвращает все взаимодействия][c/AAAAAA: с этой стороной машины работающий как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
+	Tooltip: "[c/FFFFFF:Предотвращает все взаимодействия][c/AAAAAA: с этой стороной машины работающий как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]"
 }
 
 silicon_boule: {
@@ -32412,7 +32407,7 @@ solar_panel: {
 	Tooltip:
 		'''
 		[c/AAAAAA:Да прибудет с тобой Солнце.]
-		Производит [c/FFFFFF:Энергию][c/AAAAAA: от][c/FFFF55:Солнца][c/AAAAAA: работающий как][c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
+		Производит [c/FFFFFF:Энергию][c/AAAAAA: от] [c/FFFF55:Солнца][c/AAAAAA: работающий как] [c/FFFFFF:Улучшение механизма][c/AAAAAA:.]
 		'''
 }
 
@@ -33052,7 +33047,7 @@ uev_energy_input_hatch_16a: {
 }
 
 uev_energy_input_hatch_4a: {
-	DisplayName: Энергетический входной разъем (4A [c/55FF55:UEV])
+	DisplayName: Энергетический входной разъем (4A [c/55FF55:UEV] )
 	// Tooltip: ""
 }
 
@@ -33062,12 +33057,12 @@ uev_energy_output_hatch: {
 }
 
 uev_energy_output_hatch_16a: {
-	DisplayName: Энергетический выходной разъем (16A [c/55FF55:UEV])
+	DisplayName: Энергетический выходной разъем (16A [c/55FF55:UEV] )
 	// Tooltip: ""
 }
 
 uev_energy_output_hatch_4a: {
-	DisplayName: Энергетический выходной разъем (4A [c/55FF55:UEV])
+	DisplayName: Энергетический выходной разъем (4A [c/55FF55:UEV] )
 	// Tooltip: ""
 }
 
@@ -34443,7 +34438,7 @@ uv_battery_buffer_8x: {
 
 uv_battery_hull: {
 	DisplayName: Корпус большой наквадриевой батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/00AAAA:UV][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/00AAAA:UV] [c/AAAAAA:корпус батареи]"
 }
 
 uv_bender: {
@@ -35588,7 +35583,7 @@ zpm_battery_buffer_8x: {
 
 zpm_battery_hull: {
 	DisplayName: Корпус средней наквадриевой батареи
-	Tooltip: "[c/AAAAAA:Пустой][c/FFFFFF:ZPM][c/AAAAAA:корпус батареи]"
+	Tooltip: "[c/AAAAAA:Пустой] [c/FFFFFF:ZPM] [c/AAAAAA:корпус батареи]"
 }
 
 zpm_bender: {
@@ -38056,6 +38051,61 @@ aluminium_turbine_rotor: {
 	// DisplayName: Aluminium Turbine Rotor
 }
 
+ultimate_manual: {
+	// Tooltip: ""
+	// DisplayName: Ultimate Manual Crafting Station
+}
+
+manual_crowbar: {
+	// Tooltip: ""
+	// DisplayName: Manual Crowbar Crafting Station
+}
+
+manual_mortar: {
+	// Tooltip: ""
+	// DisplayName: Manual Mortar Crafting Station
+}
+
+manual_wire_cutter: {
+	// Tooltip: ""
+	// DisplayName: Manual Wire Cutter Crafting Station
+}
+
+manual_screwdriver: {
+	// Tooltip: ""
+	// DisplayName: Manual Screwdriver Crafting Station
+}
+
+manual_wrench: {
+	// Tooltip: ""
+	// DisplayName: Manual Wrench Crafting Station
+}
+
+manual_saw: {
+	// Tooltip: ""
+	// DisplayName: Manual Saw Crafting Station
+}
+
+manual_file: {
+	// Tooltip: ""
+	// DisplayName: Manual File Crafting Station
+}
+
+manual_knife: {
+	// Tooltip: ""
+	// DisplayName: Manual Knife Crafting Station
+}
+
+manual_mallet: {
+	// Tooltip: ""
+	// DisplayName: Manual Mallet Crafting Station
+}
+
+manual_hammer: {
+	// Tooltip: ""
+	// DisplayName: Manual Hammer Crafting Station
+}
+
 max_4096a_laser_source_hatch: {
 	// Tooltip: ""
 	// DisplayName: MAX 4096A Laser Source Hatch
@@ -38771,83 +38821,1002 @@ tungsten_carbide_gregith: {
 	// DisplayName: Tungsten Carbide Gregith
 }
 
-acid_etched_inert_casing: {
-	// DisplayName: Acid-Etched Inert Casing
-	/* Tooltip:
-		'''
-		An inert casing etched reactive in an HV chemical reactor
-		Use on the surface to summon the Caustic Reactor
-		''' */
+titanium_gregith: {
+	// Tooltip: ""
+	// DisplayName: Titanium Gregith
 }
 
-OverburnedCoilBlock: {
-	// DisplayName: Overburned Coil Block
-	/* Tooltip:
-		'''
-		A cupronickel coil block stoked past its limit
-		Use on the surface to summon the Fallen EBF
-		''' */
+sterling_silver_gregith: {
+	// Tooltip: ""
+	// DisplayName: Sterling Silver Gregith
 }
 
-unstable_compressor_charge: {
-	// DisplayName: Unstable Compressor Charge
-	/* Tooltip:
-		'''
-		A steel casing packed with ITNT, primed in a Large Chemical Reactor
-		Use on the surface to summon the Implosion Press
-		''' */
+steel_gregith: {
+	// Tooltip: ""
+	// DisplayName: Steel Gregith
 }
 
-dirty_stainless_steel_casing: {
-	// DisplayName: Dirty Stainless Steel Casing
-	/* Tooltip:
-		'''
-		A stainless casing clogged with soul residue
-		Use in hardmode to summon the Soul Distiller
-		''' */
+stainless_steel_gregith: {
+	// Tooltip: ""
+	// DisplayName: Stainless Steel Gregith
 }
 
-frozen_frostproof_casing: {
-	// DisplayName: Frozen Frostproof Casing
-	/* Tooltip:
-		'''
-		A frost-proof casing frozen solid in an HV chemical bath
-		Use on the surface to summon the Vacuum Freezer
-		''' */
+rose_gold_gregith: {
+	// Tooltip: ""
+	// DisplayName: Rose Gold Gregith
 }
 
-GregTechIronToolsBag: {
-	// DisplayName: Starter Bag: Iron Tools
-	/* Tooltip:
-		'''
-		Right-click to open. Drops the iron-tier crafting catalysts:
-		hammer, wrench, wire cutter, file, screwdriver, saw, mortar, crowbar, knife.
-		''' */
+red_steel_gregith: {
+	// Tooltip: ""
+	// DisplayName: Red Steel Gregith
 }
 
-SkipStoneAgeBag: {
-	// DisplayName: Starter Bag: Skip Stone Age
-	/* Tooltip:
-		'''
-		Right-click to open. Drops a steam-age auto-mining setup so you can skip manual mining:
-		HP steam miner, two HP coal boilers, bronze crates, HP steam furnace + macerator,
-		coke fuel, fluid + item pipes, and the primitive-pump + coke-oven multiblock bags.
-		''' */
+neutronium_gregith: {
+	// Tooltip: ""
+	// DisplayName: Neutronium Gregith
 }
 
-SteamAgeSkipBag: {
-	// DisplayName: Starter Bag: Skip Steam Age
-	/* Tooltip:
-		'''
-		Right-click to open. Drops an LV-tier bootstrap kit so you can skip the Bronze / Steam age:
-		4x LV solar panel + 4x LV lamp + LV 4x battery buffer + 1 sodium battery,
-		4 LV machine hulls + circuits + plates + rods + wires for assembling LV machines,
-		and a stack of simple item + fluid pipes.
-		''' */
+netherite_gregith: {
+	// Tooltip: ""
+	// DisplayName: Netherite Gregith
+}
+
+naquadah_alloy_gregith: {
+	// Tooltip: ""
+	// DisplayName: Naquadah Alloy Gregith
+}
+
+iron_gregith: {
+	// Tooltip: ""
+	// DisplayName: Iron Gregith
+}
+
+invar_gregith: {
+	// Tooltip: ""
+	// DisplayName: Invar Gregith
+}
+
+hsse_gregith: {
+	// Tooltip: ""
+	// DisplayName: Hsse Gregith
+}
+
+duranium_gregith: {
+	// Tooltip: ""
+	// DisplayName: Duranium Gregith
+}
+
+diamond_gregith: {
+	// Tooltip: ""
+	// DisplayName: Diamond Gregith
+}
+
+damascus_steel_gregith: {
+	// Tooltip: ""
+	// DisplayName: Damascus Steel Gregith
+}
+
+cobalt_brass_gregith: {
+	// Tooltip: ""
+	// DisplayName: Cobalt Brass Gregith
+}
+
+bronze_gregith: {
+	// Tooltip: ""
+	// DisplayName: Bronze Gregith
+}
+
+blue_steel_gregith: {
+	// Tooltip: ""
+	// DisplayName: Blue Steel Gregith
+}
+
+aluminium_gregith: {
+	// Tooltip: ""
+	// DisplayName: Aluminium Gregith
+}
+
+simple_fluid_pipe_huge: {
+	// Tooltip: ""
+	// DisplayName: Huge Simple Fluid Pipe
+}
+
+simple_fluid_pipe_large: {
+	// Tooltip: ""
+	// DisplayName: Large Simple Fluid Pipe
+}
+
+simple_fluid_pipe: {
+	// Tooltip: ""
+	// DisplayName: Simple Fluid Pipe
+}
+
+simple_fluid_pipe_small: {
+	// Tooltip: ""
+	// DisplayName: Small Simple Fluid Pipe
+}
+
+simple_fluid_pipe_tiny: {
+	// Tooltip: ""
+	// DisplayName: Tiny Simple Fluid Pipe
+}
+
+simple_item_pipe_huge: {
+	// Tooltip: ""
+	// DisplayName: Huge Simple Item Pipe
+}
+
+simple_item_pipe_large: {
+	// Tooltip: ""
+	// DisplayName: Large Simple Item Pipe
+}
+
+simple_item_pipe: {
+	// Tooltip: ""
+	// DisplayName: Simple Item Pipe
+}
+
+simple_item_pipe_small: {
+	// Tooltip: ""
+	// DisplayName: Small Simple Item Pipe
+}
+
+luminite_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: UV Luminite Superconductor Hex Wire
+}
+
+luminite_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: UV Luminite Superconductor Octal Wire
+}
+
+luminite_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: UV Luminite Superconductor Quadruple Wire
+}
+
+luminite_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: UV Luminite Superconductor Double Wire
+}
+
+luminite_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: UV Luminite Superconductor Wire
+}
+
+shroomite_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: ZPM Shroomite Superconductor Hex Wire
+}
+
+shroomite_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: ZPM Shroomite Superconductor Octal Wire
+}
+
+shroomite_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: ZPM Shroomite Superconductor Quadruple Wire
+}
+
+shroomite_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: ZPM Shroomite Superconductor Double Wire
+}
+
+shroomite_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: ZPM Shroomite Superconductor Wire
+}
+
+spectre_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: LuV Spectre Superconductor Hex Wire
+}
+
+spectre_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: LuV Spectre Superconductor Octal Wire
+}
+
+spectre_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: LuV Spectre Superconductor Quadruple Wire
+}
+
+spectre_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: LuV Spectre Superconductor Double Wire
+}
+
+spectre_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: LuV Spectre Superconductor Wire
+}
+
+chlorophyte_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: IV Chlorophyte Superconductor Hex Wire
+}
+
+chlorophyte_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: IV Chlorophyte Superconductor Octal Wire
+}
+
+chlorophyte_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: IV Chlorophyte Superconductor Quadruple Wire
+}
+
+chlorophyte_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: IV Chlorophyte Superconductor Double Wire
+}
+
+chlorophyte_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: IV Chlorophyte Superconductor Wire
+}
+
+hallowed_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: EV Hallowed Superconductor Hex Wire
+}
+
+hallowed_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: EV Hallowed Superconductor Octal Wire
+}
+
+hallowed_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: EV Hallowed Superconductor Quadruple Wire
+}
+
+hallowed_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: EV Hallowed Superconductor Double Wire
+}
+
+hallowed_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: EV Hallowed Superconductor Wire
+}
+
+hellstone_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: HV Hellstone Superconductor Hex Wire
+}
+
+hellstone_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: HV Hellstone Superconductor Octal Wire
+}
+
+hellstone_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: HV Hellstone Superconductor Quadruple Wire
+}
+
+hellstone_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: HV Hellstone Superconductor Double Wire
+}
+
+hellstone_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: HV Hellstone Superconductor Wire
+}
+
+meteorite_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: MV Meteorite Superconductor Hex Wire
+}
+
+meteorite_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: MV Meteorite Superconductor Octal Wire
+}
+
+meteorite_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: MV Meteorite Superconductor Quadruple Wire
+}
+
+meteorite_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: MV Meteorite Superconductor Double Wire
+}
+
+meteorite_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: MV Meteorite Superconductor Wire
+}
+
+evil_superconductor_hex: {
+	// Tooltip: ""
+	// DisplayName: LV Evil Superconductor Hex Wire
+}
+
+evil_superconductor_octal: {
+	// Tooltip: ""
+	// DisplayName: LV Evil Superconductor Octal Wire
+}
+
+evil_superconductor_quadruple: {
+	// Tooltip: ""
+	// DisplayName: LV Evil Superconductor Quadruple Wire
+}
+
+evil_superconductor_double: {
+	// Tooltip: ""
+	// DisplayName: LV Evil Superconductor Double Wire
+}
+
+evil_superconductor_single: {
+	// Tooltip: ""
+	// DisplayName: LV Evil Superconductor Wire
+}
+
+molten_zeron_100_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Zeron 100 Bucket
+}
+
+molten_yttrium_barium_cuprate_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Yttrium Barium Cuprate Bucket
+}
+
+molten_watertight_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Watertight Steel Bucket
+}
+
+molten_vanadium_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Vanadium Steel Bucket
+}
+
+molten_vanadium_gallium_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Vanadium Gallium Bucket
+}
+
+molten_uranium_triplatinum_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Uranium Triplatinum Bucket
+}
+
+molten_uranium_rhodium_dinaquadide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Uranium Rhodium Dinaquadide Bucket
+}
+
+molten_ultimet_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Ultimet Bucket
+}
+
+molten_tungsten_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Tungsten Steel Bucket
+}
+
+molten_tungsten_carbide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Tungsten Carbide Bucket
+}
+
+molten_titanium_tungsten_carbide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Titanium Tungsten Carbide Bucket
+}
+
+molten_titanium_carbide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Titanium Carbide Bucket
+}
+
+tin_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Tin Plasma Bucket
+}
+
+molten_tantalum_carbide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Tantalum Carbide Bucket
+}
+
+molten_sterling_silver_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Sterling Silver Bucket
+}
+
+molten_stellite_100_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Stellite 100 Bucket
+}
+
+molten_stainless_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Stainless Steel Bucket
+}
+
+molten_samarium_iron_arsenic_oxide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Samarium Iron Arsenic Oxide Bucket
+}
+
+molten_ruthenium_trinium_americium_neutronate_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Ruthenium Trinium Americium Neutronate Bucket
+}
+
+molten_ruridit_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Ruridit Bucket
+}
+
+molten_rtm_alloy_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Rtm Alloy Bucket
+}
+
+molten_rose_gold_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Rose Gold Bucket
+}
+
+molten_rhodium_plated_palladium_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Rhodium Plated Palladium Bucket
+}
+
+molten_red_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Red Steel Bucket
+}
+
+oxygen_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Oxygen Plasma Bucket
+}
+
+liquid_oxygen_bucket: {
+	// Tooltip: ""
+	// DisplayName: Liquid Oxygen Bucket
+}
+
+molten_osmiridium_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Osmiridium Bucket
+}
+
+nitrogen_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Nitrogen Plasma Bucket
+}
+
+molten_niobium_titanium_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Niobium Titanium Bucket
+}
+
+molten_niobium_nitride_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Niobium Nitride Bucket
+}
+
+nickel_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Nickel Plasma Bucket
+}
+
+molten_nichrome_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Nichrome Bucket
+}
+
+molten_naquadah_alloy_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Naquadah Alloy Bucket
+}
+
+molten_molybdenum_disilicide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Molybdenum Disilicide Bucket
+}
+
+milk_bucket: {
+	// Tooltip: ""
+	// DisplayName: Milk Bucket
+}
+
+molten_mercury_barium_calcium_cuprate_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Mercury Barium Calcium Cuprate Bucket
+}
+
+molten_maraging_steel_300_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Maraging Steel 300 Bucket
+}
+
+molten_manganese_phosphide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Manganese Phosphide Bucket
+}
+
+molten_magnesium_diboride_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Magnesium Diboride Bucket
+}
+
+molten_kanthal_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Kanthal Bucket
+}
+
+iron_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Iron Plasma Bucket
+}
+
+molten_indium_tin_barium_titanium_cuprate_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Indium Tin Barium Titanium Cuprate Bucket
+}
+
+molten_incoloy_ma_956_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Incoloy Ma 956 Bucket
+}
+
+molten_hsss_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hsss Bucket
+}
+
+molten_hssg_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hssg Bucket
+}
+
+molten_hsse_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hsse Bucket
+}
+
+molten_hsla_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hsla Steel Bucket
+}
+
+helium_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Helium Plasma Bucket
+}
+
+liquid_helium_bucket: {
+	// Tooltip: ""
+	// DisplayName: Liquid Helium Bucket
+}
+
+molten_hastelloy_x_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hastelloy X Bucket
+}
+
+molten_hastelloy_c_276_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Hastelloy C 276 Bucket
+}
+
+molten_gallium_arsenide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Gallium Arsenide Bucket
+}
+
+molten_enriched_naquadah_trinium_europium_duranide_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Enriched Naquadah Trinium Europium Duranide Bucket
+}
+
+molten_blue_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Blue Steel Bucket
+}
+
+molten_black_steel_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Black Steel Bucket
+}
+
+molten_black_bronze_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Black Bronze Bucket
+}
+
+molten_bismuth_bronze_bucket: {
+	// Tooltip: ""
+	// DisplayName: Molten Bismuth Bronze Bucket
+}
+
+argon_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Argon Plasma Bucket
+}
+
+americium_plasma_bucket: {
+	// Tooltip: ""
+	// DisplayName: Americium Plasma Bucket
+}
+
+shimmer_bucket: {
+	// Tooltip: ""
+	// DisplayName: Shimmer Bucket
+}
+
+honey_bucket: {
+	// Tooltip: ""
+	// DisplayName: Honey Bucket
+}
+
+lava_bucket: {
+	// Tooltip: ""
+	// DisplayName: Lava Bucket
+}
+
+water_bucket: {
+	// Tooltip: ""
+	// DisplayName: Water Bucket
+}
+
+GregTechMultitool: {
+	// Tooltip: ""
+	// DisplayName: Greg Multitool
+}
+
+pipe_intersection: {
+	// Tooltip: ""
+	// DisplayName: Pipe Intersection
+}
+
+multiblock_bag_steel_multiblock_tank: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Steel Multiblock Tank Multiblock Bag
+}
+
+multiblock_bag_bronze_multiblock_tank: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Bronze Multiblock Tank Multiblock Bag
+}
+
+multiblock_bag_wooden_multiblock_tank: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Wooden Multiblock Tank Multiblock Bag
+}
+
+multiblock_bag_mega_blast_furnace: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Rotary Hearth Furnace Multiblock Bag
+}
+
+multiblock_bag_alloy_blast_smelter: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Alloy Blast Smelter Multiblock Bag
+}
+
+multiblock_bag_cracker: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Cracking Unit Multiblock Bag
+}
+
+multiblock_bag_pyrolyse_oven: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Pyrolyse Oven Multiblock Bag
+}
+
+multiblock_bag_multi_smelter: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Multi Smelter Multiblock Bag
+}
+
+multiblock_bag_mega_vacuum_freezer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Bulk Blast Chiller Multiblock Bag
+}
+
+multiblock_bag_large_mixer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Mixing Vessel Multiblock Bag
+}
+
+multiblock_bag_large_maceration_tower: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Maceration Tower Multiblock Bag
+}
+
+multiblock_bag_large_chemical_bath: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Chemical Bath Multiblock Bag
+}
+
+multiblock_bag_large_wiremill: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Wire Factory Multiblock Bag
+}
+
+multiblock_bag_large_solidifier: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Solidification Array Multiblock Bag
+}
+
+multiblock_bag_large_extruder: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Extrusion Machine Multiblock Bag
+}
+
+multiblock_bag_large_extractor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Extraction Machine Multiblock Bag
+}
+
+multiblock_bag_large_cutter: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Cutting Saw Multiblock Bag
+}
+
+multiblock_bag_large_brewer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Brewing Vat Multiblock Bag
+}
+
+multiblock_bag_large_material_press: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Material Press Multiblock Bag
+}
+
+multiblock_bag_large_sifting_funnel: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Sifting Funnel Multiblock Bag
+}
+
+multiblock_bag_large_engraving_laser: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Engraving Laser Multiblock Bag
+}
+
+multiblock_bag_large_arc_smelter: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Arc Smelter Multiblock Bag
+}
+
+multiblock_bag_large_circuit_assembler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Circuit Assembling Facility Multiblock Bag
+}
+
+multiblock_bag_large_assembler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Assembling Factory Multiblock Bag
+}
+
+multiblock_bag_large_packer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Packaging Machine Multiblock Bag
+}
+
+multiblock_bag_large_electromagnet: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Electromagnet Multiblock Bag
+}
+
+multiblock_bag_large_electrolyzer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Electrolysis Chamber Multiblock Bag
+}
+
+multiblock_bag_large_centrifuge: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Centrifugal Unit Multiblock Bag
+}
+
+multiblock_bag_research_station: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Research Station Multiblock Bag
+}
+
+multiblock_bag_network_switch: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Network Switch Multiblock Bag
+}
+
+multiblock_bag_data_bank: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Data Bank Multiblock Bag
+}
+
+multiblock_bag_high_performance_computation_array: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: High Performance Computing Array Multiblock Bag
+}
+
+multiblock_bag_power_substation: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Power Substation Multiblock Bag
+}
+
+multiblock_bag_active_transformer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Active Transformer Multiblock Bag
+}
+
+multiblock_bag_uv_fusion_reactor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Fusion Reactor Mk III Multiblock Bag
+}
+
+multiblock_bag_zpm_fusion_reactor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Fusion Reactor Mk II Multiblock Bag
+}
+
+multiblock_bag_luv_fusion_reactor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Fusion Reactor Mk I Multiblock Bag
+}
+
+multiblock_bag_ev_fluid_drilling_rig: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Advanced Fluid Drilling Rig II Multiblock Bag
+}
+
+multiblock_bag_hv_fluid_drilling_rig: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Advanced Fluid Drilling Rig Multiblock Bag
+}
+
+multiblock_bag_mv_fluid_drilling_rig: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Fluid Drilling Rig Multiblock Bag
+}
+
+multiblock_bag_luv_large_miner: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Advanced Large Miner II Multiblock Bag
+}
+
+multiblock_bag_iv_large_miner: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Advanced Large Miner Multiblock Bag
+}
+
+multiblock_bag_ev_large_miner: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Miner Multiblock Bag
+}
+
+multiblock_bag_plasma_large_turbine: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Plasma Turbine Multiblock Bag
+}
+
+multiblock_bag_gas_large_turbine: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Gas Turbine Multiblock Bag
+}
+
+multiblock_bag_steam_large_turbine: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Steam Turbine Multiblock Bag
+}
+
+multiblock_bag_extreme_combustion_engine: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Extreme Combustion Engine Multiblock Bag
+}
+
+multiblock_bag_large_combustion_engine: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Combustion Engine Multiblock Bag
+}
+
+multiblock_bag_steam_oven: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Steam Oven Multiblock Bag
+}
+
+multiblock_bag_steam_grinder: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Steam Grinder Multiblock Bag
+}
+
+multiblock_bag_assembly_line: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Assembly Line Multiblock Bag
+}
+
+multiblock_bag_large_distillery: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Distillery Multiblock Bag
+}
+
+multiblock_bag_distillation_tower: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Distillation Tower Multiblock Bag
+}
+
+multiblock_bag_large_autoclave: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Crystallization Chamber Multiblock Bag
+}
+
+multiblock_bag_implosion_compressor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Implosion Compressor Multiblock Bag
+}
+
+multiblock_bag_vacuum_freezer: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Vacuum Freezer Multiblock Bag
+}
+
+multiblock_bag_large_chemical_reactor: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Chemical Reactor Multiblock Bag
+}
+
+multiblock_bag_cleanroom: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Cleanroom Multiblock Bag
+}
+
+multiblock_bag_electric_blast_furnace: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Electric Blast Furnace Multiblock Bag
+}
+
+multiblock_bag_tungstensteel_large_boiler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Tungstensteel Boiler Multiblock Bag
+}
+
+multiblock_bag_titanium_large_boiler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Titanium Boiler Multiblock Bag
+}
+
+multiblock_bag_steel_large_boiler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Steel Boiler Multiblock Bag
+}
+
+multiblock_bag_bronze_large_boiler: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Large Bronze Boiler Multiblock Bag
+}
+
+multiblock_bag_primitive_pump: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Primitive Water Pump Multiblock Bag
+}
+
+multiblock_bag_primitive_blast_furnace: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Primitive Blast Furnace Multiblock Bag
+}
+
+multiblock_bag_coke_oven: {
+	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
+	// DisplayName: Coke Oven Multiblock Bag
 }
 
 TooManyItemsItem: {
-	// DisplayName: Too Many Items
 	/* Tooltip:
 		'''
 		Place anywhere * right-click to open the global recipe browser.
@@ -38866,784 +39835,70 @@ TooManyItemsItem: {
 		  Esc / X         - close browser
 		  Hover ingredient cell - tooltip with chance / tool info
 		''' */
-}
-
-water_bucket: {
-	// DisplayName: Water Bucket
-	// Tooltip: ""
-}
-
-lava_bucket: {
-	// DisplayName: Lava Bucket
-	// Tooltip: ""
-}
-
-americium_plasma_bucket: {
-	// DisplayName: Americium Plasma Bucket
-	// Tooltip: ""
-}
-
-argon_plasma_bucket: {
-	// DisplayName: Argon Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_bismuth_bronze_bucket: {
-	// DisplayName: Molten Bismuth Bronze Bucket
-	// Tooltip: ""
-}
-
-molten_black_bronze_bucket: {
-	// DisplayName: Molten Black Bronze Bucket
-	// Tooltip: ""
-}
-
-molten_black_steel_bucket: {
-	// DisplayName: Molten Black Steel Bucket
-	// Tooltip: ""
-}
-
-molten_blue_steel_bucket: {
-	// DisplayName: Molten Blue Steel Bucket
-	// Tooltip: ""
-}
-
-molten_enriched_naquadah_trinium_europium_duranide_bucket: {
-	// DisplayName: Molten Enriched Naquadah Trinium Europium Duranide Bucket
-	// Tooltip: ""
-}
-
-molten_gallium_arsenide_bucket: {
-	// DisplayName: Molten Gallium Arsenide Bucket
-	// Tooltip: ""
-}
-
-molten_hastelloy_c_276_bucket: {
-	// DisplayName: Molten Hastelloy C 276 Bucket
-	// Tooltip: ""
-}
-
-molten_hastelloy_x_bucket: {
-	// DisplayName: Molten Hastelloy X Bucket
-	// Tooltip: ""
-}
-
-liquid_helium_bucket: {
-	// DisplayName: Liquid Helium Bucket
-	// Tooltip: ""
-}
-
-helium_plasma_bucket: {
-	// DisplayName: Helium Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_hsla_steel_bucket: {
-	// DisplayName: Molten Hsla Steel Bucket
-	// Tooltip: ""
-}
-
-molten_hsse_bucket: {
-	// DisplayName: Molten Hsse Bucket
-	// Tooltip: ""
-}
-
-molten_hssg_bucket: {
-	// DisplayName: Molten Hssg Bucket
-	// Tooltip: ""
-}
-
-molten_hsss_bucket: {
-	// DisplayName: Molten Hsss Bucket
-	// Tooltip: ""
-}
-
-molten_incoloy_ma_956_bucket: {
-	// DisplayName: Molten Incoloy Ma 956 Bucket
-	// Tooltip: ""
-}
-
-molten_indium_tin_barium_titanium_cuprate_bucket: {
-	// DisplayName: Molten Indium Tin Barium Titanium Cuprate Bucket
-	// Tooltip: ""
-}
-
-iron_plasma_bucket: {
-	// DisplayName: Iron Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_kanthal_bucket: {
-	// DisplayName: Molten Kanthal Bucket
-	// Tooltip: ""
-}
-
-molten_magnesium_diboride_bucket: {
-	// DisplayName: Molten Magnesium Diboride Bucket
-	// Tooltip: ""
-}
-
-molten_manganese_phosphide_bucket: {
-	// DisplayName: Molten Manganese Phosphide Bucket
-	// Tooltip: ""
-}
-
-molten_maraging_steel_300_bucket: {
-	// DisplayName: Molten Maraging Steel 300 Bucket
-	// Tooltip: ""
-}
-
-molten_mercury_barium_calcium_cuprate_bucket: {
-	// DisplayName: Molten Mercury Barium Calcium Cuprate Bucket
-	// Tooltip: ""
-}
-
-milk_bucket: {
-	// DisplayName: Milk Bucket
-	// Tooltip: ""
-}
-
-molten_molybdenum_disilicide_bucket: {
-	// DisplayName: Molten Molybdenum Disilicide Bucket
-	// Tooltip: ""
-}
-
-molten_naquadah_alloy_bucket: {
-	// DisplayName: Molten Naquadah Alloy Bucket
-	// Tooltip: ""
-}
-
-molten_nichrome_bucket: {
-	// DisplayName: Molten Nichrome Bucket
-	// Tooltip: ""
-}
-
-nickel_plasma_bucket: {
-	// DisplayName: Nickel Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_niobium_nitride_bucket: {
-	// DisplayName: Molten Niobium Nitride Bucket
-	// Tooltip: ""
-}
-
-molten_niobium_titanium_bucket: {
-	// DisplayName: Molten Niobium Titanium Bucket
-	// Tooltip: ""
-}
-
-nitrogen_plasma_bucket: {
-	// DisplayName: Nitrogen Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_osmiridium_bucket: {
-	// DisplayName: Molten Osmiridium Bucket
-	// Tooltip: ""
-}
-
-liquid_oxygen_bucket: {
-	// DisplayName: Liquid Oxygen Bucket
-	// Tooltip: ""
-}
-
-oxygen_plasma_bucket: {
-	// DisplayName: Oxygen Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_red_steel_bucket: {
-	// DisplayName: Molten Red Steel Bucket
-	// Tooltip: ""
-}
-
-molten_rhodium_plated_palladium_bucket: {
-	// DisplayName: Molten Rhodium Plated Palladium Bucket
-	// Tooltip: ""
-}
-
-molten_rose_gold_bucket: {
-	// DisplayName: Molten Rose Gold Bucket
-	// Tooltip: ""
-}
-
-molten_rtm_alloy_bucket: {
-	// DisplayName: Molten Rtm Alloy Bucket
-	// Tooltip: ""
-}
-
-molten_ruridit_bucket: {
-	// DisplayName: Molten Ruridit Bucket
-	// Tooltip: ""
-}
-
-molten_ruthenium_trinium_americium_neutronate_bucket: {
-	// DisplayName: Molten Ruthenium Trinium Americium Neutronate Bucket
-	// Tooltip: ""
-}
-
-molten_samarium_iron_arsenic_oxide_bucket: {
-	// DisplayName: Molten Samarium Iron Arsenic Oxide Bucket
-	// Tooltip: ""
-}
-
-molten_stainless_steel_bucket: {
-	// DisplayName: Molten Stainless Steel Bucket
-	// Tooltip: ""
-}
-
-molten_stellite_100_bucket: {
-	// DisplayName: Molten Stellite 100 Bucket
-	// Tooltip: ""
-}
-
-molten_sterling_silver_bucket: {
-	// DisplayName: Molten Sterling Silver Bucket
-	// Tooltip: ""
-}
-
-molten_tantalum_carbide_bucket: {
-	// DisplayName: Molten Tantalum Carbide Bucket
-	// Tooltip: ""
-}
-
-tin_plasma_bucket: {
-	// DisplayName: Tin Plasma Bucket
-	// Tooltip: ""
-}
-
-molten_titanium_carbide_bucket: {
-	// DisplayName: Molten Titanium Carbide Bucket
-	// Tooltip: ""
-}
-
-molten_titanium_tungsten_carbide_bucket: {
-	// DisplayName: Molten Titanium Tungsten Carbide Bucket
-	// Tooltip: ""
-}
-
-molten_tungsten_carbide_bucket: {
-	// DisplayName: Molten Tungsten Carbide Bucket
-	// Tooltip: ""
-}
-
-molten_tungsten_steel_bucket: {
-	// DisplayName: Molten Tungsten Steel Bucket
-	// Tooltip: ""
-}
-
-molten_ultimet_bucket: {
-	// DisplayName: Molten Ultimet Bucket
-	// Tooltip: ""
-}
-
-molten_uranium_rhodium_dinaquadide_bucket: {
-	// DisplayName: Molten Uranium Rhodium Dinaquadide Bucket
-	// Tooltip: ""
-}
-
-molten_uranium_triplatinum_bucket: {
-	// DisplayName: Molten Uranium Triplatinum Bucket
-	// Tooltip: ""
-}
-
-molten_vanadium_gallium_bucket: {
-	// DisplayName: Molten Vanadium Gallium Bucket
-	// Tooltip: ""
-}
-
-molten_vanadium_steel_bucket: {
-	// DisplayName: Molten Vanadium Steel Bucket
-	// Tooltip: ""
-}
-
-molten_watertight_steel_bucket: {
-	// DisplayName: Molten Watertight Steel Bucket
-	// Tooltip: ""
-}
-
-molten_yttrium_barium_cuprate_bucket: {
-	// DisplayName: Molten Yttrium Barium Cuprate Bucket
-	// Tooltip: ""
-}
-
-molten_zeron_100_bucket: {
-	// DisplayName: Molten Zeron 100 Bucket
-	// Tooltip: ""
-}
-
-simple_item_pipe_small: {
-	// DisplayName: Small Simple Item Pipe
-	// Tooltip: ""
-}
-
-simple_item_pipe: {
-	// DisplayName: Simple Item Pipe
-	// Tooltip: ""
-}
-
-simple_item_pipe_large: {
-	// DisplayName: Large Simple Item Pipe
-	// Tooltip: ""
-}
-
-simple_item_pipe_huge: {
-	// DisplayName: Huge Simple Item Pipe
-	// Tooltip: ""
-}
-
-simple_fluid_pipe_tiny: {
-	// DisplayName: Tiny Simple Fluid Pipe
-	// Tooltip: ""
-}
-
-simple_fluid_pipe_small: {
-	// DisplayName: Small Simple Fluid Pipe
-	// Tooltip: ""
-}
-
-simple_fluid_pipe: {
-	// DisplayName: Simple Fluid Pipe
-	// Tooltip: ""
-}
-
-simple_fluid_pipe_large: {
-	// DisplayName: Large Simple Fluid Pipe
-	// Tooltip: ""
-}
-
-simple_fluid_pipe_huge: {
-	// DisplayName: Huge Simple Fluid Pipe
-	// Tooltip: ""
-}
-
-aluminium_gregith: {
-	// DisplayName: Aluminium Gregith
-	// Tooltip: ""
-}
-
-blue_steel_gregith: {
-	// DisplayName: Blue Steel Gregith
-	// Tooltip: ""
-}
-
-bronze_gregith: {
-	// DisplayName: Bronze Gregith
-	// Tooltip: ""
-}
-
-cobalt_brass_gregith: {
-	// DisplayName: Cobalt Brass Gregith
-	// Tooltip: ""
-}
-
-damascus_steel_gregith: {
-	// DisplayName: Damascus Steel Gregith
-	// Tooltip: ""
-}
-
-diamond_gregith: {
-	// DisplayName: Diamond Gregith
-	// Tooltip: ""
-}
-
-duranium_gregith: {
-	// DisplayName: Duranium Gregith
-	// Tooltip: ""
-}
-
-hsse_gregith: {
-	// DisplayName: Hsse Gregith
-	// Tooltip: ""
-}
-
-invar_gregith: {
-	// DisplayName: Invar Gregith
-	// Tooltip: ""
-}
-
-iron_gregith: {
-	// DisplayName: Iron Gregith
-	// Tooltip: ""
-}
-
-naquadah_alloy_gregith: {
-	// DisplayName: Naquadah Alloy Gregith
-	// Tooltip: ""
-}
-
-netherite_gregith: {
-	// DisplayName: Netherite Gregith
-	// Tooltip: ""
-}
-
-neutronium_gregith: {
-	// DisplayName: Neutronium Gregith
-	// Tooltip: ""
-}
-
-red_steel_gregith: {
-	// DisplayName: Red Steel Gregith
-	// Tooltip: ""
-}
-
-rose_gold_gregith: {
-	// DisplayName: Rose Gold Gregith
-	// Tooltip: ""
-}
-
-stainless_steel_gregith: {
-	// DisplayName: Stainless Steel Gregith
-	// Tooltip: ""
-}
-
-steel_gregith: {
-	// DisplayName: Steel Gregith
-	// Tooltip: ""
-}
-
-sterling_silver_gregith: {
-	// DisplayName: Sterling Silver Gregith
-	// Tooltip: ""
-}
-
-titanium_gregith: {
-	// DisplayName: Titanium Gregith
-	// Tooltip: ""
-}
-
-multiblock_bag_coke_oven: {
-	// DisplayName: Coke Oven Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_primitive_blast_furnace: {
-	// DisplayName: Primitive Blast Furnace Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_primitive_pump: {
-	// DisplayName: Primitive Water Pump Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_bronze_large_boiler: {
-	// DisplayName: Large Bronze Boiler Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_steel_large_boiler: {
-	// DisplayName: Large Steel Boiler Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_titanium_large_boiler: {
-	// DisplayName: Large Titanium Boiler Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_tungstensteel_large_boiler: {
-	// DisplayName: Large Tungstensteel Boiler Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_electric_blast_furnace: {
-	// DisplayName: Electric Blast Furnace Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_cleanroom: {
-	// DisplayName: Cleanroom Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_chemical_reactor: {
-	// DisplayName: Large Chemical Reactor Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_vacuum_freezer: {
-	// DisplayName: Vacuum Freezer Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_implosion_compressor: {
-	// DisplayName: Implosion Compressor Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_autoclave: {
-	// DisplayName: Large Crystallization Chamber Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_distillation_tower: {
-	// DisplayName: Distillation Tower Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_distillery: {
-	// DisplayName: Large Distillery Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_assembly_line: {
-	// DisplayName: Assembly Line Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_steam_grinder: {
-	// DisplayName: Steam Grinder Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_steam_oven: {
-	// DisplayName: Steam Oven Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_combustion_engine: {
-	// DisplayName: Large Combustion Engine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_extreme_combustion_engine: {
-	// DisplayName: Extreme Combustion Engine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_steam_large_turbine: {
-	// DisplayName: Large Steam Turbine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_gas_large_turbine: {
-	// DisplayName: Large Gas Turbine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_plasma_large_turbine: {
-	// DisplayName: Large Plasma Turbine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_ev_large_miner: {
-	// DisplayName: Large Miner Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_iv_large_miner: {
-	// DisplayName: Advanced Large Miner Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_luv_large_miner: {
-	// DisplayName: Advanced Large Miner II Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_mv_fluid_drilling_rig: {
-	// DisplayName: Fluid Drilling Rig Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_hv_fluid_drilling_rig: {
-	// DisplayName: Advanced Fluid Drilling Rig Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_ev_fluid_drilling_rig: {
-	// DisplayName: Advanced Fluid Drilling Rig II Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_luv_fusion_reactor: {
-	// DisplayName: Fusion Reactor Mk I Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_zpm_fusion_reactor: {
-	// DisplayName: Fusion Reactor Mk II Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_uv_fusion_reactor: {
-	// DisplayName: Fusion Reactor Mk III Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_active_transformer: {
-	// DisplayName: Active Transformer Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_power_substation: {
-	// DisplayName: Power Substation Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_high_performance_computation_array: {
-	// DisplayName: High Performance Computing Array Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_data_bank: {
-	// DisplayName: Data Bank Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_network_switch: {
-	// DisplayName: Network Switch Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_research_station: {
-	// DisplayName: Research Station Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_centrifuge: {
-	// DisplayName: Large Centrifugal Unit Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_electrolyzer: {
-	// DisplayName: Large Electrolysis Chamber Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_electromagnet: {
-	// DisplayName: Large Electromagnet Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_packer: {
-	// DisplayName: Large Packaging Machine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_assembler: {
-	// DisplayName: Large Assembling Factory Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_circuit_assembler: {
-	// DisplayName: Large Circuit Assembling Facility Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_arc_smelter: {
-	// DisplayName: Large Arc Smelter Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_engraving_laser: {
-	// DisplayName: Large Engraving Laser Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_sifting_funnel: {
-	// DisplayName: Large Sifting Funnel Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_material_press: {
-	// DisplayName: Large Material Press Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_brewer: {
-	// DisplayName: Large Brewing Vat Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_cutter: {
-	// DisplayName: Large Cutting Saw Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_extractor: {
-	// DisplayName: Large Extraction Machine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_extruder: {
-	// DisplayName: Large Extrusion Machine Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_solidifier: {
-	// DisplayName: Large Solidification Array Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_wiremill: {
-	// DisplayName: Large Wire Factory Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_chemical_bath: {
-	// DisplayName: Large Chemical Bath Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_maceration_tower: {
-	// DisplayName: Large Maceration Tower Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_large_mixer: {
-	// DisplayName: Large Mixing Vessel Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_mega_vacuum_freezer: {
-	// DisplayName: Bulk Blast Chiller Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_multi_smelter: {
-	// DisplayName: Multi Smelter Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_pyrolyse_oven: {
-	// DisplayName: Pyrolyse Oven Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_cracker: {
-	// DisplayName: Cracking Unit Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_alloy_blast_smelter: {
-	// DisplayName: Alloy Blast Smelter Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_mega_blast_furnace: {
-	// DisplayName: Rotary Hearth Furnace Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_wooden_multiblock_tank: {
-	// DisplayName: Wooden Multiblock Tank Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_bronze_multiblock_tank: {
-	// DisplayName: Bronze Multiblock Tank Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-multiblock_bag_steel_multiblock_tank: {
-	// DisplayName: Steel Multiblock Tank Multiblock Bag
-	// Tooltip: Right-click to open - drops the structure parts to assemble this multiblock.
-}
-
-pipe_intersection: {
-	// DisplayName: Pipe Intersection
-	// Tooltip: ""
+	// DisplayName: Too Many Items
+}
+
+SteamAgeSkipBag: {
+	// Tooltip: Right-click to open. Gives a minimal LV bootstrap kit
+	// DisplayName: Starter Bag: Skip Steam Age
+}
+
+SkipStoneAgeBag: {
+	// Tooltip: Right-click to open. A steam-age auto-mining setup so you can skip manual mining.
+	// DisplayName: Starter Bag: Skip Stone Age
+}
+
+GregTechIronToolsBag: {
+	/* Tooltip:
+		'''
+		Right-click to open. Drops the iron-tier crafting catalysts:
+		hammer, wrench, wire cutter, file, screwdriver, saw, mortar, crowbar, knife,
+		plus a GregTech Multitool.
+		''' */
+	// DisplayName: Starter Bag: Iron Tools
+}
+
+frozen_frostproof_casing: {
+	/* Tooltip:
+		'''
+		A frost-proof casing frozen solid in an HV chemical bath
+		Use on the surface to summon the Vacuum Freezer
+		''' */
+	// DisplayName: Frozen Frostproof Casing
+}
+
+dirty_stainless_steel_casing: {
+	/* Tooltip:
+		'''
+		A stainless casing clogged with soul residue
+		Use in hardmode to summon the Soul Distiller
+		''' */
+	// DisplayName: Dirty Stainless Steel Casing
+}
+
+unstable_compressor_charge: {
+	/* Tooltip:
+		'''
+		A steel casing packed with ITNT, primed in a Large Chemical Reactor
+		Use on the surface to summon the Implosion Press
+		''' */
+	// DisplayName: Unstable Compressor Charge
+}
+
+OverburnedCoilBlock: {
+	/* Tooltip:
+		'''
+		A cupronickel coil block stoked past its limit
+		Use on the surface to summon the Fallen EBF
+		''' */
+	// DisplayName: Overburned Coil Block
+}
+
+acid_etched_inert_casing: {
+	/* Tooltip:
+		'''
+		An inert casing etched reactive in an HV chemical reactor
+		Use on the surface to summon the Caustic Reactor
+		''' */
+	// DisplayName: Acid-Etched Inert Casing
 }
