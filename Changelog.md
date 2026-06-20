@@ -42,6 +42,9 @@ Visuals:
 - Fixed dimension condition tooltip in recipe browser (thanks TheLarvi)
 - Removed all the unresolved recipes from the recipe browser
 
+Existing worlds should be fine to update
+Make sure to convert your tin, platinum etc. ingots into terraria variants
+
 ## 0.0.5
 
 Bugfix update! I want to get core gregtech logic to a full stability until introducing new mechanics and overhauls
