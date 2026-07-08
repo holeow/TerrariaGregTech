@@ -18,16 +18,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Magnets;
 
-// Port of ItemMagnetBehavior + the ComponentItem / ElectricStats.createElectricItem
-// composition from GTItems.ITEM_MAGNET_{LV,HV}. Chargeable electric item that
-// pulls nearby drops every 10 ticks, draining EU per activation. Variants:
-// lv_item_magnet (range 8, 100k EU, LV); hv_item_magnet (range 32, 1.6M EU, HV).
-// Configured from the registry dump (MagnetItemLoader).
-//
-// Adaptations: inventoryTick -> UpdateAccessory; tickCount gate -> GameUpdateCount
-// % 10; getEntitiesOfClass -> Main.item scan; nearest-player skip via
-// Item.playerIndexTheItemIsReservedFor; XP orbs dropped; onItemToss not ported
-// (Terraria's noGrabDelay covers it). EU + filter are per-stack ModItem state.
 public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 {
 	private readonly string? _id;
@@ -40,7 +30,7 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 
 	private long _storedEu;
 	private bool _isActive;
-	private int _filterOrdinal;                       // 0 = SIMPLE (items), 1 = TAG
+	private int _filterOrdinal; // 0 = SIMPLE, 1 = TAG
 	private SimpleItemFilter _simpleFilter = new();
 	private TagItemFilter _tagFilter = new();
 
@@ -54,7 +44,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		_maxEu = maxEu;
 		_rangeTiles = rangeTiles;
 		_rangePixels = rangeTiles * 16;
-		// Upstream: energyDraw = V[range > 8 ? HV : LV].
 		_energyDraw = VoltageTiers.Voltage(rangeTiles > 8 ? VoltageTier.HV : VoltageTier.LV);
 	}
 
@@ -72,8 +61,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 	public TagItemFilter    TagFilter    => _tagFilter;
 	public int RangeTiles => _rangeTiles;
 
-	// NOTE (verbatim upstream): a fresh SimpleItemFilter is an EMPTY WHITELIST -
-	// matches nothing, so a brand-new magnet pulls nothing until configured.
 	public IItemFilter ActiveFilter() => _filterOrdinal == 1 ? _tagFilter : _simpleFilter;
 
 	public long StoredEu
@@ -81,9 +68,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		get => _storedEu;
 		set => _storedEu = Math.Clamp(value, 0, _maxEu);
 	}
-
-	// IElectricItem - verbatim ElectricItem.java. Chargeable, NOT externally
-	// dischargeable: machine chargers fill it, nothing else can drain it.
 
 	public bool CanProvideChargeExternally() => false;
 	public bool Chargeable() => true;
@@ -113,7 +97,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 	{
 		if (Item.stack != 1) return 0L;
 		int tier = (int)_tier;
-		// dischargeable=false -> only internal drain (or tier-MAX request) honoured.
 		if ((!externally || amount == long.MaxValue) && (dischargerTier >= tier) && amount > 0L)
 		{
 			if (!ignoreTransferLimit)
@@ -127,8 +110,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		return 0;
 	}
 
-	// Upstream drainEnergy: internal, transfer-limit-ignoring; reports
-	// whether the full amount was available.
 	private bool DrainEnergy(long amount, bool simulate) =>
 		Discharge(amount, int.MaxValue, ignoreTransferLimit: true, externally: false, simulate) >= amount;
 
@@ -152,16 +133,12 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		Item.autoReuse = false;
 		Item.noMelee = true;
 		Item.UseSound = null;
-		// DEVIATION: accessory-slot gated (upstream works anywhere
-		// in hotbar/inventory).
 		Item.accessory = true;
 	}
 
 	public override bool AltFunctionUse(Player player) => true;
 	public override bool CanUseItem(Player player) => player.altFunctionUse == 2;
 
-	// Held RMB -> filter UI. Upstream's `use` was split: held-RMB opens UI;
-	// the toggle moved to the inventory-slot RMB (RightClick below).
 	public override bool? UseItem(Player player)
 	{
 		if (player.altFunctionUse != 2 || player.whoAmI != Main.myPlayer || Main.dedServ)
@@ -171,7 +148,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		return true;
 	}
 
-	// Inventory RMB -> toggle active (upstream's shift+use, Encumbering-Stone pattern).
 	public override bool CanRightClick() => true;
 
 	public override void RightClick(Player player)
@@ -184,7 +160,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 
 	public override bool ConsumeItem(Player player) => false;
 
-	// Upstream inventoryTick -> UpdateAccessory. Fires every tick while slotted.
 	public override void UpdateAccessory(Player player, bool hideVisual)
 	{
 		if (Main.dedServ || player.whoAmI != Main.myPlayer) return;
@@ -202,15 +177,12 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 			Item it = Main.item[i];
 			if (it is null || !it.active || it.IsAir) continue;
 			if (it.noGrabDelay != 0) continue;
-			// Upstream's nearest-player skip: only pull what's ours or unclaimed.
 			int reserved = it.playerIndexTheItemIsReservedFor;
 			if (reserved >= 0 && reserved != player.whoAmI) continue;
 			if (Math.Abs(it.Center.X - center.X) > _rangePixels) continue;
 			if (Math.Abs(it.Center.Y - center.Y) > _rangePixels) continue;
 			if (!filter.Test(it)) continue;
 
-			// Upstream teleports to player (jittered) + zeros velocity; vanilla
-			// GrabItems picks it up next tick.
 			it.velocity = Vector2.Zero;
 			it.position = new Vector2(
 				center.X - it.width * 0.5f + Main.rand.NextFloat(-3.2f, 3.2f),
@@ -225,8 +197,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 		}
 	}
 
-	// Carry per-stack state through tML's clone paths; filters deep-copied via
-	// save/load round-trip so each stack edits independently.
 	public override ModItem Clone(Item newEntity)
 	{
 		var c = (MagnetItem)base.Clone(newEntity);
@@ -287,6 +257,6 @@ public sealed class MagnetItem : ModItem, IElectricItem, ITextureWarmUp
 				"! Empty whitelist - pulls nothing")
 			{ OverrideColor = UI.FilterWarning.Color });
 		tooltips.Add(new TooltipLine(Mod, "MagnetHint",
-			$"Equip in an accessory slot to activate  *  Use (right-click held): filter settings  *  Right-click in inventory: pause/resume  *  Range {_rangeTiles}"));
+			$"Equip in an accessory slot to activate   Use (right-click held): filter settings   Right-click in inventory: pause/resume   Range {_rangeTiles}"));
 	}
 }

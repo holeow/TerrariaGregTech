@@ -10,8 +10,8 @@ public static class GenericMultiblockLayout
 {
 	private const int Padding = 12;
 	private const int TitleH  = 14;
-	private const int BodyW   = 280;
-	private const int BodyH   = 14 * 14;
+	private const int BodyW   = 190;
+	private const int BodyH   = 120;
 
 	public static MachineUILayout Build(WorkableElectricMultiblockMachine machine)
 	{
@@ -25,7 +25,8 @@ public static class GenericMultiblockLayout
 
 		layout.Widgets.Add(new MultiLineDynamicLabelWidgetSpec(
 			X: Padding, Y: baseY,
-			Getter: () => BuildDisplayLines(machine)));
+			Getter: () => BuildDisplayLines(machine),
+			Width: BodyW, Height: BodyH));
 
 		return layout;
 	}

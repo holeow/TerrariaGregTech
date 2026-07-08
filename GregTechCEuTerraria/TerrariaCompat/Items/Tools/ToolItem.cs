@@ -73,7 +73,7 @@ public sealed class ToolItem : ModItem, IElectricItem
 		_axe     = isAxe    ? ToolTier.Blend(upAxe,     anchor.Axe)     : 0;
 		_hammer  = isHammer ? ToolTier.Blend(upHammer,  anchor.Hammer)  : 0;
 		_damage  = Math.Max(1, ToolTier.Blend(upDamage, anchor.Damage));
-		_useTime = Math.Max(2, ToolTier.Blend(upUseTime, anchor.UseTime));
+		_useTime = Math.Max(2, ToolTier.SpeedUseTime(material));
 
 		string n = type.Name;
 		if (n == "shovel" || n == "spade")

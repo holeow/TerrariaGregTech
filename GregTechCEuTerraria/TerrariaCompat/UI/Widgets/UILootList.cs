@@ -17,15 +17,12 @@ public sealed class UILootList : UIElement
 	private readonly Func<IReadOnlyList<LootRegistry.LootEntry>> _sourceProvider;
 	private readonly string _emptyHint;
 	private int _scrollOffsetPx;
-	private bool _leftDown;
-	private bool _rightDown;
 
-	private bool _dragging;
-	private int  _dragAnchorOffsetPx;
+	private readonly Scrollbar _bar = new();
 
 	public int ScrollBottomInset;
 
-	private const int ScrollbarWidth = VanillaScrollbar.Width;
+	private const int ScrollbarWidth = Scrollbar.Width;
 	private const int Margin = 6;
 	private const int MinThumbHeight = 28;
 	private const int RowHeight = 30;
@@ -44,8 +41,7 @@ public sealed class UILootList : UIElement
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
-		_scrollOffsetPx -= evt.ScrollWheelValue;
-		_scrollOffsetPx = Math.Max(0, _scrollOffsetPx);
+		Scrollbar.Wheel(evt, ref _scrollOffsetPx);
 	}
 
 	protected override void DrawSelf(SpriteBatch spriteBatch)
@@ -80,55 +76,21 @@ public sealed class UILootList : UIElement
 		int totalH = src.Count * rowH;
 		int viewH  = content.Height;
 		int maxOffset = Math.Max(0, totalH - viewH);
-		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
+		var mouse = ModalEscape.PollCursor();
 
-		int firstRow = _scrollOffsetPx / rowH;
-		int lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
-
-		var mouse = GlobalRecipeBrowserState.BrowserCursor();
-
-		bool draggingThisFrame = false;
-		Rectangle trackRect = Rectangle.Empty;
-		Rectangle thumbRect = Rectangle.Empty;
+		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
 			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
 			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
-
-			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
-			int travel = barH - thumbH;
-			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
-			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-
-			if (Main.mouseLeft && !_leftDown && trackRect.Contains(mouse))
-			{
-				_dragging = true;
-				_dragAnchorOffsetPx = thumbRect.Contains(mouse) ? (mouse.Y - thumbY) : (thumbH / 2);
-			}
-
-			if (_dragging && Main.mouseLeft)
-			{
-				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax   = Math.Max(1, barH - thumbH);
-				int clampedTop  = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
-				_scrollOffsetPx = (int)((float)clampedTop / travelMax * maxOffset);
-				draggingThisFrame = true;
-			}
-			else if (!Main.mouseLeft)
-			{
-				_dragging = false;
-			}
-
-			if (draggingThisFrame)
-			{
-				thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
-				thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-				firstRow = _scrollOffsetPx / rowH;
-				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
-			}
+			thumbRect = _bar.Update(trackRect, maxOffset, (float)viewH / totalH, ref _scrollOffsetPx, mouse);
 		}
+		bool draggingThisFrame = _bar.Dragging;
+		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
+
+		int firstRow = _scrollOffsetPx / rowH;
+		int lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 
 		int hoveredRow = -1;
 		ScissorDraw.Draw(spriteBatch, ScissorDraw.DeviceClip(content), () =>
@@ -174,7 +136,10 @@ public sealed class UILootList : UIElement
 			{
 				Main.HoverItem = new Item();
 				Main.HoverItem.SetDefaults(entry.TargetItem);
-				LootTooltipGlobal.PushHover(entry.SourceLabel, entry.Detail);
+				BrowserTooltipGlobal.Begin();
+				BrowserTooltipGlobal.Append($"From: {entry.SourceLabel}", BrowserTooltipGlobal.Source);
+				if (!string.IsNullOrWhiteSpace(entry.Detail))
+					BrowserTooltipGlobal.Append(entry.Detail, BrowserTooltipGlobal.Detail);
 				Main.instance.MouseText("");
 			}
 			else
@@ -182,9 +147,9 @@ public sealed class UILootList : UIElement
 				Main.instance.MouseText(entry.SourceLabel);
 			}
 
-			if (!_dragging)
+			if (!_bar.Dragging)
 			{
-				var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
+				var click = BrowserSlotInteraction.Poll();
 				if (overSource)
 				{
 					if (entry.SourceNpcType > 0)
@@ -206,15 +171,8 @@ public sealed class UILootList : UIElement
 				}
 			}
 		}
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-
 		if (totalH > viewH)
-		{
-			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			VanillaScrollbar.Draw(spriteBatch, trackRect, thumbRect, thumbHot);
-			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
-		}
+			_bar.Draw(spriteBatch, trackRect, thumbRect, mouse);
 	}
 
 	private static void DrawRow(SpriteBatch sb, Rectangle bounds, in LootRegistry.LootEntry entry)

@@ -6,7 +6,6 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Authoritative cursor (Main.mouseItem) after a server-side SlotAction
 public static class CursorUpdatePacket
 {
 	public enum Delivery : byte
@@ -14,6 +13,14 @@ public static class CursorUpdatePacket
 		Cursor          = 0,
 		PlayerInventory = 1,
 		CursorMerge     = 2,
+	}
+
+	public static void SetCursor(int whoAmI, Item item)
+	{
+		if (Main.netMode == NetmodeID.Server)
+			SendTo(whoAmI, item, Delivery.Cursor);
+		else
+			Main.mouseItem = item;
 	}
 
 	public static void SendTo(int toClient, Item item, Delivery delivery)

@@ -8,9 +8,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.ItemPipe;
 
-// Per-world ItemPipeLayer
-// Save format = co-indexed lists; one PipeCoverable per cell with any
-// configured side (default-state cells skip allocation)
 public sealed class ItemPipeLayerSystem : ModSystem
 {
 	public static ItemPipeLayer Pipes { get; } = new();
@@ -80,7 +77,8 @@ public sealed class ItemPipeLayerSystem : ModSystem
 		if (held is null) return;
 		bool itemLayer = held.ModItem is Items.Pipes.SimpleItemPipeItem
 		              || (held.ModItem is Items.Pipes.PipeItem pipe && pipe.Kind == PipeKind.Item)
-		              || (held.ModItem is Items.Tools.ToolItem tool && tool.IsWrench);
+		              || (held.ModItem is Items.Tools.ToolItem tool && tool.IsWrench)
+		              || Items.Tools.Multitool.MultitoolState.IsActiveLayer(Main.LocalPlayer, "item_pipe");
 		if (!itemLayer) return;
 		PipeRenderer.DrawItemForegroundOverlay();
 	}

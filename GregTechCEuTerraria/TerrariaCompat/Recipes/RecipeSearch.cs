@@ -39,10 +39,10 @@ public static class RecipeSearch
 		return true;
 	}
 
-	public static bool Matches(GTRecipe recipe, string[] tokens)
+	public static bool Matches(GTRecipe recipe, string[] tokens, bool outputsOnly = false)
 	{
 		if (tokens.Length == 0) return true;
-		string text = TextFor(recipe);
+		string text = outputsOnly ? OutputTextFor(recipe) : TextFor(recipe);
 		string? station = null;
 		foreach (string token in tokens)
 		{
@@ -200,6 +200,38 @@ public static class RecipeSearch
 		probe.SetDefaults(itemType);
 		if (!string.IsNullOrEmpty(probe.Name))
 			sb.Append(probe.Name.ToLowerInvariant()).Append(' ');
+		if (probe.ModItem is not null)
+			sb.Append(probe.ModItem.Name.ToLowerInvariant()).Append(' ');
+		string tags = ItemTagText(itemType);
+		if (tags.Length > 0) sb.Append(tags);
+	}
+
+	private static Dictionary<int, string>? _itemTagText;
+
+	public static string ItemTagText(int itemType)
+	{
+		_itemTagText ??= BuildItemTagText();
+		return _itemTagText.TryGetValue(itemType, out var s) ? s : string.Empty;
+	}
+
+	private static Dictionary<int, string> BuildItemTagText()
+	{
+		var byItem = new Dictionary<int, StringBuilder>();
+		var resolver = IIngredientResolver.Default;
+		if (resolver is not null)
+			foreach (var tag in Items.Registry.RegistryTagLoader.AllItemTags)
+			{
+				string bare = StripNamespace(tag);
+				foreach (int t in resolver.ResolveItemTag(tag))
+				{
+					if (t <= 0) continue;
+					if (!byItem.TryGetValue(t, out var sb)) { sb = new StringBuilder(); byItem[t] = sb; }
+					sb.Append(bare).Append(' ');
+				}
+			}
+		var map = new Dictionary<int, string>(byItem.Count);
+		foreach (var kv in byItem) map[kv.Key] = kv.Value.ToString();
+		return map;
 	}
 
 	private static bool HasUnresolvedIngredient(GTRecipe recipe)

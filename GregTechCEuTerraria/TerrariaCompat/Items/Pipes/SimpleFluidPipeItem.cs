@@ -83,17 +83,7 @@ public sealed class SimpleFluidPipeItem : ModItem, ITextureWarmUp
 		if (x <= 0 || x >= Main.maxTilesX - 1 || y <= 0 || y >= Main.maxTilesY - 1) return false;
 		if (Item.stack <= 0) return false;
 
-		var cell = new Pipelike.Fluid.FluidPipeCell(
-			MaterialId:          "simple_fluid",
-			Size:                Size,
-			Throughput:          Throughput,
-			Channels:            PipeSizes.FluidPipeChannels(Size),
-			MaxFluidTemperature: NaquadahMaxTemp,
-			GasProof:            NaquadahGasProof,
-			CryoProof:           NaquadahCryoProof,
-			PlasmaProof:         NaquadahPlasmaProof,
-			AcidProof:           NaquadahAcidProof,
-			IsSimple:            true);
+		var cell = BuildCell(Size);
 
 		if (!Pipelike.Fluid.FluidPipeLayerHandle.Instance.TryPlace(cell, x, y, player))
 			return false;
@@ -103,6 +93,45 @@ public sealed class SimpleFluidPipeItem : ModItem, ITextureWarmUp
 
 		Item.stack--;
 		return true;
+	}
+
+	internal static readonly PipeSize[] Sizes =
+		{ PipeSize.Tiny, PipeSize.Small, PipeSize.Normal, PipeSize.Large, PipeSize.Huge };
+
+	public static Pipelike.Fluid.FluidPipeCell BuildCell(PipeSize size)
+	{
+		int throughput = PotinBaseThroughput * PipeSizes.FluidPipeCapacityMultiplier(size);
+		return new Pipelike.Fluid.FluidPipeCell(
+			MaterialId:          "simple_fluid",
+			Size:                size,
+			Throughput:          throughput,
+			Channels:            PipeSizes.FluidPipeChannels(size),
+			MaxFluidTemperature: NaquadahMaxTemp,
+			GasProof:            NaquadahGasProof,
+			CryoProof:           NaquadahCryoProof,
+			PlasmaProof:         NaquadahPlasmaProof,
+			AcidProof:           NaquadahAcidProof,
+			IsSimple:            true);
+	}
+
+	public static int TypeFor(PipeSize size)
+	{
+		string id = size == PipeSize.Normal
+			? "simple_fluid_pipe"
+			: "simple_fluid_pipe_" + PipeSizes.Word(size);
+		return ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(id, out var mi) ? mi.Type : 0;
+	}
+
+	private static Dictionary<int, PipeSize>? _byType;
+	public static bool TryGetSize(int itemType, out PipeSize size)
+	{
+		if (_byType is null)
+		{
+			var d = new Dictionary<int, PipeSize>();
+			foreach (var s in Sizes) { int t = TypeFor(s); if (t > 0) d[t] = s; }
+			_byType = d;
+		}
+		return _byType.TryGetValue(itemType, out size);
 	}
 
 	void ITextureWarmUp.WarmUpTexture() => ItemIconBaker.Install(Item.type, Texture);

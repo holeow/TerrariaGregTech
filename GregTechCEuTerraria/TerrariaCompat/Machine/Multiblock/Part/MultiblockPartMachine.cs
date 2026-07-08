@@ -12,12 +12,8 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of MultiblockPartMachine. Base for every multi part.
 public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHandler, IFluidHandler
 {
-	// Trait attach is LATE (after Configure) - route the IXHandler surface
-	// through virtual hooks so external cover-side pushes still target via
-	// GetItemHandlerCap/GetFluidHandlerCap (which check `is IXHandler`).
 	public virtual IItemHandler?  ExposedItemHandler  => null;
 	public virtual IFluidHandler? ExposedFluidHandler => null;
 
@@ -36,11 +32,11 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 	FluidStack  IFluidHandler.Drain(int max, bool sim)           => ExposedFluidHandler?.Drain(max, sim) ?? FluidStack.Empty;
 	FluidStack  IFluidHandler.Drain(FluidStack f, bool sim)      => ExposedFluidHandler?.Drain(f, sim) ?? FluidStack.Empty;
 	IFluidHandler IFluidHandler.GetTankAccess(int tank)          => ExposedFluidHandler?.GetTankAccess(tank) ?? this;
+	(bool AllowFill, bool AllowDrain) IFluidHandler.GetTankClickCaps(int tank) => ExposedFluidHandler?.GetTankClickCaps(tank) ?? (true, true);
 
 
 	private readonly HashSet<Point16> _controllerPositions = new();
 
-	// Insertion-ordered + reference-dedup (List + parallel HashSet).
 	private readonly List<MultiblockControllerMachine> _controllers = new();
 	private readonly HashSet<MultiblockControllerMachine> _controllerSet = new();
 
@@ -52,10 +48,6 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 		_controllerPositions.Contains(new Point16(controllerPosX, controllerPosY));
 
 	public bool IsFormed() => _controllerPositions.Count > 0;
-
-	// IsActive deliberately NOT controller-forwarded - TileLightScanner runs
-	// FastParallel.For; concurrent List<T>.Clear races into NRE. ParallelHatch
-	// overrides directly.
 
 	public void OnControllersUpdated()
 	{
@@ -80,9 +72,6 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 
 	public List<RecipeHandlerList> GetRecipeHandlers() => new() { GetHandlerList() };
 
-	// Virtual bridges to IMultiPart DIMs - C# implicit-impl only binds on
-	// the class that LISTS the interface; without these, subclass overrides
-	// are dead (muffler particles, rotor ramp, parallel application).
 	public virtual bool OnWorking   (IWorkableMultiController controller) => true;
 	public virtual bool OnWaiting   (IWorkableMultiController controller) => true;
 	public virtual bool OnPaused    (IWorkableMultiController controller) => true;
@@ -121,8 +110,6 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 		base.OnKill();
 		if (!IsServer) return;
 
-		// Always snapshot - C# List<T>.Enumerator throws CME even on single
-		// removal (Java HashSet only checks inside next/hasNext).
 		var snapshot = new List<MultiblockControllerMachine>(_controllers);
 		foreach (var controller in snapshot)
 		{
@@ -150,8 +137,6 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 
 	public virtual bool ReplacePartModelWhenFormed() => IsFormed();
 
-	// MP clients otherwise see empty controllers + IsFormed()=false (parts
-	// fail to reskin to FusedCasingTexture).
 	public override void SaveData(TagCompound tag)
 	{
 		base.SaveData(tag);
@@ -176,7 +161,5 @@ public abstract class MultiblockPartMachine : MetaMachine, IMultiPart, IItemHand
 		int n = System.Math.Min(xs.Length, ys.Length);
 		for (int i = 0; i < n; i++)
 			_controllerPositions.Add(new Point16(xs[i], ys[i]));
-		// Don't rebuild here - controller TE may not be loaded yet.
-		// GetControllers lazily rebuilds on mismatch.
 	}
 }

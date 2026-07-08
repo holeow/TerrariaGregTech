@@ -1,10 +1,11 @@
 #nullable enable
+using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.Api.Cover;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 using GregTechCEuTerraria.TerrariaCompat.Net.Actions;
+using GregTechCEuTerraria.TerrariaCompat.UI.MeCraft;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
@@ -12,10 +13,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// One phantom matcher slot of a cover's SimpleItemFilter. Verbatim
-// PhantomSlotWidget click semantics (LMB=held count, RMB=1, empty +LMB/RMB
-// = +/-1, Shift halves/doubles, MMB clears). Held item is never consumed.
-// Server-authoritative via CoverFilterAction; live cover resolved per frame.
 public sealed class UIPhantomItemSlot : UIElement
 {
 	public const int NativeUnscaledSize = 22;
@@ -26,7 +23,8 @@ public sealed class UIPhantomItemSlot : UIElement
 	private readonly int _index;
 	private readonly Item[] _render = { new() };
 
-	private bool _leftDown, _rightDown, _midDown;
+	private bool AmountMatters => (_entity.GetCoverAtSide(_side)?.UiItemFilter?.MaxStackSize ?? 1) > 1;
+
 
 	public UIPhantomItemSlot(ICoverable entity, CoverSide side, int index)
 	{
@@ -40,10 +38,27 @@ public sealed class UIPhantomItemSlot : UIElement
 	protected override void DrawSelf(SpriteBatch spriteBatch)
 	{
 		var filter = _entity.GetCoverAtSide(_side)?.UiItemFilter;
-		_render[0] = filter is not null && _index < filter.Matches.Length
+		var src = filter is not null && _index < filter.Matches.Length
 			? filter.Matches[_index] : new Item();
+		if (!AmountMatters && !src.IsAir && src.stack != 1)
+		{
+			var clone = src.Clone();
+			clone.stack = 1;
+			_render[0] = clone;
+		}
+		else _render[0] = src;
 
 		var bounds = GetDimensions().ToRectangle();
+
+		if (ItemDrag.TryDropItem(bounds, out int dropped))
+		{
+			var it = new Item();
+			it.SetDefaults(dropped);
+			it.stack = 1;
+			CoverActions.Send(CoverFilterAction.Matcher(_side, fluid: false, _index, 0, false, it), _entity);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+		}
+
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = bounds.Width / VanillaNativeSlotPixels;
 		try
@@ -51,12 +66,7 @@ public sealed class UIPhantomItemSlot : UIElement
 			if (IsMouseHovering)
 			{
 				Main.LocalPlayer.mouseInterface = true;
-				HandleClicks();
 				ShowTooltip();
-			}
-			else
-			{
-				_leftDown = _rightDown = _midDown = false;
 			}
 			ItemSlot.Draw(spriteBatch, _render, ItemSlot.Context.ChestItem, 0, new Vector2(bounds.X, bounds.Y));
 		}
@@ -66,53 +76,53 @@ public sealed class UIPhantomItemSlot : UIElement
 		}
 	}
 
-	// Hand-rolled text via MouseText (instead of ItemSlot.MouseHover) so the
-	// click cheat-sheet rides alongside the item name.
 	private void ShowTooltip()
 	{
 		var slot = _render[0];
-		var sb = new System.Text.StringBuilder();
-		if (slot.IsAir)
-		{
-			sb.Append("Empty matcher slot");
-		}
-		else
-		{
-			sb.Append(slot.Name);
-			sb.Append("  *  amount: ");
-			sb.Append(slot.stack);
-		}
-		sb.Append('\n');
-		if (slot.IsAir)
-		{
-			sb.Append("[c/AAAAAA:LMB / RMB with held item:] set type\n");
-			sb.Append("[c/AAAAAA:LMB] = amount of held stack   [c/AAAAAA:RMB] = 1");
-		}
-		else
-		{
-			sb.Append("[c/AAAAAA:Empty hand  LMB] -1   [c/AAAAAA:RMB] +1\n");
-			sb.Append("[c/AAAAAA:Shift+LMB] halve   [c/AAAAAA:Shift+RMB] double\n");
-			sb.Append("[c/AAAAAA:Middle-click] clear   [c/AAAAAA:LMB/RMB with held] replace");
-		}
-		Main.instance.MouseText(sb.ToString());
+		bool amountShown = AmountMatters;
+		string tip = slot.IsAir
+			? PhantomSlotChrome.EmptyTooltip(PhantomSlotChrome.Kind.Item)
+			: PhantomSlotChrome.FilledTooltip(slot.Name, amountShown ? "amount: " + slot.stack : null, amountShown);
+		Main.instance.MouseText(tip);
 	}
 
-	private void HandleClicks()
+	public override void LeftMouseDown(UIMouseEvent evt)  { base.LeftMouseDown(evt);  HandleLeft(); }
+	public override void RightMouseDown(UIMouseEvent evt) { base.RightMouseDown(evt); HandleClear(); }
+
+	private void HandleLeft()
 	{
-		bool shift = Main.keyState.IsKeyDown(Keys.LeftShift) || Main.keyState.IsKeyDown(Keys.RightShift);
-		bool leftPress  = Main.mouseLeft   && !_leftDown;
-		bool rightPress = Main.mouseRight  && !_rightDown;
-		bool midPress   = Main.mouseMiddle && !_midDown;
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-		_midDown   = Main.mouseMiddle;
+		var filter = _entity.GetCoverAtSide(_side)?.UiItemFilter;
+		Item slot = filter is not null && _index < filter.Matches.Length ? filter.Matches[_index] : new Item();
 
-		// Button ordinal matches slotClickPhantom: 0=L, 1=R, 2=M.
-		int button = leftPress ? 0 : rightPress ? 1 : midPress ? 2 : -1;
-		if (button < 0) return;
+		if (!Main.mouseItem.IsAir)
+		{
+			CoverActions.Send(
+				CoverFilterAction.Matcher(_side, fluid: false, _index, 0, false, Main.mouseItem), _entity);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
 
+		if (slot.IsAir)
+		{
+			ItemPickerSystem.OpenForItem(
+				it => CoverActions.Send(CoverFilterAction.Matcher(_side, fluid: false, _index, 0, false, it), _entity));
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
+
+		if (!AmountMatters) return;
+
+		MeCraftSystem.OpenForAmount(AEItemKey.Of(slot)!, slot.stack, 1, "Set Amount", "Set",
+			"Amount this slot matches",
+			amt => CoverActions.Send(CoverFilterAction.MatcherSetAmount(_side, fluid: false, _index, amt), _entity),
+			parentLayer: UILayers.TopModal);
+		SoundEngine.PlaySound(SoundID.MenuTick);
+	}
+
+	private void HandleClear()
+	{
 		CoverActions.Send(
-			CoverFilterAction.Matcher(_side, fluid: false, _index, button, shift, Main.mouseItem), _entity);
+			CoverFilterAction.Matcher(_side, fluid: false, _index, 2, false, new Item()), _entity);
 		SoundEngine.PlaySound(SoundID.MenuTick);
 	}
 }

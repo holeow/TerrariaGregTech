@@ -91,9 +91,9 @@ public sealed class UISearchBar : UIElement
 		base.Update(gameTime);
 
 		var bounds = GetDimensions().ToRectangle();
-		bool over = bounds.Contains((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		bool over = bounds.Contains(ModalEscape.PollCursor());
 
-		if (IsFocused && Main.mouseLeft && !over) Unfocus();
+		if (IsFocused && MouseClick.LeftPressed && !over) Unfocus();
 
 		if (IsFocused)
 		{
@@ -102,6 +102,7 @@ public sealed class UISearchBar : UIElement
 			var kb = Keyboard.GetState();
 			if (Edge(kb, Keys.Enter) || Edge(kb, Keys.Escape))
 			{
+				Main.chatRelease = false;
 				Unfocus();
 			}
 			else if (kb.IsKeyDown(Keys.Back))

@@ -1,5 +1,7 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
+using GregTechCEuTerraria.Common.Energy;
 using GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -87,5 +89,31 @@ public sealed class CoverItem : ModItem, ITextureWarmUp
 			tooltips.Add(new TooltipLine(Mod, "InertCover",
 				"Does nothing as a cover - crafting ingredient only")
 			{ OverrideColor = new Color(170, 170, 180) });
+
+		if (TrySolarPanelVoltage(_coverId, out long eut, out VoltageTier tier))
+		{
+			var c = VoltageTiers.TextColor(tier);
+			string tierHex = $"{c.R:X2}{c.G:X2}{c.B:X2}";
+			tooltips.Add(new TooltipLine(Mod, "VoltageOut",
+				$"[c/55FF55:Voltage OUT:] [c/FFFFFF:{eut} EU/t] ([c/{tierHex}:{VoltageTiers.ShortName(tier)}])"));
+		}
+	}
+
+	private static bool TrySolarPanelVoltage(string? coverId, out long eut, out VoltageTier tier)
+	{
+		eut = 0;
+		tier = VoltageTier.ULV;
+		if (coverId == "solar_panel") { eut = 1; return true; }
+		if (coverId is null || !coverId.StartsWith("solar_panel.", StringComparison.Ordinal)) return false;
+
+		string suffix = coverId["solar_panel.".Length..];
+		for (var t = VoltageTier.ULV; t <= VoltageTier.UV; t++)
+			if (VoltageTiers.Id(t) == suffix)
+			{
+				tier = t;
+				eut = VoltageTiers.Voltage(t);
+				return true;
+			}
+		return false;
 	}
 }

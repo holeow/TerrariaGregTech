@@ -51,12 +51,12 @@ public class PatternError
 		}
 	}
 
-	protected string FoundBlockDescriptor()
+	public string FoundBlockDescriptor()
 	{
 		int x = GetX(), y = GetY();
 		if (x < 0 || x >= Main.maxTilesX || y < 0 || y >= Main.maxTilesY) return "out of world";
 		var t = Main.tile[x, y];
-		if (!t.HasTile) return "empty - is the block aligned to the 2x2 grid?";
+		if (!t.HasTile) return "empty";
 		var modTile = Terraria.ModLoader.TileLoader.GetTile(t.TileType);
 		if (modTile != null)
 		{

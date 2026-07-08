@@ -23,4 +23,17 @@ public static class QuestbookProgress
 		else
 			QuestbookWorldProgress.Instance.CompleteQuest(questId, Main.myPlayer);
 	}
+
+	public static void MarkTask(string questId, int taskIndex)
+	{
+		if (QuestbookWorldProgress.Completed.Contains(questId))
+			return;
+		if (IsTaskSatisfied(questId, taskIndex))
+			return;
+
+		if (Main.netMode == NetmodeID.MultiplayerClient)
+			QuestbookPackets.SendTaskCompleteRequest(questId, taskIndex);
+		else
+			QuestbookWorldProgress.Instance.CompleteTask(questId, taskIndex, Main.myPlayer);
+	}
 }

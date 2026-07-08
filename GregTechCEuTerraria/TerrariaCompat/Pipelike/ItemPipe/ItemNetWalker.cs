@@ -131,7 +131,7 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 		var thisCover      = ItemPipeLayerSystem.GetSides(pipePos.x, pipePos.y)?
 			.GetCoverAtSide(ToCoverSide(faceToNeighbour));
 		var neighbourCover = ItemPipeLayerSystem.GetSides(nx, ny)?
-			.GetCoverAtSide(ToCoverSide(IODirectionOpposite(faceToNeighbour)));
+			.GetCoverAtSide(ToCoverSide(faceToNeighbour.Opposite()));
 
 		var collected = new List<Func<Terraria.Item, bool>>(2);
 		switch (thisCover)
@@ -156,23 +156,8 @@ public sealed class ItemNetWalker : PipeNetWalker<ItemPipeCell, ItemPipeProperti
 		return true;
 	}
 
-	private static CoverSide ToCoverSide(IODirection dir) => dir switch
-	{
-		IODirection.Up    => CoverSide.Up,
-		IODirection.Down  => CoverSide.Down,
-		IODirection.Left  => CoverSide.Left,
-		IODirection.Right => CoverSide.Right,
-		_                 => CoverSide.Up,
-	};
-
-	private static IODirection IODirectionOpposite(IODirection d) => d switch
-	{
-		IODirection.Up    => IODirection.Down,
-		IODirection.Down  => IODirection.Up,
-		IODirection.Left  => IODirection.Right,
-		IODirection.Right => IODirection.Left,
-		_                 => IODirection.None,
-	};
+	private static CoverSide ToCoverSide(IODirection dir)
+		=> Capabilities.WorldCapability.ToCoverSide(dir) ?? CoverSide.Up;
 
 	private static (int dx, int dy) OffsetForIODirection(IODirection dir) => dir switch
 	{

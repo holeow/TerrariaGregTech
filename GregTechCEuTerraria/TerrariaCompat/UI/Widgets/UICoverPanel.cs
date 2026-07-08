@@ -14,10 +14,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// 4-slot plus-layout cover cluster (Up/Left/Right/Down). Each cell is a real
-// inventory slot over the cover_slot_overlay hint. LMB empty + cover item =
-// attach; LMB occupied + empty cursor = remove; RMB on an IUICover opens its
-// settings popup. 54-logical-px, matches UIDirectionSelector.
 public sealed class UICoverPanel : UIElement
 {
 	public const int Cell = 18;
@@ -27,8 +23,6 @@ public sealed class UICoverPanel : UIElement
 
 	private readonly MetaMachine _entity;
 	private readonly System.Action<CoverSide>? _onOpenSettings;
-	private bool _leftDown;
-	private bool _rightDown;
 
 	private readonly Item[] _cellItem = new Item[1];
 	private static readonly Item Empty = new();
@@ -58,10 +52,10 @@ public sealed class UICoverPanel : UIElement
 		var bounds = GetDimensions().ToRectangle();
 		float cellW = bounds.Width / 3f;
 		float cellH = bounds.Height / 3f;
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = ModalEscape.PollCursor();
 
-		bool leftPress  = Main.mouseLeft  && !_leftDown;
-		bool rightPress = Main.mouseRight && !_rightDown;
+		bool leftPress  = MouseClick.LeftPressed;
+		bool rightPress = MouseClick.RightPressed;
 		CoverSide? hovered = null;
 
 		float oldScale = Main.inventoryScale;
@@ -104,9 +98,6 @@ public sealed class UICoverPanel : UIElement
 			if (leftPress)  HandleLeftClick(hovered.Value, cover);
 			if (rightPress) HandleRightClick(hovered.Value, cover);
 		}
-
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
 	}
 
 	private void DrawCell(SpriteBatch sb, Rectangle dest, CoverSide side)
@@ -126,8 +117,6 @@ public sealed class UICoverPanel : UIElement
 	{
 		if (cover is null)
 		{
-			// Cursor consumed server-side only on a successful place - rejected
-			// places (wrong side, missing definition) don't eat the item.
 			if (Main.mouseItem.ModItem is not CoverItem coverItem) return;
 			CoverActions.Send(CoverAction.Place(side, coverItem.CoverId, Main.mouseItem), _entity);
 			SoundEngine.PlaySound(SoundID.Grab);
@@ -142,7 +131,6 @@ public sealed class UICoverPanel : UIElement
 	private void HandleRightClick(CoverSide side, CoverBehavior? cover)
 	{
 		if (cover is null) return;
-		// RMB on an IUICover toggles its settings popup.
 		if (cover is IUICover)
 		{
 			_onOpenSettings?.Invoke(side);

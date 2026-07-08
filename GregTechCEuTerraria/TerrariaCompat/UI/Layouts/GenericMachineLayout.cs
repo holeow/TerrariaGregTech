@@ -5,45 +5,34 @@ using GregTechCEuTerraria.TerrariaCompat.Machine;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// port of GTRecipeTypeUI.addInventorySlotGroup + createEditableUITemplate
-//
-// adaptations:
-//  slot stride = 22 (vanilla-inventory alignment) instead of 18
-//  energy bar + circuit selector added as side fixtures
-//  status + EU readout below
+
 public static class GenericMachineLayout
 {
-	private const int SlotStride = 22;     // matches UISlot.NativeUnscaledSize
-	private const int GroupPad   = 4;      // upstream pad
-	private const int MaxCols    = 3;      // upstream cap
-	private const int ArrowSize  = 22;     // our progress arrow box size
-	private const int ArrowGap   = 40;     // upstream's `2 * maxWidth + 40`
+	private const int SlotStride = 22;
+	private const int GroupPad   = 4;
+	private const int MaxCols    = 3;
+	private const int ArrowSize  = 22;
+	private const int ArrowGap   = 40;
 
 	public static MachineUILayout Build(WorkableTieredMachine m, string title)
 	{
-		// Items then fluids - we hardcode the upstream COMPARATOR ordering.
 		var inputEntries  = BuildEntries(itemCount: m.InputSlots,  fluidCount: m.InputFluidTanks);
 		var outputEntries = BuildEntries(itemCount: m.OutputSlots, fluidCount: m.OutputFluidTanks);
 
 		var (inW, inH)   = MeasureGroup(inputEntries);
 		var (outW, outH) = MeasureGroup(outputEntries);
 
-		int maxGroupW = System.Math.Max(inW, outW);
 		int groupH    = System.Math.Max(inH, outH);
 
-		// Outer template (upstream lines 200-217). Circuit (if present) stacks
-		// above the arrow; templateH grows so side groups don't clip.
 		int circuitColumnHeight = m.UsesCircuit ? SlotStride + 4 + ArrowSize : ArrowSize;
-		int templateW = 2 * maxGroupW + ArrowGap;
+		int templateW = inW + ArrowGap + outW;
 		int templateH = System.Math.Max(groupH, circuitColumnHeight);
 
-		int inputsBaseX  = (maxGroupW - inW) / 2;
+		int inputsBaseX  = 0;
 		int inputsBaseY  = 40 + (templateH - inH) / 2;
-		int outputsBaseX = maxGroupW + ArrowGap + (maxGroupW - outW) / 2;
+		int outputsBaseX = inW + ArrowGap;
 		int outputsBaseY = 40 + (templateH - outH) / 2;
-		int arrowX       = maxGroupW + (ArrowGap - ArrowSize) / 2;
-		// Arrow at the bottom of its column so the circuit sits above cleanly.
-		// No-circuit case still centres (circuitColumnHeight == ArrowSize).
+		int arrowX       = inW + (ArrowGap - ArrowSize) / 2;
 		int arrowY       = 40 + (templateH + circuitColumnHeight) / 2 - ArrowSize;
 
 		int circuitX = arrowX + (ArrowSize - SlotStride) / 2;
@@ -55,14 +44,10 @@ public static class GenericMachineLayout
 		int leftPad   = 12;
 		int rightPad  = 12;
 		int totalW    = leftPad + templateW + 6 + energyW + rightPad;
-		// OC + EU/t labels stack under the arrow.
-		int ocLabelY  = arrowY + ArrowSize + 2;
-		int euLabelY  = ocLabelY + 10;
-		int footerY   = System.Math.Max(40 + templateH + 6, euLabelY + 10);
-		// Low-tier output-cap warning sits as a final row under the footer.
+		int footerY   = 40 + templateH + 6;
 		string? byproductWarn = OutputLimitWarning.Text(m, m.OutputSlots);
 		int warnY     = footerY + 16;
-		int totalH    = byproductWarn != null ? warnY + 14 : footerY + 22;
+		int totalH    = byproductWarn != null ? warnY + 12 : footerY + 16;
 
 		var layout = new MachineUILayout
 		{
@@ -88,12 +73,6 @@ public static class GenericMachineLayout
 			sectionLabel: "Output");
 
 		layout.Widgets.Add(new ProgressArrowWidgetSpec(X: leftPad + arrowX, Y: arrowY, Progress: () => m.Progress01));
-		layout.Widgets.Add(new DynamicLabelWidgetSpec(X: leftPad + arrowX, Y: ocLabelY,
-			Getter: () => m.ActiveOverclock > 0 ? $"OCx{m.ActiveOverclock}" : "",
-			Scale: 0.65f));
-		layout.Widgets.Add(new DynamicLabelWidgetSpec(X: leftPad + arrowX, Y: euLabelY,
-			Getter: () => m.IsRunning ? $"{m.ActiveEuPerTick} EU/t" : "",
-			Scale: 0.65f));
 
 		if (m.UsesCircuit)
 		{
@@ -102,11 +81,15 @@ public static class GenericMachineLayout
 
 		layout.Widgets.Add(new EnergyBarWidgetSpec(X: leftPad + energyX, Y: 40, Width: energyW, Height: energyH));
 
-		// Footer: status + energy readout.
-		layout.Widgets.Add(new DynamicLabelWidgetSpec(X: leftPad, Y: footerY,
-			Getter: () => RecipeStatusText.StatusLine(m.Recipe), Scale: 0.7f));
-		layout.Widgets.Add(new DynamicLabelWidgetSpec(X: leftPad + energyX - 4, Y: footerY, Getter: () =>
-			$"{m.EnergyStored:N0} EU", Scale: 0.55f));
+		layout.Widgets.Add(new DynamicLabelWidgetSpec(X: leftPad, Y: footerY, Getter: () =>
+		{
+			if (!m.IsRunning)
+				return RecipeStatusText.StatusLine(m.Recipe);
+			string status = $"Running  {m.ActiveEuPerTick} EU/t";
+			if (m.ActiveOverclock > 0) status += $" OCx{m.ActiveOverclock}";
+			status += $"  {RecipeStatusText.FormatProgressSeconds(m.Recipe.GetProgress(), m.Recipe.GetMaxProgress())}";
+			return status;
+		}, Scale: 0.7f));
 
 		if (byproductWarn != null)
 			layout.Widgets.Add(new LabelWidgetSpec(X: leftPad, Y: warnY, Text: byproductWarn,
@@ -175,7 +158,6 @@ public static class GenericMachineLayout
 				}
 				index++;
 			}
-			// Pad to next row so capabilities don't share a partial row.
 			index += (MaxCols - (index % MaxCols)) % MaxCols;
 		}
 	}

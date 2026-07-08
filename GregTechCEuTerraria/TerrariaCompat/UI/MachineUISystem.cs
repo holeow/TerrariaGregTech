@@ -11,12 +11,11 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Tied to Main.playerInventory so the inventory panel shows alongside
 public sealed class MachineUISystem : ModalUISystem
 {
 	private MachineUIState? _state;
 
-	private const string LayerNameStr = "GregTechCEuTerraria: Machine UI";
+	public const string LayerNameStr = "GregTechCEuTerraria: Machine UI";
 	protected override string LayerName => LayerNameStr;
 	protected override bool CloseOnEscape => false;
 
@@ -52,6 +51,8 @@ public sealed class MachineUISystem : ModalUISystem
 	protected override void OnClose()
 	{
 		var entity = _state?.Entity;
+		if (entity is TerrariaCompat.AppliedEnergistics.MeTerminalMachine)
+			TerrariaCompat.AppliedEnergistics.MeTerminalClient.Unbind(entity.Position);
 		_state?.Unbind();
 		ModUIRegistry.OnClose(Close);
 		Widgets.UISearchBar.UnfocusAll();

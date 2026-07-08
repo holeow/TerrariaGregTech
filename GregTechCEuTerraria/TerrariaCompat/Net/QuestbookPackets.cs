@@ -81,4 +81,22 @@ public static class QuestbookPackets
 
 		QuestbookWorldProgress.Instance.CompleteQuest(questId, whoAmI);
 	}
+
+	public static void SendTaskCompleteRequest(string questId, int taskIndex)
+	{
+		if (Main.netMode != NetmodeID.MultiplayerClient) return;
+		var p = NetRouter.NewPacket(PacketType.QuestbookTaskComplete);
+		p.Write(questId);
+		p.Write(taskIndex);
+		p.Send();
+	}
+
+	public static void HandleTaskCompleteRequest(BinaryReader r, int whoAmI)
+	{
+		if (Main.netMode != NetmodeID.Server) return;
+		string questId = r.ReadString();
+		int taskIndex = r.ReadInt32();
+
+		QuestbookWorldProgress.Instance.CompleteTask(questId, taskIndex, whoAmI);
+	}
 }

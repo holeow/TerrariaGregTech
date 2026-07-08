@@ -13,11 +13,6 @@ using Terraria.UI.Chat;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Deposit/extract slot for SuperChestTileEntity. Holds one item type up to
-// billions of units; icon shows the type, overlay shows the real count.
-// Clicks route through ChestAction (server-authoritative; uses
-// CursorUpdatePacket - bypasses SyncEquipment's ignore-self dupe gate).
-// LMB+cursor = Insert; LMB empty = Dump one Item.maxStack.
 public sealed class UISuperChestSlot : UIElement
 {
 	private readonly SuperChestTileEntity _chest;
@@ -53,7 +48,6 @@ public sealed class UISuperChestSlot : UIElement
 	{
 		var bounds = GetDimensions().ToRectangle();
 
-		// stack=1 so vanilla's stack-count overlay doesn't render the wrong number.
 		var stored = _chest.StoredItem;
 		_temp[0] = stored.IsAir ? new Item() : stored.Clone();
 		if (!_temp[0].IsAir) _temp[0].stack = 1;
@@ -74,10 +68,9 @@ public sealed class UISuperChestSlot : UIElement
 			ItemSlot.Draw(spriteBatch, _temp, ItemSlot.Context.ChestItem, 0,
 				new Vector2(bounds.X, bounds.Y));
 
-			// Real count overlay in slot-stack font (truncated: 1.2M / 14.5k).
 			if (!_temp[0].IsAir && _chest.StoredAmount > 0)
 			{
-				string text = FormatCount(_chest.StoredAmount);
+				string text = UINumberFormat.Count(_chest.StoredAmount);
 				DynamicSpriteFont font = FontAssets.ItemStack.Value;
 				const float overlayScale = 0.7f;
 				var size = ChatManager.GetStringSize(font, text, new Vector2(overlayScale));
@@ -93,13 +86,5 @@ public sealed class UISuperChestSlot : UIElement
 		{
 			Main.inventoryScale = oldScale;
 		}
-	}
-
-	private static string FormatCount(long n)
-	{
-		if (n >= 1_000_000_000) return (n / 1_000_000_000.0).ToString("0.#") + "B";
-		if (n >= 1_000_000)     return (n / 1_000_000.0).ToString("0.#") + "M";
-		if (n >= 10_000)        return (n / 1_000.0).ToString("0.#") + "k";
-		return n.ToString();
 	}
 }

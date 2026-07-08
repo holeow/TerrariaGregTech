@@ -11,11 +11,6 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Fluid;
 
-// port of FluidPipeBlockEntity
-// Adaptations:
-//  Direction (6) -> CoverSide (4 cardinal),
-//  per-stack temperature reads FluidType.Temperature (no NBT);
-//  destroyPipe collapses to cable-burn-style instant destroy
 public class FluidPipeState : IFluidPipeHost
 {
 	public const int FREQUENCY = 5;
@@ -51,7 +46,7 @@ public class FluidPipeState : IFluidPipeHost
 
 	public bool IsBlocked(CoverSide side)
 	{
-		var (dx, dy) = OffsetFor(side);
+		var (dx, dy) = CoverSides.Offset(side);
 		var (px, py) = Api.Pipenet.PipePassthrough.EffectiveNeighbor(X, Y, dx, dy);
 		if (PipeNeighborProbe.IsConnectedPipe(X, Y, px, py, PipeKind.Fluid))
 			return false;
@@ -275,22 +270,14 @@ public class FluidPipeState : IFluidPipeHost
 		var (kind, handler) = PipeNeighborProbe.ResolveFluid(X, Y, facing);
 		if (kind == SideNeighbourKind.Pipe)
 		{
-			var (dx, dy) = OffsetFor(facing);
+			var (dx, dy) = CoverSides.Offset(facing);
 			var (px, py) = Api.Pipenet.PipePassthrough.EffectiveNeighbor(X, Y, dx, dy);
 			var neighborState = FluidPipeLayerSystem.EnsureState(px, py);
-			return neighborState.GetTankList(OppositeSide(facing));
+			return neighborState.GetTankList(CoverSides.Opposite(facing));
 		}
 		return handler;
 	}
 
-	private static CoverSide OppositeSide(CoverSide s) => s switch
-	{
-		CoverSide.Up    => CoverSide.Down,
-		CoverSide.Down  => CoverSide.Up,
-		CoverSide.Left  => CoverSide.Right,
-		CoverSide.Right => CoverSide.Left,
-		_               => s,
-	};
 
 	public void CheckAndDestroy(FluidStack stack)
 	{
@@ -362,13 +349,5 @@ public class FluidPipeState : IFluidPipeHost
 
 	private bool _destroyed;
 
-	private static (int dx, int dy) OffsetFor(CoverSide side) => side switch
-	{
-		CoverSide.Up    => (0, -1),
-		CoverSide.Down  => (0, +1),
-		CoverSide.Left  => (-1, 0),
-		CoverSide.Right => (+1, 0),
-		_               => (0, 0),
-	};
 
 }

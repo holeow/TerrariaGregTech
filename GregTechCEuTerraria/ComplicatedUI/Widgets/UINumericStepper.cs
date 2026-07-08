@@ -4,9 +4,6 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Terraria;
-using Terraria.Audio;
-using Terraria.GameContent;
-using Terraria.ID;
 using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
@@ -18,10 +15,10 @@ public sealed class UINumericStepper : UIElement
 	private readonly Action<long> _setter;
 	private readonly long _min, _max, _step;
 	private readonly int _labelWidth;
-	private bool _leftDown, _rightDown;
+	private readonly UITextField _field;
 
 	public UINumericStepper(string label, Func<long> getter, Action<long> setter,
-		long min, long max, long step, int labelWidth)
+		long min, long max, long step, int labelWidth, int width = 0)
 	{
 		_label  = label;
 		_getter = getter;
@@ -30,76 +27,50 @@ public sealed class UINumericStepper : UIElement
 		_max    = max;
 		_step   = step;
 		_labelWidth = labelWidth;
-		Width  = StyleDimension.FromPixels(labelWidth + 100);
+		Width  = StyleDimension.FromPixels(width > 0 ? width : labelWidth + 100);
 		Height = StyleDimension.FromPixels(16);
+
+		Append(new UITextButton(() => "-",
+			onLeft:  () => Apply(-_step * Mult()),
+			onRight: () => Apply(_step * Mult()),
+			tooltip: "(Shift x10, Ctrl x100; RMB inverts)", width: 16, height: 16)
+		{ Left = StyleDimension.FromPixels(_labelWidth), Top = StyleDimension.FromPixels(0) });
+
+		_field = new UITextField(
+			current:   () => _getter().ToString(),
+			onConfirm: s => { if (long.TryParse(s.Trim(), out long v)) _setter(Math.Clamp(v, _min, _max)); },
+			maxLength: 12,
+			filter:    c => char.IsDigit(c) || c == '-')
+		{
+			Left   = StyleDimension.FromPixels(_labelWidth + 18),
+			Top    = StyleDimension.FromPixels(0),
+			Width  = new StyleDimension(-(_labelWidth + 36), 1f),
+			Height = StyleDimension.FromPixels(16),
+		};
+		Append(_field);
+
+		Append(new UITextButton(() => "+",
+			onLeft:  () => Apply(_step * Mult()),
+			onRight: () => Apply(-_step * Mult()),
+			tooltip: "(Shift x10, Ctrl x100; RMB inverts)", width: 16, height: 16)
+		{ Left = new StyleDimension(-16, 1f), Top = StyleDimension.FromPixels(0) });
 	}
+
+	private static long Mult()
+	{
+		long m = 1;
+		if (Main.keyState.IsKeyDown(Keys.LeftShift) || Main.keyState.IsKeyDown(Keys.RightShift)) m *= 10;
+		if (Main.keyState.IsKeyDown(Keys.LeftControl) || Main.keyState.IsKeyDown(Keys.RightControl)) m *= 100;
+		return m;
+	}
+
+	private void Apply(long delta) => _setter(Math.Clamp(_getter() + delta, _min, _max));
 
 	protected override void DrawSelf(SpriteBatch sb)
 	{
+		if (_label.Length == 0) return;
 		var bounds = GetDimensions().ToRectangle();
-		var font = FontAssets.MouseText.Value;
-		const float scale = 0.72f;
-
 		Terraria.Utils.DrawBorderString(sb, _label,
-			new Vector2(bounds.X, bounds.Y + 2), Color.White, scale);
-
-		var minusRect = new Rectangle(bounds.X + _labelWidth,      bounds.Y, 16, 16);
-		var valueRect = new Rectangle(bounds.X + _labelWidth + 18, bounds.Y, 64, 16);
-		var plusRect  = new Rectangle(bounds.X + _labelWidth + 84, bounds.Y, 16, 16);
-		DrawButton(sb, minusRect, "-");
-		long val = _getter();
-		string text = val.ToString("N0");
-		var size = font.MeasureString(text) * scale;
-		Terraria.Utils.DrawBorderString(sb, text,
-			new Vector2(valueRect.X + (valueRect.Width - size.X) / 2f, valueRect.Y + 1),
-			Color.White, scale);
-		DrawButton(sb, plusRect, "+");
-
-		var ms = Main.MouseScreen;
-		bool leftPress  = Main.mouseLeft  && !_leftDown;
-		bool rightPress = Main.mouseRight && !_rightDown;
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-
-		if (!leftPress && !rightPress) return;
-
-		long mult = 1;
-		if (Main.keyState.IsKeyDown(Keys.LeftShift) || Main.keyState.IsKeyDown(Keys.RightShift)) mult *= 10;
-		if (Main.keyState.IsKeyDown(Keys.LeftControl) || Main.keyState.IsKeyDown(Keys.RightControl)) mult *= 100;
-
-		if (minusRect.Contains((int)ms.X, (int)ms.Y))
-		{
-			Apply(-(_step * mult * (rightPress ? -1 : 1)));
-			SoundEngine.PlaySound(SoundID.MenuTick);
-		}
-		else if (plusRect.Contains((int)ms.X, (int)ms.Y))
-		{
-			Apply(_step * mult * (rightPress ? -1 : 1));
-			SoundEngine.PlaySound(SoundID.MenuTick);
-		}
-	}
-
-	private void Apply(long delta)
-	{
-		long v = _getter() + delta;
-		if (v < _min) v = _min;
-		if (v > _max) v = _max;
-		_setter(v);
-	}
-
-	private static void DrawButton(SpriteBatch sb, Rectangle rect, string label)
-	{
-		var px = TextureAssets.MagicPixel.Value;
-		sb.Draw(px, rect, new Color(50, 52, 110) * 0.92f);
-		sb.Draw(px, new Rectangle(rect.X, rect.Y, rect.Width, 1),         new Color(89, 116, 213) * 0.9f);
-		sb.Draw(px, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), new Color(89, 116, 213) * 0.9f);
-		sb.Draw(px, new Rectangle(rect.X, rect.Y, 1, rect.Height),         new Color(89, 116, 213) * 0.9f);
-		sb.Draw(px, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), new Color(89, 116, 213) * 0.9f);
-		var font = FontAssets.MouseText.Value;
-		const float scale = 0.72f;
-		var size = font.MeasureString(label) * scale;
-		Terraria.Utils.DrawBorderString(sb, label,
-			new Vector2(rect.X + (rect.Width - size.X) / 2f, rect.Y + 1),
-			Color.White, scale);
+			new Vector2(bounds.X, bounds.Y + 2), Color.White, 0.72f);
 	}
 }

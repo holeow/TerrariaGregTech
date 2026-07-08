@@ -139,6 +139,23 @@ public static class VanillaItemMap
 		{ "gtceu:chemical_white_dye",      ItemID.BrightSilverDye },
 		{ "gtceu:chemical_light_gray_dye", ItemID.SilverDye },
 		{ "gtceu:chemical_gray_dye",       ItemID.BlackAndWhiteDye },
+		{ "gtceu:red_dye_spray_can",        ItemID.RedPaint },
+		{ "gtceu:orange_dye_spray_can",     ItemID.OrangePaint },
+		{ "gtceu:yellow_dye_spray_can",     ItemID.YellowPaint },
+		{ "gtceu:lime_dye_spray_can",       ItemID.LimePaint },
+		{ "gtceu:green_dye_spray_can",      ItemID.GreenPaint },
+		{ "gtceu:cyan_dye_spray_can",       ItemID.CyanPaint },
+		{ "gtceu:light_blue_dye_spray_can", ItemID.SkyBluePaint },
+		{ "gtceu:blue_dye_spray_can",       ItemID.BluePaint },
+		{ "gtceu:purple_dye_spray_can",     ItemID.PurplePaint },
+		{ "gtceu:magenta_dye_spray_can",    ItemID.VioletPaint },
+		{ "gtceu:pink_dye_spray_can",       ItemID.PinkPaint },
+		{ "gtceu:brown_dye_spray_can",      ItemID.BrownPaint },
+		{ "gtceu:black_dye_spray_can",      ItemID.BlackPaint },
+		{ "gtceu:white_dye_spray_can",      ItemID.WhitePaint },
+		{ "gtceu:light_gray_dye_spray_can", ItemID.GrayPaint },
+		{ "gtceu:gray_dye_spray_can",       ItemID.GrayPaint },
+		{ "gtceu:fertilizer",           ItemID.Fertilizer },
 		{ "minecraft:glass",            ItemID.Glass },
 		{ "minecraft:clay",             ItemID.ClayBlock },
 		{ "minecraft:ice",              ItemID.IceBlock },
@@ -209,13 +226,8 @@ public static class VanillaItemMap
 
 	private static readonly Dictionary<string, int> TagItems = new()
 	{
-		{ "minecraft:logs",                       ItemID.Wood },
-		{ "minecraft:logs_that_burn",             ItemID.Wood },
-		{ "minecraft:oak_logs",                   ItemID.Wood },
-		{ "forge:oak_logs",                       ItemID.Wood },
 		{ "minecraft:saplings",                   ItemID.Acorn },
 		{ "minecraft:stone_crafting_materials",   ItemID.StoneBlock },
-		{ "forge:wood",                           ItemID.Wood },
 		{ "forge:saplings",                       ItemID.Acorn },
 		{ "forge:cobblestone",                    ItemID.StoneBlock },
 		{ "forge:glass",                          ItemID.Glass },
@@ -254,6 +266,8 @@ public static class VanillaItemMap
 	{
 		{ "minecraft:logs",             RecipeGroupID.Wood },
 		{ "minecraft:logs_that_burn",   RecipeGroupID.Wood },
+		{ "minecraft:oak_logs",         RecipeGroupID.Wood },
+		{ "forge:oak_logs",             RecipeGroupID.Wood },
 		{ "forge:wood",                 RecipeGroupID.Wood },
 		{ "forge:ingots/iron",          RecipeGroupID.IronBar },
 		{ "minecraft:sand",             RecipeGroupID.Sand },
@@ -319,4 +333,56 @@ public static class VanillaItemMap
 
 	public static bool TryGetGroup(string tag, out int id) =>
 		Groups.TryGetValue(tag, out id) || _runtimeGroups.TryGetValue(tag, out id);
+
+	private static readonly HashSet<int> GtFungibleGroups = new() { RecipeGroupID.Wood };
+
+	private static readonly Dictionary<int, RecipeGroupItemView> _groupViews = new();
+
+	public static bool TryGetFungibleGroupView(string tag, out IReadOnlyList<int> view)
+	{
+		if (TryGetGroup(tag, out int gid) && GtFungibleGroups.Contains(gid))
+		{
+			if (!_groupViews.TryGetValue(gid, out var v))
+				_groupViews[gid] = v = new RecipeGroupItemView(gid);
+			view = v;
+			return true;
+		}
+		view = System.Array.Empty<int>();
+		return false;
+	}
+
+	public static bool TryGetFungibleGroupName(string tag, out string name)
+	{
+		if (TryGetGroup(tag, out int gid) && GtFungibleGroups.Contains(gid)
+		    && Terraria.RecipeGroup.recipeGroups.TryGetValue(gid, out var g))
+		{
+			name = g.GetText();
+			return true;
+		}
+		name = "";
+		return false;
+	}
+}
+
+internal sealed class RecipeGroupItemView : IReadOnlyList<int>
+{
+	private readonly int _groupId;
+	private int[] _cache = System.Array.Empty<int>();
+
+	public RecipeGroupItemView(int groupId) => _groupId = groupId;
+
+	private int[] Resolve()
+	{
+		if (Terraria.RecipeGroup.recipeGroups.TryGetValue(_groupId, out var g))
+		{
+			if (_cache.Length != g.ValidItems.Count)
+				_cache = System.Linq.Enumerable.ToArray(g.ValidItems);
+		}
+		return _cache;
+	}
+
+	public int this[int index] => Resolve()[index];
+	public int Count => Resolve().Length;
+	public IEnumerator<int> GetEnumerator() => ((IEnumerable<int>)Resolve()).GetEnumerator();
+	System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => Resolve().GetEnumerator();
 }

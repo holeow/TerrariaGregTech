@@ -68,33 +68,6 @@ public static class MultiblockPreviewHover
 		ushort currentTileType = hovered.HasTile ? hovered.TileType : (ushort)0;
 		lines.Add($"[c/AAEEFF:{controller.DisplayName} - Multiblock Slot]");
 
-		MachineTooltipLookup.AppendDescriptionAndBuilder(lines, controller.MachineKey, controller.MachineId, controller.Definition);
-
-		if (predicate.IsAir())
-		{
-			lines.Add("Expected: [c/AAAAAA:air]");
-		}
-		else if (predicate.IsAny())
-		{
-			lines.Add("Expected: [c/AAAAAA:any block]");
-		}
-		else if (predicate.IsController)
-		{
-			lines.Add("Expected: [c/AAEEFF:controller (this machine)]");
-		}
-		else
-		{
-			var candidates = GatherCandidateNames(predicate);
-			if (candidates.Count == 0)
-				lines.Add("Expected: [c/AAAAAA:(no candidates registered)]");
-			else
-			{
-				lines.Add("Expected:");
-				foreach (var name in candidates)
-					lines.Add("  " + name);
-			}
-		}
-
 		if (currentTileType == 0)
 		{
 			lines.Add("Placed: [c/AAAAAA:empty]");
@@ -115,63 +88,52 @@ public static class MultiblockPreviewHover
 			string marker = matches ? "[c/44FF44:✓]" : "[c/FF4444:✗]";
 			lines.Add($"Placed: {placedName} {marker}");
 		}
+
+		if (predicate.IsAir())
+		{
+			lines.Add("Expected: [c/AAAAAA:air]");
+		}
+		else if (predicate.IsAny())
+		{
+			lines.Add("Expected: [c/AAAAAA:any block]");
+		}
+		else if (predicate.IsController)
+		{
+			lines.Add("Expected: [c/AAEEFF:controller (this machine)]");
+		}
+		else
+		{
+			var groups = GatherCandidateGroups(predicate);
+			if (groups.Count == 0)
+				lines.Add("Expected: [c/AAAAAA:(no candidates registered)]");
+			else
+			{
+				lines.Add("Expected:");
+				foreach (var name in groups)
+					lines.Add("  " + name);
+			}
+		}
 	}
 
-	private static List<string> GatherCandidateNames(TraceabilityPredicate predicate)
+	private static List<string> GatherCandidateGroups(TraceabilityPredicate predicate)
 	{
-		var names    = new List<string>();
-		var seenType = new HashSet<int>();
-		var seenKey  = new HashSet<string>(System.StringComparer.Ordinal);
+		var groups = new List<string>();
+		var seen   = new HashSet<string>(System.StringComparer.Ordinal);
 		Add(predicate.Common);
 		Add(predicate.Limited);
-		return names;
+		return groups;
 
 		void Add(List<SimplePredicate> bucket)
 		{
 			foreach (var sp in bucket)
 			{
-				if (sp.Candidates is null) continue;
-				var items = sp.Candidates();
-				if (items is null) continue;
-				foreach (var item in items)
-				{
-					if (item is null || item.IsAir) continue;
-					if (!seenType.Add(item.type)) continue;
-					string key = StripTierId(item.ModItem?.Name ?? item.type.ToString());
-					if (!seenKey.Add(key)) continue;
-					names.Add(StripTier(MetaMachine.StripColorTags(Lang.GetItemName(item.type).Value)));
-				}
+				var items = sp.GetCandidates();
+				if (items is null || items.Count == 0) continue;
+				string name = MultiblockErrorText.DescribeGroup(items);
+				if (seen.Add(name)) groups.Add(name);
 			}
 		}
 	}
-
-	private static string StripTier(string name)
-	{
-		int sp = name.IndexOf(' ');
-		if (sp > 0 && System.Array.IndexOf(_tierShortNames, name.Substring(0, sp)) >= 0)
-			return name.Substring(sp + 1);
-		int lsp = name.LastIndexOf(' ');
-		if (lsp > 0 && System.Array.IndexOf(_tierShortNames, name.Substring(lsp + 1)) >= 0)
-			return name.Substring(0, lsp);
-		return name;
-	}
-
-	private static string StripTierId(string id)
-	{
-		int us = id.IndexOf('_');
-		if (us <= 0) return id;
-		string first = id.Substring(0, us);
-		foreach (var t in _tierShortNames)
-			if (string.Equals(first, t, System.StringComparison.OrdinalIgnoreCase))
-				return id.Substring(us + 1);
-		return id;
-	}
-
-	private static readonly string[] _tierShortNames =
-	{
-		"ULV", "LV", "MV", "HV", "EV", "IV", "LuV", "ZPM",
-		"UV",  "UHV","UEV","UIV","UXV","OpV","MAX",
-	};
 
 	public static bool PredicateMatchesTileAt(TraceabilityPredicate predicate, int tileX, int tileY)
 	{
@@ -216,7 +178,7 @@ public static class MultiblockPreviewHover
 				return Lang.GetItemName(modItem.Type).Value;
 			return modTile.Name;
 		}
-		string vanillaName = Lang.GetMapObjectName(Terraria.Map.MapHelper.TileToLookup(tileType, 0));
+		string vanillaName = Capabilities.WorldCapability.MapObjectName(tileType);
 		return string.IsNullOrEmpty(vanillaName) ? $"Tile #{tileType}" : vanillaName;
 	}
 }

@@ -22,7 +22,6 @@ public sealed class UIFluidSlot : UIElement
 	private readonly bool _allowFill;
 	private readonly bool _allowDrain;
 	private readonly bool _fillBar;
-	private bool _rightDown;
 
 	public UIFluidSlot(MetaMachine entity, IO direction, int localTankIndex, int width, int height,
 		bool fillBar = false)
@@ -70,9 +69,18 @@ public sealed class UIFluidSlot : UIElement
 			Main.instance.MouseText(label);
 			if (!stored.IsEmpty)
 				HoverItemTracker.SetFluid(stored.Type!.Id);
-			HandleClicks();
 		}
-		_rightDown = Main.mouseRight;
+	}
+
+	public override void RightMouseDown(UIMouseEvent evt)
+	{
+		base.RightMouseDown(evt);
+		var held = Main.mouseItem;
+		if (held is null || held.IsAir) return;
+		if (!WouldTransfer(held)) return;
+
+		MachineActions.Send(new FluidSlotAction(_tankIndex, held), _entity);
+		Terraria.Audio.SoundEngine.PlaySound(Terraria.ID.SoundID.Splash);
 	}
 
 	private static void DrawFillBar(SpriteBatch sb, Rectangle bounds, FluidStack stored, int capacity)
@@ -88,17 +96,6 @@ public sealed class UIFluidSlot : UIElement
 		var fillRect = new Rectangle(bounds.X, bounds.Y + bounds.Height - fillH, bounds.Width, fillH);
 		if (!FluidIconRenderer.Draw(sb, stored.Type!, fillRect))
 			sb.Draw(tex, fillRect, FluidIconRenderer.RgbColor(stored.Type!.Color));
-	}
-
-	private void HandleClicks()
-	{
-		if (!Main.mouseRight || _rightDown) return;
-		var held = Main.mouseItem;
-		if (held is null || held.IsAir) return;
-		if (!WouldTransfer(held)) return;
-
-		MachineActions.Send(new FluidSlotAction(_tankIndex, held), _entity);
-		Terraria.Audio.SoundEngine.PlaySound(Terraria.ID.SoundID.Splash);
 	}
 
 	private bool WouldTransfer(Item held)

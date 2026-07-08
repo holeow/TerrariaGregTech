@@ -11,16 +11,10 @@ using GregTechCEuTerraria.TerrariaCompat.Capabilities;
 using GregTechCEuTerraria.TerrariaCompat.Cover;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 using Terraria;
-using Item = Terraria.Item;   // disambiguate from this file's `Item` sub-namespace
+using Item = Terraria.Item;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.ItemPipe;
 
-// Verbatim port of com.gregtechceu.gtceu.common.pipelike.item.ItemNetHandler.
-// One instance per (pipe cell, source side). Insert is the pipe network's
-// entry point; Extract / SetSlot no-op like upstream's IItemHandlerModifiable.
-//
-// Adaptations: ItemPipeBlockEntity -> PipeCoverable, Direction -> CoverSide,
-// ItemStack -> Item, pipe.isBlocked(facing) -> cover-at-side == null.
 public sealed class ItemNetHandler : IItemHandler
 {
 	public ItemPipeNet Network { get; set; }
@@ -48,8 +42,6 @@ public sealed class ItemNetHandler : IItemHandler
 	{
 		if (stack.IsAir) return stack;
 
-		// Re-resolve every call - PipeNet merge/split replaces the per-net
-		// instance, a stale Network would route through a dead net.
 		Network = ItemPipeNetSystem.Level.GetNetFromPos((_pipe.X, _pipe.Y))!;
 
 		if (Network is null || _pipe is null || !ItemPipeLayerSystem.Pipes.Has(_pipe.X, _pipe.Y) ||
@@ -66,7 +58,6 @@ public sealed class ItemNetHandler : IItemHandler
 		var tileCover = GetCoverOnNeighbour(_pipe.X, _pipe.Y, Facing);
 		ConveyorCover? conveyor = null;
 
-		// Two conveyors cancel out (upstream parity).
 		if (pipeCover is ConveyorCover && tileCover is ConveyorCover) return stack;
 
 		if (!CheckImportCover(tileCover, onPipe: false, stack)) return stack;
@@ -136,7 +127,6 @@ public sealed class ItemNetHandler : IItemHandler
 		var steps = new List<int>();
 		int min = int.MaxValue;
 
-		// Discover non-full targets + their already-transferred counts.
 		foreach (var inv in copy)
 		{
 			var simStack = stack.Clone();
@@ -164,8 +154,6 @@ public sealed class ItemNetHandler : IItemHandler
 		int nextStep = steps[0];
 		steps.RemoveAt(0);
 
-		// Forward iteration with mid-loop removal mirrors upstream's
-		// Iterator.remove() semantics; order determines who gets leftover items.
 		bool brokenOuter = false;
 		while (amount > 0 && transferredCopy.Count > 0 && !brokenOuter)
 		{
@@ -188,7 +176,7 @@ public sealed class ItemNetHandler : IItemHandler
 				if (data.ToTransfer + toInsert >= data.MaxInsertable)
 				{
 					data.ToTransfer = data.MaxInsertable;
-					transferredCopy.RemoveAt(i);   // stay at i; removal shifts the next entry here
+					transferredCopy.RemoveAt(i);
 				}
 				else
 				{
@@ -201,7 +189,6 @@ public sealed class ItemNetHandler : IItemHandler
 			}
 			if (brokenOuter) break;
 
-			// Upstream's `continue outer` if any target hasn't reached nextStep.
 			bool allAtStep = true;
 			foreach (var data in transferredCopy)
 				if (data.Transferred < nextStep) { allAtStep = false; break; }
@@ -252,9 +239,6 @@ public sealed class ItemNetHandler : IItemHandler
 
 		if (pipeCover != null)
 		{
-			// Probe through the cover; Extract==0 means cover is vetoing.
-			// Default FilterInsert+AllowFlow=Disabled blocks until player
-			// flips AllowFlow / FilterMode (upstream-verbatim).
 			var defaultHandler = new ProbeHandler(stack.Clone());
 			IItemHandler? itemHandler = pipeCover.GetItemHandlerCap(defaultHandler);
 			if (itemHandler is null) return stack;
@@ -361,11 +345,9 @@ public sealed class ItemNetHandler : IItemHandler
 		return true;
 	}
 
-	// Upstream getCoverOnNeighbour - cover on the adjacent machine's
-	// facing-back side; null if no machine / no cover.
 	public static CoverBehavior? GetCoverOnNeighbour(int pipeX, int pipeY, CoverSide handlerFacing)
 	{
-		var (dx, dy) = OffsetForCoverSide(handlerFacing);
+		var (dx, dy) = CoverSides.Offset(handlerFacing);
 		int nx = pipeX + dx, ny = pipeY + dy;
 		if (!MachineCellResolver.TryFindMachineAt(nx, ny, out var machine)) return null;
 		return ((ICoverable)machine).GetCoverAtSide(CoverSides.Opposite(handlerFacing));
@@ -414,16 +396,7 @@ public sealed class ItemNetHandler : IItemHandler
 			_pipe.Transferred[k] -= amount;
 	}
 
-	private static (int dx, int dy) OffsetForCoverSide(CoverSide side) => side switch
-	{
-		CoverSide.Up    => (0, -1),
-		CoverSide.Down  => (0, +1),
-		CoverSide.Left  => (-1, 0),
-		CoverSide.Right => (+1, 0),
-		_               => (0, 0),
-	};
 
-	// Upstream pattern: `new ItemStackHandler(1)` seeded with the inserted stack.
 	private sealed class ProbeHandler : IItemHandler
 	{
 		private Item _slot;
@@ -433,7 +406,7 @@ public sealed class ItemNetHandler : IItemHandler
 		public bool IsItemValid(int slot, Item item) => true;
 		public Item GetSlot(int slot) => _slot;
 		public void SetSlot(int slot, Item item) => _slot = item;
-		public Item Insert(int slot, Item item, bool simulate) => item; // probe accepts nothing
+		public Item Insert(int slot, Item item, bool simulate) => item;
 		public Item Extract(int slot, int maxAmount, bool simulate)
 		{
 			if (_slot.IsAir || maxAmount <= 0) return new Item();

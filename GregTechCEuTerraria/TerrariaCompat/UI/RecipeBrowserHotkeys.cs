@@ -20,6 +20,7 @@ public sealed class RecipeBrowserKeybinds : ModSystem
 
 	private bool _ownObtain;
 	private bool _ownUsed;
+	private bool _lastLmb;
 
 	public override void Load()
 	{
@@ -45,6 +46,23 @@ public sealed class RecipeBrowserKeybinds : ModSystem
 		if (Main.dedServ) return;
 		Handle(HowToObtain, GlobalRecipeBrowserState.BrowseFilter.Output, ref _ownObtain);
 		Handle(UsedAsIngredient, GlobalRecipeBrowserState.BrowseFilter.Input, ref _ownUsed);
+		HandleInventoryFavorite();
+	}
+
+	private void HandleInventoryFavorite()
+	{
+		bool lmb  = Main.mouseLeft;
+		bool edge = lmb && !_lastLmb;
+		_lastLmb  = lmb;
+		if (!edge) return;
+		if (!Main.playerInventory || !GlobalRecipeBrowserSystem.DockedActive) return;
+		var k = Main.keyState;
+		if (!k.IsKeyDown(Keys.LeftAlt) && !k.IsKeyDown(Keys.RightAlt)) return;
+		if (UILayers.IsCursorOverAnyModal()) return;
+
+		var h = Main.HoverItem;
+		if (h is not null && !h.IsAir)
+			FavoritesPlayer.Local.BringItemToFront(h.type);
 	}
 
 	private void Handle(ModKeybind? kb, GlobalRecipeBrowserState.BrowseFilter dir, ref bool owned)

@@ -28,6 +28,17 @@ public sealed class MachineShiftClickPlayer : ModPlayer
 		if (src.IsAir) return false;
 		if (src.favorited) return false;
 
+		if (machine is TerrariaCompat.AppliedEnergistics.MeTerminalMachine)
+		{
+			var movingAll = src.Clone();
+			inventory[slot].TurnToAir();
+			if (Main.netMode == NetmodeID.MultiplayerClient)
+				NetMessage.SendData(MessageID.SyncEquipment, -1, -1, null, Main.myPlayer, slot);
+			MachineActions.Send(MeTerminalAction.OfShiftInsert(movingAll), machine);
+			SoundEngine.PlaySound(SoundID.Grab);
+			return true;
+		}
+
 		var (slots, _) = SlotAction.ResolveShiftInSlots(machine);
 		if (slots is null) return false;
 

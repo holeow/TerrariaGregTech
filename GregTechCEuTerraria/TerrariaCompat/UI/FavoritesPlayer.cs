@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Linq;
 using Terraria;
 using Terraria.ID;
 using Terraria.ModLoader;
@@ -9,21 +10,56 @@ namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
 public sealed class FavoritesPlayer : ModPlayer
 {
-	public readonly record struct Entry(int ItemType, string? FluidId, string? FluidLabel);
+	public readonly record struct Entry(int ItemType, string? FluidId, string? FluidLabel,
+		string? TagLabel = null, int[]? TagMembers = null);
 
 	private const string Key = "gtFavorites";
+	private const string HistoryKey = "gtHistory";
+	private const int HistoryCap = 64;
 
 	private readonly List<Entry> _entries = new();
+	private readonly List<Entry> _history = new();
 
 	public static FavoritesPlayer Local => Main.LocalPlayer.GetModPlayer<FavoritesPlayer>();
 
 	public IReadOnlyList<Entry> Entries => _entries;
+	public IReadOnlyList<Entry> History => _history;
+
+	public void RecordItem(int itemType)
+	{
+		if (itemType <= 0) return;
+		RecordEntry(new Entry(itemType, null, null), e => e.ItemType == itemType);
+	}
+
+	public void RecordFluid(string fluidId, string? label)
+	{
+		if (string.IsNullOrEmpty(fluidId)) return;
+		RecordEntry(new Entry(0, fluidId, label), e => e.FluidId == fluidId);
+	}
+
+	public void RecordTag(string tagLabel, IEnumerable<int> members)
+	{
+		if (string.IsNullOrEmpty(tagLabel)) return;
+		RecordEntry(new Entry(0, null, null, tagLabel, new List<int>(members).ToArray()),
+			e => e.TagLabel == tagLabel);
+	}
+
+	private void RecordEntry(Entry entry, System.Predicate<Entry> match)
+	{
+		int idx = _history.FindIndex(match);
+		if (idx >= 0) _history.RemoveAt(idx);
+		_history.Insert(0, entry);
+		if (_history.Count > HistoryCap) _history.RemoveRange(HistoryCap, _history.Count - HistoryCap);
+	}
 
 	public bool IsItemFavorite(int itemType) =>
 		itemType > 0 && IndexOfItem(itemType) >= 0;
 
 	public bool IsFluidFavorite(string fluidId) =>
 		!string.IsNullOrEmpty(fluidId) && IndexOfFluid(fluidId) >= 0;
+
+	public bool IsTagFavorite(string tagLabel) =>
+		!string.IsNullOrEmpty(tagLabel) && IndexOfTag(tagLabel) >= 0;
 
 	public void BringItemToFront(int itemType)
 	{
@@ -43,6 +79,22 @@ public sealed class FavoritesPlayer : ModPlayer
 		_entries.Insert(0, entry);
 	}
 
+	public void BringTagToFront(string tagLabel, IEnumerable<int> members)
+	{
+		if (string.IsNullOrEmpty(tagLabel)) return;
+		int idx = IndexOfTag(tagLabel);
+		var entry = idx >= 0 ? _entries[idx] : new Entry(0, null, null, tagLabel, new List<int>(members).ToArray());
+		if (idx >= 0) _entries.RemoveAt(idx);
+		_entries.Insert(0, entry);
+	}
+
+	public void RemoveTag(string tagLabel)
+	{
+		if (string.IsNullOrEmpty(tagLabel)) return;
+		int idx = IndexOfTag(tagLabel);
+		if (idx >= 0) _entries.RemoveAt(idx);
+	}
+
 	public void RemoveItem(int itemType)
 	{
 		if (itemType <= 0) return;
@@ -59,8 +111,22 @@ public sealed class FavoritesPlayer : ModPlayer
 
 	public override void SaveData(TagCompound tag)
 	{
+		tag[Key] = SerializeEntries(_entries);
+		tag[HistoryKey] = SerializeEntries(_history);
+	}
+
+	public override void LoadData(TagCompound tag)
+	{
+		_entries.Clear();
+		_history.Clear();
+		if (tag.TryGet<List<TagCompound>>(Key, out var favList)) DeserializeInto(favList, _entries);
+		if (tag.TryGet<List<TagCompound>>(HistoryKey, out var histList)) DeserializeInto(histList, _history);
+	}
+
+	private static List<TagCompound> SerializeEntries(List<Entry> entries)
+	{
 		var list = new List<TagCompound>();
-		foreach (var e in _entries)
+		foreach (var e in entries)
 		{
 			var sub = new TagCompound();
 			if (e.ItemType > 0)
@@ -74,43 +140,49 @@ public sealed class FavoritesPlayer : ModPlayer
 				sub["fluidId"] = e.FluidId;
 				if (!string.IsNullOrEmpty(e.FluidLabel)) sub["fluidLabel"] = e.FluidLabel;
 			}
+			else if (!string.IsNullOrEmpty(e.TagLabel))
+			{
+				sub["tagLabel"] = e.TagLabel;
+				sub["tagMembers"] = new List<int>(e.TagMembers ?? System.Array.Empty<int>());
+			}
 			else continue;
 			list.Add(sub);
 		}
-		tag[Key] = list;
+		return list;
 	}
 
-	public override void LoadData(TagCompound tag)
+	private static void DeserializeInto(List<TagCompound> list, List<Entry> target)
 	{
-		_entries.Clear();
-		if (!tag.TryGet<List<TagCompound>>(Key, out var list)) return;
 		foreach (var sub in list)
 		{
 			if (sub.ContainsKey("item"))
 			{
 				var item = ItemIO.Load(sub.GetCompound("item"));
-				if (item is not null && !item.IsAir && item.type > ItemID.None)
-					AddItemSilent(item.type);
+				if (item is not null && !item.IsAir && item.type > ItemID.None
+					&& !target.Exists(e => e.ItemType == item.type))
+					target.Add(new Entry(item.type, null, null));
 			}
 			else if (sub.ContainsKey("fluidId"))
 			{
 				string id = sub.GetString("fluidId");
 				string? label = sub.ContainsKey("fluidLabel") ? sub.GetString("fluidLabel") : null;
-				AddFluidSilent(id, label);
+				if (!target.Exists(e => e.FluidId == id)) target.Add(new Entry(0, id, label));
+			}
+			else if (sub.ContainsKey("tagLabel"))
+			{
+				string label = sub.GetString("tagLabel");
+				var members = sub.ContainsKey("tagMembers") ? sub.GetList<int>("tagMembers") : new List<int>();
+				if (!target.Exists(e => e.TagLabel == label))
+					target.Add(new Entry(0, null, null, label, new List<int>(members).ToArray()));
 			}
 		}
 	}
 
-	private void AddItemSilent(int itemType)
+	private int IndexOfTag(string tagLabel)
 	{
-		if (itemType <= 0 || IndexOfItem(itemType) >= 0) return;
-		_entries.Add(new Entry(itemType, null, null));
-	}
-
-	private void AddFluidSilent(string fluidId, string? fluidLabel)
-	{
-		if (string.IsNullOrEmpty(fluidId) || IndexOfFluid(fluidId) >= 0) return;
-		_entries.Add(new Entry(0, fluidId, fluidLabel));
+		for (int i = 0; i < _entries.Count; i++)
+			if (_entries[i].TagLabel == tagLabel) return i;
+		return -1;
 	}
 
 	private int IndexOfItem(int itemType)

@@ -24,6 +24,7 @@ public sealed class UITextArea : UIElement, ITextInput
 	private readonly Action<string> _onConfirm;
 	private readonly int _maxLength;
 	private readonly string _placeholder;
+	private readonly bool _commitOnEscape;
 
 	private string _buffer = "";
 	private int _caret;
@@ -43,12 +44,13 @@ public sealed class UITextArea : UIElement, ITextInput
 	void ITextInput.CommitInput() => Commit();
 
 	public UITextArea(Func<string> current, Action<string> onConfirm, int maxLength = 1024,
-		string placeholder = "")
+		string placeholder = "", bool commitOnEscape = false)
 	{
 		_current = current;
 		_onConfirm = onConfirm;
 		_maxLength = maxLength;
 		_placeholder = placeholder;
+		_commitOnEscape = commitOnEscape;
 		OnLeftMouseDown += (_, _) => FocusFromMouse();
 	}
 
@@ -73,7 +75,7 @@ public sealed class UITextArea : UIElement, ITextInput
 		Focus();
 		_innerW = GetDimensions().ToRectangle().Width - PadX * 2;
 		EnsureLayout();
-		_caret = CaretFromPoint(Main.MouseScreen);
+		_caret = CaretFromPoint(ModalEscape.PollCursorScreen());
 		_selAnchor = _caret;
 		_mouseSelecting = true;
 	}
@@ -95,7 +97,7 @@ public sealed class UITextArea : UIElement, ITextInput
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
-		if (!IsFocused || !ContainsPoint(Main.MouseScreen)) return;
+		if (!IsFocused || !ContainsPoint(ModalEscape.PollCursorScreen())) return;
 		_scrollLine = Math.Clamp(_scrollLine - Math.Sign(evt.ScrollWheelValue), 0, MaxScroll());
 	}
 
@@ -104,14 +106,14 @@ public sealed class UITextArea : UIElement, ITextInput
 		base.Update(gameTime);
 		var bounds = GetDimensions().ToRectangle();
 		_innerW = bounds.Width - PadX * 2;
-		bool over = bounds.Contains((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		bool over = bounds.Contains(ModalEscape.PollCursor());
 
 		if (_mouseSelecting)
 		{
-			if (Main.mouseLeft) { EnsureLayout(); _caret = CaretFromPoint(Main.MouseScreen); }
+			if (Main.mouseLeft) { EnsureLayout(); _caret = CaretFromPoint(ModalEscape.PollCursorScreen()); }
 			else { _mouseSelecting = false; if (_selAnchor == _caret) _selAnchor = -1; }
 		}
-		else if (IsFocused && Main.mouseLeft && !over)
+		else if (IsFocused && MouseClick.LeftPressed && !over)
 		{
 			Commit();
 		}
@@ -151,8 +153,8 @@ public sealed class UITextArea : UIElement, ITextInput
 		int line = CaretLine();
 		switch (fired)
 		{
-			case Keys.Enter: InsertText("\n"); return;
-			case Keys.Escape: Discard(); return;
+			case Keys.Enter: Main.chatRelease = false; InsertText("\n"); return;
+			case Keys.Escape: if (_commitOnEscape) Commit(); else Discard(); return;
 			case Keys.Left: MoveCaret(_caret - 1, shift); return;
 			case Keys.Right: MoveCaret(_caret + 1, shift); return;
 			case Keys.Up: MoveVertical(-1, shift); return;
@@ -173,8 +175,6 @@ public sealed class UITextArea : UIElement, ITextInput
 		char? ch = TextInputUtil.CharFor(fired, shift, forceUpper: false);
 		if (ch is { } c) InsertText(c.ToString());
 	}
-
-	// --- editing helpers ---
 
 	private bool HasSelection() => _selAnchor >= 0 && _selAnchor != _caret;
 	private int SelMin() => Math.Min(_selAnchor, _caret);

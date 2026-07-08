@@ -18,10 +18,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI;
 
-// Per-cover settings-popup builder (cover analogue of MachineLayoutRegistry).
-// Widgets resolve the live cover via entity.GetCoverAtSide(side) per access -
-// captured CoverBehavior refs go stale across MachineStateSyncPacket rebuilds.
-// Mutations are server-authoritative via CoverConfigAction -> CoverBehavior.ApplySetting.
 public static class CoverSettingsUI
 {
 	public static UITerrariaPanel? Build(ICoverable entity, CoverSide side, float scale)
@@ -54,9 +50,9 @@ public static class CoverSettingsUI
 
 	private const string TagFilterInfo =
 		"Accepts complex expressions:\n"
-		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"
-		+ "!a = NOT   *   (a) for grouping\n"
-		+ "* = wildcard   *   $ = untagged\n"
+		+ "a & b = AND   a | b = OR   a ^ b = XOR\n"
+		+ "!a = NOT   (a) for grouping\n"
+		+ "* = wildcard   $ = untagged\n"
 		+ "Tags are 'namespace:tag/subtype'.\n"
 		+ "The 'forge:' namespace is assumed if one isn't given.\n"
 		+ "Example: *dusts/gold | (gtceu:circuits & !*lv)\n"
@@ -223,7 +219,7 @@ public static class CoverSettingsUI
 			() => $"Keep: {Voiding(entity, side)?.VoidLimit ?? 0}",
 			onLeft:  () => StepVoidLimit(entity, side, +1),
 			onRight: () => StepVoidLimit(entity, side, -1),
-			tooltip: "VoidOverflow keep-limit (kept per type)\nL +  *  R -  *  hold Shift for a bigger step",
+			tooltip: "VoidOverflow keep-limit (kept per type)\nL +   R -   hold Shift for a bigger step",
 			width:  (int)((W - Pad * 2) * scale),
 			height: (int)(16 * scale))
 		{
@@ -261,8 +257,6 @@ public static class CoverSettingsUI
 		CoverActions.Send(new CoverConfigAction(side, 2, next), entity);
 	}
 
-	// Machine controller - invert / controller-mode / prevent-power-fail.
-	// minRedstoneStrength dropped - Terraria wire has no analog level.
 	private static UITerrariaPanel BuildMachineController(ICoverable entity, CoverSide side, float scale)
 	{
 		const int W = 184, H = 84, Pad = 6, RowH = 16, RowGap = 20;
@@ -363,8 +357,6 @@ public static class CoverSettingsUI
 		_                         => "?",
 	};
 
-	// Advanced detector covers - invert / min / max / 4th-row mode
-	// (latch for item+fluid, EU-vs-percent for energy) + filter for item/fluid.
 	private static UITerrariaPanel BuildAdvancedDetector(ICoverable entity, CoverSide side, float scale)
 	{
 		const int W = 184, Pad = 6, RowH = 16, RowGap = 20;
@@ -386,23 +378,20 @@ public static class CoverSettingsUI
 				Top  = StyleDimension.FromPixels((y0 + RowGap * row) * scale),
 			};
 
-		// field 1: invert
 		panel.Append(Row(0,
 			() => "Inverted: " + ((Detector(entity, side)?.IsInverted ?? false) ? "Yes" : "No"),
 			() => ToggleDetectorInvert(entity, side), () => ToggleDetectorInvert(entity, side),
 			"Invert the emitted signal"));
 
-		// fields 2/3: min / max threshold
 		panel.Append(Row(1,
 			() => $"Min: {Detector(entity, side)?.MinValue ?? 0}",
 			() => StepDetectorValue(entity, side, 2, +1), () => StepDetectorValue(entity, side, 2, -1),
-			"Lower threshold  *  L +  *  R -  *  hold Shift for a bigger step"));
+			"Lower threshold   L +   R -   hold Shift for a bigger step"));
 		panel.Append(Row(2,
 			() => $"Max: {Detector(entity, side)?.MaxValue ?? 0}",
 			() => StepDetectorValue(entity, side, 3, +1), () => StepDetectorValue(entity, side, 3, -1),
-			"Upper threshold  *  L +  *  R -  *  hold Shift for a bigger step"));
+			"Upper threshold   L +   R -   hold Shift for a bigger step"));
 
-		// 4th row: latch (item/fluid) or EU/percent (energy).
 		if (entity.GetCoverAtSide(side) is AdvancedEnergyDetectorCover)
 			panel.Append(Row(3,
 				() => "Mode: " + ((entity.GetCoverAtSide(side) as AdvancedEnergyDetectorCover)?.UsePercent ?? true
@@ -415,7 +404,6 @@ public static class CoverSettingsUI
 				() => ToggleDetectorLatch(entity, side), () => ToggleDetectorLatch(entity, side),
 				"Latched output - holds until the value crosses the opposite threshold"));
 
-		// item/fluid detectors carry a filter; energy doesn't.
 		int bottom = y0 + RowGap * 3 + RowH;
 		var cover = entity.GetCoverAtSide(side);
 		if (cover is AdvancedItemDetectorCover or AdvancedFluidDetectorCover)
@@ -468,8 +456,6 @@ public static class CoverSettingsUI
 			CoverActions.Send(new CoverConfigAction(side, 5, e.UsePercent ? 0 : 1), entity);
 	}
 
-	// Ender link covers - channel field + working-enabled + IO direction;
-	// item/fluid variants also get a channel-contents view + filter block.
 	private static UITerrariaPanel BuildEnderLink(ICoverable entity, CoverSide side, float scale)
 	{
 		const int W = 188, Pad = 6, Btn = 22, FieldH = 18;
@@ -483,7 +469,6 @@ public static class CoverSettingsUI
 
 		int y0 = Pad + 16;
 
-		// field 0 (text): channel name (8-hex)
 		panel.Append(new UITextField(
 			() => Ender(entity, side)?.ColorStr ?? VirtualEntry.DefaultColor,
 			txt => CoverActions.Send(CoverConfigAction.OfText(side, 0, txt), entity),
@@ -504,7 +489,6 @@ public static class CoverSettingsUI
 
 		int y1 = y0 + FieldH + 4;
 
-		// field 0 (long): working-enabled
 		panel.Append(new UIPowerToggle(
 			() => Ender(entity, side)?.IsWorkingEnabled() ?? false,
 			v => CoverActions.Send(new CoverConfigAction(side, 0, v ? 1 : 0), entity),
@@ -515,7 +499,6 @@ public static class CoverSettingsUI
 			Top  = StyleDimension.FromPixels(y1 * scale),
 		});
 
-		// field 1: IO direction
 		panel.Append(new UITextButton(
 			() => Ender(entity, side)?.Io == IO.IN
 				? "Import (machine -> channel)" : "Export (channel -> machine)",
@@ -530,13 +513,11 @@ public static class CoverSettingsUI
 			Top  = StyleDimension.FromPixels(y1 * scale),
 		});
 
-		// item/fluid links carry a channel-contents view + filter; redstone doesn't.
 		int bottom = y1 + Btn;
 		var cover = entity.GetCoverAtSide(side);
 		if (cover is EnderItemLinkCover or EnderFluidLinkCover)
 		{
 			bool fluid = cover is EnderFluidLinkCover;
-			// Channel-contents view - server-synced via EnderChannelSyncPacket.
 			int viewY = bottom + 6;
 			int viewH = fluid ? 16 : 22;
 			panel.Append(new UIText("Channel", 0.5f)
@@ -609,14 +590,14 @@ public static class CoverSettingsUI
 			() => "Manual I/O: " + ManualIoName(Io(entity, side)?.ManualIOMode ?? ManualIOMode.Disabled),
 			() => CycleManualIo(entity, side),
 			"How transfer behaves on the filter's non-filtered direction:\n"
-			+ "Disabled - blocked  *  Filtered - the filter applies  *  Unfiltered - all pass"));
+			+ "Disabled - blocked   Filtered - the filter applies   Unfiltered - all pass"));
 
 		// field 3: transfer rate (stepper)
 		panel.Append(new UITextButton(
 			() => RateLabel(entity, side, fluid),
 			onLeft:  () => StepTransferRate(entity, side, +1, fluid),
 			onRight: () => StepTransferRate(entity, side, -1, fluid),
-			tooltip: "Transfer rate  *  L +  *  R -  *  hold Shift for a bigger step",
+			tooltip: "Transfer rate   L +   R -   hold Shift for a bigger step",
 			width:  (int)(btnW * scale),
 			height: (int)(RowH * scale))
 		{
@@ -780,8 +761,6 @@ public static class CoverSettingsUI
 			CoverActions.Send(new CoverConfigAction(side, 0, c.IsWorkingEnabled() ? 0 : 1), entity);
 	}
 
-	// Shared filter editor: optional install slot + 3x3 matcher grid +
-	// blacklist/ignore-NBT toggles. Returns the block height in logical px
 	private static int AppendFilterBlock(
 		UITerrariaPanel panel, ICoverable entity, CoverSide side, bool fluid, int x, int y, float scale)
 	{
@@ -793,7 +772,6 @@ public static class CoverSettingsUI
 
 		int gridY = y;
 
-		// Install slot - handler covers only (detector / voiding / ender).
 		if (hasHandler)
 		{
 			panel.Append(new UIFilterItemSlot(entity, side, fluid)
@@ -811,8 +789,6 @@ public static class CoverSettingsUI
 			gridY = y + Slot + 4;
 		}
 
-		// SimpleFilter -> grid + toggles. TagFilter -> expression field. Nothing
-		// installed -> nothing. Popup rebuilds via FilterEditorSignature change.
 		bool hasSimple = fluid ? cover?.UiFluidFilter is not null : cover?.UiItemFilter is not null;
 		if (!hasSimple)
 		{
@@ -821,7 +797,6 @@ public static class CoverSettingsUI
 			if (tag is null)
 				return gridY - y;
 
-			// 64-char expression field; setter runs NormalizeExpression before SetOreDict.
 			panel.Append(new UITextField(
 				() => (fluid
 						? (TagFilter?)entity.GetCoverAtSide(side)?.UiTagFluidFilter
@@ -830,7 +805,7 @@ public static class CoverSettingsUI
 				txt => CoverActions.Send(
 					CoverFilterAction.TagExpr(side, fluid, TagFilter.NormalizeExpression(txt)), entity),
 				maxLength: 64,
-				placeholder: "tag expression  *  e.g.  *dusts/gold | !*lv",
+				placeholder: "tag expression   e.g.  *dusts/gold | !*lv",
 				tooltip: TagFilterInfo)
 			{
 				Left   = StyleDimension.FromPixels(x * scale),
@@ -855,7 +830,7 @@ public static class CoverSettingsUI
 			panel.Append(slot);
 		}
 
-		int tx = x + 3 * Slot + 6;   // toggles, right of the grid
+		int tx = x + 3 * Slot + 6;
 		panel.Append(new UITextButton(
 			() => FilterBlackList(entity, side, fluid) ? "Mode: Blacklist" : "Mode: Whitelist",
 			onLeft:  () => ToggleFilterBlacklist(entity, side, fluid),
@@ -906,6 +881,6 @@ public static class CoverSettingsUI
 	{
 		var cover = entity.GetCoverAtSide(side);
 		string name = cover is null || cover.AttachItem.IsAir ? "Cover" : cover.AttachItem.Name;
-		return $"{name}  *  {side}";
+		return $"{name}   {side}";
 	}
 }

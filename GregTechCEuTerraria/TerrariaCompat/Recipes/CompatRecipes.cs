@@ -8,6 +8,7 @@ using GregTechCEuTerraria.Api.Recipe;
 using GregTechCEuTerraria.Api.Recipe.Ingredient;
 using GregTechCEuTerraria.Common.Energy;
 using GregTechCEuTerraria.TerrariaCompat.Items.Cables;
+using GregTechCEuTerraria.AppliedEnergistics.Api.Util;
 using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
@@ -17,7 +18,6 @@ namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 public static class CompatRecipes
 {
 	public static readonly System.Collections.Generic.HashSet<string> OverriddenIds = new();
-
 
 	// compat_{ulv,lv}_{input,output}_{hatch,bus} - make ULV/LV hatches/buses in hand.
 	private const string HatchesAndBuses = """
@@ -416,10 +416,340 @@ public static class CompatRecipes
 	]
 	""";
 
+	private const string Ae2FluixCables = """
+	[
+	  { "id": "alloy_smelter/compat_me_cable_fluix_ulv", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:bronze_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 8, "ingredient": { "item": "gtceu:red_alloy_single_wire" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 8 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 8,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_lv_gt", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:steel_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 16, "ingredient": { "item": "gtceu:manganese_phosphide_single_wire" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 16,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_lv_tr", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:steel_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 16, "ingredient": { "item": "GregTechCEuTerraria/evil_superconductor_single" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 16,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_mv_gt", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:aluminium_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 32, "ingredient": { "item": "gtceu:magnesium_diboride_single_wire" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 32,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_mv_tr", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:aluminium_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 32, "ingredient": { "item": "GregTechCEuTerraria/meteorite_superconductor_single" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 32,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_hv_gt", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:stainless_steel_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 64, "ingredient": { "item": "gtceu:mercury_barium_calcium_cuprate_single_wire" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 512 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 64,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } },
+
+	  { "id": "alloy_smelter/compat_me_cable_fluix_hv_tr", "type": "gtceu:alloy_smelter", "duration": 100,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:stainless_steel_ingot" } },
+	      { "content": { "type": "gtceu:sized", "count": 64, "ingredient": { "item": "GregTechCEuTerraria/hellstone_superconductor_single" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 512 } ] },
+	    "outputs": { "item": [ { "content": { "type": "gtceu:sized", "count": 64,
+	      "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } } ] } }
+	]
+	""";
+
+	private const string Ae2Machines = """
+	[
+	  { "id": "crafting_shapeless/compat_me_terminal", "type": "minecraft:crafting_shapeless",
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/wood_crate" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_modular_terminal" } } ] } },
+
+	  { "id": "crafting_shapeless/compat_me_crafting_terminal", "type": "minecraft:crafting_shapeless",
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/bronze_crate" } },
+	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_crafting_card" } } ] } },
+
+	  { "id": "crafting_shapeless/compat_me_interface", "type": "minecraft:crafting_shapeless",
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:bronze_machine_casing" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_interface" } } ] } },
+
+	  { "id": "assembler/compat_me_pattern_encoding_terminal", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/steel_crate" } },
+	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_pattern_encoding_card" } } ] } },
+
+	  { "id": "assembler/compat_me_crafting_status_card", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/steel_drum" } },
+	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_crafting_status_card" } } ] } },
+
+	  { "id": "assembler/compat_me_pattern_access_terminal", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/aluminium_crate" } },
+	      { "content": { "item": "gtceu:good_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_pattern_access_card" } } ] } },
+
+	  { "id": "assembler/compat_quantum_computer", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "gtceu:solid_machine_casing" } },
+	      { "content": { "type": "gtceu:sized", "count": 4, "ingredient": { "item": "gtceu:basic_electronic_circuit" } } },
+	      { "content": { "type": "gtceu:sized", "count": 20, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/quantum_computer" } } ] } },
+
+	  { "id": "assembler/compat_me_storage", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/lv_super_chest" } },
+	      { "content": { "type": "gtceu:sized", "count": 20, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_storage" } } ] } },
+
+	  { "id": "assembler/compat_me_pattern_provider", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "item": "GregTechCEuTerraria/me_interface" } },
+	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_pattern_provider" } } ] } }
+	]
+	""";
+
+	private const string Money = """
+	[
+	  { "id": "extractor/compat_extract_silver_coin", "type": "gtceu:extractor", "duration": 40,
+	    "inputs":  { "item": [ { "content": { "item": "terraria:SilverCoin" } } ] },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ] } },
+
+	  { "id": "extractor/compat_extract_gold_coin", "type": "gtceu:extractor", "duration": 80,
+	    "inputs":  { "item": [ { "content": { "item": "terraria:GoldCoin" } } ] },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ] } },
+
+	  { "id": "extractor/compat_extract_platinum_coin", "type": "gtceu:extractor", "duration": 200,
+	    "inputs":  { "item": [ { "content": { "item": "terraria:PlatinumCoin" } } ] },
+	    "tickInputs": { "eu": [ { "content": 512 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 10000, "value": { "fluid": "gtceu:money" } } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_silver_coin", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:nugget_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:SilverCoin" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_gold_coin", "type": "gtceu:fluid_solidifier", "duration": 80,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:ingot_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:GoldCoin" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_platinum_coin", "type": "gtceu:fluid_solidifier", "duration": 200,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 10000, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:block_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 512 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:PlatinumCoin" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_redstone_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:cylinder_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:redstone_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_iron_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 2, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:anvil_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:iron_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_silver_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 4, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:bottle_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:silver_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_nickel_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 2, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:ball_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:nickel_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_tin_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:pill_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:tin_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_copper_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:huge_pipe_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:copper_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_sulfur_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:tiny_pipe_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:sulfur_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_rubber_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 4, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:small_pipe_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:rubber_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_gold_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 8, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:large_pipe_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:gold_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_gallium_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:small_gear_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:gallium_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_arsenic_dust", "type": "gtceu:fluid_solidifier", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:gear_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:arsenic_dust" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_money_fallen_star", "type": "gtceu:fluid_solidifier", "duration": 300,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:rotor_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 2048 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:FallenStar" } } ] } },
+
+	  { "id": "fluid_solidifier/compat_neutronium_platinum_coin", "type": "gtceu:fluid_solidifier", "duration": 300,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:neutronium" } } } ],
+	      "item":  [ { "chance": 0, "content": { "item": "gtceu:ball_casting_mold" } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 8192 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:PlatinumCoin" } } ] } },
+
+	  { "id": "fluid_heater/compat_money_to_lava", "type": "gtceu:fluid_heater", "duration": 80,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 100, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 1 } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:lava" } } } ] } },
+
+	  { "id": "fluid_heater/compat_money_to_water", "type": "gtceu:fluid_heater", "duration": 40,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 2 } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 8 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 10000, "value": { "fluid": "gtceu:water" } } } ] } },
+
+	  { "id": "fluid_heater/compat_money_to_honey", "type": "gtceu:fluid_heater", "duration": 60,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 10, "value": { "fluid": "gtceu:money" } } } ],
+	      "item":  [ { "chance": 0, "content": { "type": "gtceu:circuit", "configuration": 3 } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 32 } ] },
+	    "outputs": { "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:honey" } } } ] } }
+	]
+	""";
+
+	private const string Damascus = """
+	[
+	  { "id": "mixer/compat_damascus_steel_dust", "type": "gtceu:mixer", "duration": 300,
+	    "inputs":  {
+	      "item":  [ { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "forge:dusts/steel" } } } ],
+	      "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:sulfuric_acid" } } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 120 } ] },
+	    "outputs": { "item": [ { "content": { "item": "gtceu:damascus_steel_dust" } } ] } }
+	]
+	""";
+
 	private static readonly string[] JsonGroups =
 	{
 		HatchesAndBuses, Bootstrap, Misc, SimplePipes, Casings, Clay,
 		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins, LegacyConversions,
+		Ae2FluixCables, Ae2Machines, Money, Damascus,
 	};
 
 	public sealed record RecipePatch(string BaseId, string NewId, string MergeJson)
@@ -574,6 +904,23 @@ public static class CompatRecipes
 		  "outputs": { "item": [ { "content": { "item": "gtceu:{{tier}}_solar_panel_machine" } } ] } }
 		""";
 
+	// spray can to dye
+	private static readonly string[] SprayCanColors =
+	{
+		"black","blue","brown","cyan","gray","green","light_blue","light_gray",
+		"lime","magenta","orange","pink","purple","red","white","yellow",
+	};
+
+	private static string SprayCanUncanRecipe(string color) =>
+		$$"""
+		{ "id": "extractor/compat_uncan_{{color}}_dye_spray_can", "type": "gtceu:extractor", "duration": 200,
+		  "inputs":  { "item": [ { "content": { "item": "gtceu:{{color}}_dye_spray_can" } } ] },
+		  "tickInputs": { "eu": [ { "content": 7 } ] },
+		  "outputs": {
+		    "fluid": [ { "content": { "amount": 576, "value": { "fluid": "gtceu:{{color}}_dye" } } } ]
+		  } }
+		""";
+
 	// Terraria superconductors
 	private static readonly (byte Size, int Circuit, int InCount, int OutCount, int DurMult)[] WireLadder =
 	{
@@ -608,6 +955,38 @@ public static class CompatRecipes
 		""";
 	}
 
+	private static string SuperconductorCombiningRecipe(
+		SuperconductorWireLoader.ScTier tier,
+		string idVerb, byte inSize, int inCount, byte outSize, int outCount)
+	{
+		string inId  = SuperconductorWireLoader.WireItemName(tier, inSize);
+		string outId = SuperconductorWireLoader.WireItemName(tier, outSize);
+		string inWord = WireItem.WireSizeWord(inSize);
+		return $$"""
+		{ "id": "crafting_shapeless/compat_sc_{{tier.MetalId}}_{{inWord}}_{{idVerb}}", "type": "minecraft:crafting_shapeless",
+		  "inputs": { "item": [
+		    { "content": { "type": "gtceu:sized", "count": {{inCount}}, "ingredient": { "item": "GregTechCEuTerraria/{{inId}}" } } }
+		  ] },
+		  "outputs": { "item": [
+		    { "content": { "type": "gtceu:sized", "count": {{outCount}}, "ingredient": { "item": "GregTechCEuTerraria/{{outId}}" } } }
+		  ] } }
+		""";
+	}
+
+	private static IEnumerable<string> SuperconductorCombiningRecipes(SuperconductorWireLoader.ScTier tier)
+	{
+		var order = SuperconductorWireLoader.Sizes;
+		for (int i = 0; i < order.Length; i++)
+		{
+			if (i < order.Length - 1)
+				yield return SuperconductorCombiningRecipe(tier, "doubling", order[i], 2, order[i + 1], 1);
+			if (i > 0)
+				yield return SuperconductorCombiningRecipe(tier, "splitting", order[i], 1, order[i - 1], 2);
+			if (i < order.Length - 2)
+				yield return SuperconductorCombiningRecipe(tier, "quadrupling", order[i], 4, order[i + 2], 1);
+		}
+	}
+
 	public static List<(string Station, GTRecipe Recipe)> Build(IIngredientResolver resolver)
 	{
 		var result = new List<(string, GTRecipe)>();
@@ -617,6 +996,8 @@ public static class CompatRecipes
 			ParseOne(LampRecipe(tier), resolver, result);
 		foreach (var tier in SolarPanelTiers)
 			ParseOne(SolarPanelRecipe(tier), resolver, result);
+		foreach (var color in SprayCanColors)
+			ParseOne(SprayCanUncanRecipe(color), resolver, result);
 
 		foreach (var scTier in SuperconductorWireLoader.Tiers)
 			foreach (var rung in WireLadder)
@@ -629,7 +1010,32 @@ public static class CompatRecipes
 				}
 			}
 
+		foreach (var scTier in SuperconductorWireLoader.Tiers)
+			foreach (var json in SuperconductorCombiningRecipes(scTier))
+				ParseOne(json, resolver, result);
+
+		foreach (var json in Ae2ColoredCableRecipes())
+			ParseOne(json, resolver, result);
+
 		return result;
+	}
+
+	private static IEnumerable<string> Ae2ColoredCableRecipes()
+	{
+		foreach (var color in AEColors.VALID_COLORS)
+		{
+			string prefix = color.RegistryPrefix();
+			yield return $$"""
+			{ "id": "crafting_shapeless/compat_me_cable_fluix_to_{{prefix}}", "type": "minecraft:crafting_shapeless",
+			  "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/me_cable_fluix" } } ] },
+			  "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_cable_{{prefix}}" } } ] } }
+			""";
+			yield return $$"""
+			{ "id": "crafting_shapeless/compat_me_cable_{{prefix}}_to_fluix", "type": "minecraft:crafting_shapeless",
+			  "inputs":  { "item": [ { "content": { "item": "GregTechCEuTerraria/me_cable_{{prefix}}" } } ] },
+			  "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_cable_fluix" } } ] } }
+			""";
+		}
 	}
 
 	private static void ParseArray(string json, IIngredientResolver resolver, List<(string, GTRecipe)> result)

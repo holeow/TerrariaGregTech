@@ -101,6 +101,7 @@ public static class FluidRegistry
 	public static readonly FluidType DistilledWater  = Register(new FluidType("distilled_water", "Distilled Water", 0x88BBE0));
 	public static readonly FluidType Honey           = Register(new FluidType("honey", "Honey", 0xE9A700));
 	public static readonly FluidType Shimmer         = Register(new FluidType("shimmer", "Shimmer", 0xF06ED6));
+	public static readonly FluidType Money           = Register(new FluidType("money", "Liquid Money", 0xE5B814));
 
 	public static FluidType Register(FluidType fluid)
 	{

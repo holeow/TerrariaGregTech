@@ -11,9 +11,6 @@ using Terraria.ObjectData;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Universal definition-driven machine tile. One class, registered per
-// (MachineDefinition x VoltageTier) by TieredMachineFactory. Parameterless
-// ctor is the autoload probe (gated off via IsLoadingEnabled).
 public class TieredMachineTile : MetaMachineTile
 {
 	protected readonly VoltageTier _tier;
@@ -31,11 +28,9 @@ public class TieredMachineTile : MetaMachineTile
 	public override MachineDefinition Definition => _def!;
 
 	public override bool IsLoadingEnabled(Mod mod) => !_isTemplate;
-	// Null-guarded for the autoload-probe instance.
 	public override string Name => _def == null
 		? GetType().Name
 		: _def.Tiered ? $"{VoltageTiers.Id(_tier)}_{_def.Id}" : _def.Id;
-	// PreDraw composites the real sheet; this PNG is never actually drawn.
 	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsTile";
 
 	protected virtual Color MapColor => new Color(140, 130, 110);
@@ -69,7 +64,31 @@ public class TieredMachineTile : MetaMachineTile
 	public override string? CustomFaceAssetPath => _def!.CustomFaceAssetPath;
 	protected override VoltageTier TileTier => _tier;
 
-	// Multi appearance-casing - matches upstream workableCasingModel(appearance, overlay).
+	private static Microsoft.Xna.Framework.Graphics.Texture2D? _gtArrow;
+
+	public override void PostDraw(int i, int j, Microsoft.Xna.Framework.Graphics.SpriteBatch spriteBatch)
+	{
+		base.PostDraw(i, j, spriteBatch);
+
+		if (!MachineCellResolver.TryFindMachineAt(i, j, out var m)) return;
+		if (m.AutoOutput is not { } ao) return;
+		if (!ao.IsAutoOutputItems && !ao.IsAutoOutputFluids) return;
+
+		var (w, h) = m.Size;
+		int originX = m.Position.X, originY = m.Position.Y;
+		if (i != originX + w - 1 || j != originY + h - 1) return;
+
+		_gtArrow ??= ModContent.Request<Microsoft.Xna.Framework.Graphics.Texture2D>(
+			"GregTechCEuTerraria/Content/TerrariaCompat/gt_direction",
+			ReLogic.Content.AssetRequestMode.ImmediateLoad).Value;
+
+		var light = Lighting.GetColor(originX, originY);
+		if (ao.IsAutoOutputItems)
+			DirectionArrowOverlay.Draw(spriteBatch, _gtArrow, originX, originY, w, h, ao.ItemOutputDirection, light);
+		if (ao.IsAutoOutputFluids)
+			DirectionArrowOverlay.Draw(spriteBatch, _gtArrow, originX, originY, w, h, ao.FluidOutputDirection, light);
+	}
+
 	public override string? CustomCasingTexturePath
 	{
 		get
@@ -94,15 +113,12 @@ public class TieredMachineTile : MetaMachineTile
 		_                           => MachineRenderer.Casing.None,
 	};
 
-	// LayoutKey "none" = no GUI (transformer / solar / lamp).
 	public override bool RightClick(int i, int j)
 	{
-		// Terminal auto-build takes priority over the GUI.
 		if (MachineCellResolver.TryFindMachineAt(i, j, out var clicked)
 		    && Items.TerminalItem.TryAutoBuild(clicked, Main.LocalPlayer))
 			return true;
 
-		// LD endpoint screwdriver IO flip (GUI-less, LayoutKey "none").
 		if (clicked is Pipelike.LongDistance.LongDistanceEndpointMachine ep
 		    && IsScrewdriver(Main.LocalPlayer.HeldItem))
 		{

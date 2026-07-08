@@ -79,17 +79,7 @@ public sealed class SimpleItemPipeItem : ModItem, ITextureWarmUp
 		if (x <= 0 || x >= Main.maxTilesX - 1 || y <= 0 || y >= Main.maxTilesY - 1) return false;
 		if (Item.stack <= 0) return false;
 
-		var mod      = Pipelike.ItemPipe.ItemPipeSizeModifier.For(Size, restrictive: false);
-		int priority = (int)((1 * mod.ResistanceMultiplier) + 0.5f);
-		float rate   = 0.25f * mod.RateMultiplier;
-
-		var cell = new Pipelike.ItemPipe.ItemPipeCell(
-			MaterialId:   "simple_item",
-			Size:         Size,
-			Restrictive:  false,
-			Priority:     priority,
-			TransferRate: rate,
-			IsSimple:     true);
+		var cell = BuildCell(Size);
 
 		if (!Pipelike.ItemPipe.ItemPipeLayerHandle.Instance.TryPlace(cell, x, y, player))
 			return false;
@@ -109,6 +99,43 @@ public sealed class SimpleItemPipeItem : ModItem, ITextureWarmUp
 				!= Pipelike.SideNeighbourKind.Inventory) continue;
 			SimplePipeSideSetPacket.Send(layer, x, y, side, SimpleSideMode.Insert);
 		}
+	}
+
+	internal static readonly PipeSize[] Sizes =
+		{ PipeSize.Small, PipeSize.Normal, PipeSize.Large, PipeSize.Huge };
+
+	public static Pipelike.ItemPipe.ItemPipeCell BuildCell(PipeSize size)
+	{
+		var mod      = Pipelike.ItemPipe.ItemPipeSizeModifier.For(size, restrictive: false);
+		int priority = (int)((1 * mod.ResistanceMultiplier) + 0.5f);
+		float rate   = 0.25f * mod.RateMultiplier;
+		return new Pipelike.ItemPipe.ItemPipeCell(
+			MaterialId:   "simple_item",
+			Size:         size,
+			Restrictive:  false,
+			Priority:     priority,
+			TransferRate: rate,
+			IsSimple:     true);
+	}
+
+	public static int TypeFor(PipeSize size)
+	{
+		string id = size == PipeSize.Normal
+			? "simple_item_pipe"
+			: "simple_item_pipe_" + PipeSizes.Word(size);
+		return ModContent.GetInstance<GregTechCEuTerraria>().TryFind<ModItem>(id, out var mi) ? mi.Type : 0;
+	}
+
+	private static Dictionary<int, PipeSize>? _byType;
+	public static bool TryGetSize(int itemType, out PipeSize size)
+	{
+		if (_byType is null)
+		{
+			var d = new Dictionary<int, PipeSize>();
+			foreach (var s in Sizes) { int t = TypeFor(s); if (t > 0) d[t] = s; }
+			_byType = d;
+		}
+		return _byType.TryGetValue(itemType, out size);
 	}
 
 	void ITextureWarmUp.WarmUpTexture() => ItemIconBaker.Install(Item.type, Texture);

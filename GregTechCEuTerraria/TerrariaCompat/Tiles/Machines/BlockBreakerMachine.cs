@@ -11,26 +11,18 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Tiles.Machines;
 
-// Adapted port of com.gregtechceu.gtceu.common.machine.electric.BlockBreakerMachine.
-// Upstream is a front-facing single-tile drill feeding a (tier+1)^2 cache.
-//
-// DEVIATIONS (Terraria-adapted): no facing - vertical-column drill
-// (scans rows below for the shallowest breakable tile); world-height-fraction
-// Range per tier (see Range); no cache - drops fall in-world; per-tile time is
-// a tier-keyed constant (no uniform Terraria hardness scalar).
-//
-// Energy: receiver, capacity V[tier]*64, per-tick draw V[tier-1] (LV pays ULV).
 public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 {
 	public BlockBreakerMachine() { }
 	public BlockBreakerMachine(VoltageTier tier) : base(tier) { }
+
+	public enum BreakerMode : byte { MineDown, CutTrees }
 
 	protected override string Label => Definition?.Label ?? "Block Breaker";
 
 	public override bool CanAccept => true;
 	public override long EnergyCapacity => VoltageTiers.Voltage(Tier) * 64L;
 
-	// V[tier-1] (java:82)
 	private long EnergyPerTick
 	{
 		get
@@ -40,8 +32,6 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		}
 	}
 
-	// World-height-fraction vertical reach per tier (each opens new territory
-	// from a surface placement); falls back to 1200 before the world loads.
 	public int Range
 	{
 		get
@@ -62,7 +52,6 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		}
 	}
 
-	// Ticks/tile - tier-keyed constant (no uniform Terraria hardness scalar).
 	private int TicksPerTile
 	{
 		get
@@ -72,16 +61,22 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		}
 	}
 
+	private int TicksPerTreeTile => TicksPerTile * 2;
+
+	private int TierRank => (int)Tier - (int)VoltageTier.LV + 1;
+	private int CutHalfSpan => 8 * TierRank;
+	public int CutWidth => Size.Width + 2 * CutHalfSpan;
+	private const int CutBandAbove = 2;
+	private const int MaxTreeScanHeight = 60;
+
 	protected override bool HasChargerSlot => true;
 
-	// Presence is the idempotency gate (trait-reference, not bool flag).
 	private EnvironmentalExplosionTrait? _explosion;
 	private void EnsureTraits()
 	{
 		if (_explosion is not null) return;
 		BindDefinition();
-		EnsureEnergyContainer();   // attaches EnvironmentalExplosionTrait
-		// Mirror upstream setEnableEnvironmentalExplosions(false).
+		EnsureEnergyContainer();
 		_explosion = Traits.GetTrait<EnvironmentalExplosionTrait>(EnvironmentalExplosionTrait.TYPE);
 		_explosion?.SetEnableEnvironmentalExplosions(false);
 	}
@@ -96,6 +91,22 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 	public bool IsWorkingEnabled() => _isWorkingEnabled;
 	public void SetWorkingEnabled(bool enabled) => _isWorkingEnabled = enabled;
 
+	private BreakerMode _mode = BreakerMode.MineDown;
+	public BreakerMode Mode => _mode;
+	public void SetMode(BreakerMode mode)
+	{
+		if ((byte)mode > (byte)BreakerMode.CutTrees) mode = BreakerMode.MineDown;
+		if (_mode == mode) return;
+		_mode = mode;
+		_hasTarget = false;
+		_progress = 0;
+		_active = false;
+	}
+
+	private bool _replant = true;
+	public bool ReplantEnabled => _replant;
+	public void SetReplant(bool enabled) => _replant = enabled;
+
 	private bool _active;
 	public override bool IsActive => _active;
 
@@ -103,7 +114,7 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 	private int _targetX;
 	private int _targetY;
 	private bool _hasTarget;
-	private int _lastDepth;   // cosmetic - surfaced in tooltip
+	private int _lastDepth;
 
 	protected override void OnTick()
 	{
@@ -121,7 +132,14 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 			return;
 		}
 
-		// Re-pick if no target or the current one vanished (e.g. mined by another player).
+		if (_mode == BreakerMode.CutTrees)
+			CutTreesTick();
+		else
+			MineDownTick();
+	}
+
+	private void MineDownTick()
+	{
 		if (!_hasTarget || !TargetStillValid())
 		{
 			if (!FindTarget(out _targetX, out _targetY))
@@ -147,6 +165,38 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		}
 	}
 
+	private void CutTreesTick()
+	{
+		if (!_hasTarget || !TreeTargetStillValid())
+		{
+			if (!FindTreeTarget(out _targetX, out _targetY))
+			{
+				_active = false;
+				_progress = 0;
+				_hasTarget = false;
+				return;
+			}
+			_hasTarget = true;
+			_progress = 0;
+		}
+
+		_active = true;
+		DrainEnergy(simulate: false);
+
+		_progress++;
+		if (_progress >= TicksPerTreeTile)
+		{
+			_progress = 0;
+			BreakHighestTreeTile(_targetX, _targetY);
+			if (!TreeHasTiles(_targetX, _targetY))
+			{
+				if (_replant)
+					ReplantTreeAt(_targetX, _targetY);
+				_hasTarget = false;
+			}
+		}
+	}
+
 	private bool TargetStillValid()
 	{
 		if (_targetX < 0 || _targetX >= Main.maxTilesX || _targetY < 0 || _targetY >= Main.maxTilesY)
@@ -155,12 +205,9 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		return t.HasTile && !IsProtected(t.TileType);
 	}
 
-	// Scan each footprint column downward for the shallowest breakable tile
-	// within Range. Protected tiles are skipped (not blocking) so clutter or a
-	// chest in the way doesn't jam the drill.
 	private bool FindTarget(out int outX, out int outY)
 	{
-		int startY = Position.Y + Size.Height;       // row just below bottom edge
+		int startY = Position.Y + Size.Height;
 		int endY   = Math.Min(Main.maxTilesY - 1, startY + Range - 1);
 		int bestY  = int.MaxValue;
 		int bestX  = -1;
@@ -173,9 +220,9 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 			{
 				var t = Main.tile[x, y];
 				if (!t.HasTile) continue;
-				if (IsProtected(t.TileType)) continue; // skip but keep scanning the column
+				if (IsProtected(t.TileType)) continue;
 				if (y < bestY) { bestY = y; bestX = x; }
-				break; // shallowest in this column wins
+				break;
 			}
 		}
 
@@ -184,10 +231,6 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		return true;
 	}
 
-	// Tiles the drill refuses to touch: progression-gated bricks (dungeon /
-	// lihzahrd / shimmer) and containers (covers our CrateTile via IsAContainer).
-	// A type-level tile-entity test was considered but is too broad (modded
-	// furniture) - promote to a tier-progression table later if needed.
 	private static bool IsProtected(ushort tileType)
 	{
 		if (Main.tileDungeon[tileType]) return true;
@@ -203,8 +246,6 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		var t = Main.tile[_targetX, _targetY];
 		if (!t.HasTile) return;
 
-		// KillTile handles drops + FX + neighbour update; server broadcasts
-		// TileManipulation. Server-only here.
 		WorldGen.KillTile(_targetX, _targetY, fail: false, effectOnly: false, noItem: false);
 		if (Main.netMode == NetmodeID.Server && !Main.tile[_targetX, _targetY].HasTile)
 			NetMessage.SendData(MessageID.TileManipulation, -1, -1, null, 0, _targetX, _targetY);
@@ -212,7 +253,95 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		_lastDepth = _targetY - (Position.Y + Size.Height) + 1;
 	}
 
-	// simulate-first drain (java:238)
+	private static bool IsTreeTrunk(ushort type)
+		=> TileID.Sets.IsATreeTrunk[type] || type == TileID.PalmTree;
+
+	private bool TreeTargetStillValid() => TreeHasTiles(_targetX, _targetY);
+
+	private bool FindTreeTarget(out int centerX, out int baseY)
+	{
+		int topRow = Position.Y - CutBandAbove;
+		int botRow = Position.Y + Size.Height - 1;
+		int span = CutHalfSpan;
+		for (int d = 0; d < span; d++)
+		{
+			if (TryResolveTreeCenter(Position.X - 1 - d, topRow, botRow, out centerX, out baseY)) return true;
+			if (TryResolveTreeCenter(Position.X + Size.Width + d, topRow, botRow, out centerX, out baseY)) return true;
+		}
+		centerX = baseY = 0;
+		return false;
+	}
+
+	private static bool TryResolveTreeCenter(int col, int topRow, int botRow, out int centerX, out int baseY)
+	{
+		centerX = baseY = 0;
+		if (col < 0 || col >= Main.maxTilesX) return false;
+		for (int y = topRow; y <= botRow; y++)
+		{
+			if (y < 0 || y >= Main.maxTilesY) continue;
+			var t = Main.tile[col, y];
+			if (!t.HasTile || !IsTreeTrunk(t.TileType)) continue;
+			WorldGen.GetTreeBottom(col, y, out int gx, out int gy);
+			if (gy - 1 < 0 || !Main.tile[gx, gy].HasTile) return false;
+			centerX = gx;
+			baseY = gy - 1;
+			return true;
+		}
+		return false;
+	}
+
+	private void BreakHighestTreeTile(int centerX, int baseY)
+	{
+		int top = Math.Max(0, baseY - MaxTreeScanHeight);
+		int bestX = -1, bestY = int.MaxValue;
+		for (int x = centerX - 1; x <= centerX + 1; x++)
+		{
+			if (x < 0 || x >= Main.maxTilesX) continue;
+			for (int y = top; y <= baseY; y++)
+			{
+				var t = Main.tile[x, y];
+				if (!t.HasTile || !IsTreeTrunk(t.TileType)) continue;
+				if (y < bestY) { bestY = y; bestX = x; }
+				break;
+			}
+		}
+		if (bestX >= 0)
+			KillTreeTileAt(bestX, bestY);
+	}
+
+	private static bool TreeHasTiles(int centerX, int baseY)
+	{
+		int top = Math.Max(0, baseY - MaxTreeScanHeight);
+		for (int x = centerX - 1; x <= centerX + 1; x++)
+		{
+			if (x < 0 || x >= Main.maxTilesX) continue;
+			for (int y = top; y <= baseY; y++)
+			{
+				if (y < 0 || y >= Main.maxTilesY) continue;
+				var t = Main.tile[x, y];
+				if (t.HasTile && IsTreeTrunk(t.TileType)) return true;
+			}
+		}
+		return false;
+	}
+
+	private static void ReplantTreeAt(int centerX, int baseY)
+	{
+		WorldGen.PlaceTile(centerX, baseY, TileID.Saplings, mute: true, forced: false, plr: -1, style: 0);
+		if (Main.netMode == NetmodeID.Server && Main.tile[centerX, baseY].HasTile && Main.tile[centerX, baseY].TileType == TileID.Saplings)
+			NetMessage.SendData(MessageID.TileManipulation, -1, -1, null, 1, centerX, baseY, TileID.Saplings);
+	}
+
+	private static void KillTreeTileAt(int x, int ty)
+	{
+		if (x < 0 || x >= Main.maxTilesX || ty < 0 || ty >= Main.maxTilesY) return;
+		var t = Main.tile[x, ty];
+		if (!t.HasTile || !IsTreeTrunk(t.TileType)) return;
+		WorldGen.KillTile(x, ty, fail: false, effectOnly: false, noItem: false);
+		if (Main.netMode == NetmodeID.Server && !Main.tile[x, ty].HasTile)
+			NetMessage.SendData(MessageID.TileManipulation, -1, -1, null, 0, x, ty);
+	}
+
 	private bool DrainEnergy(bool simulate)
 	{
 		long resultEnergy = EnergyContainer.EnergyStored - EnergyPerTick;
@@ -235,6 +364,8 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		tag["targetY"]          = _targetY;
 		tag["hasTarget"]        = _hasTarget;
 		tag["lastDepth"]        = _lastDepth;
+		tag["mode"]             = (byte)_mode;
+		tag["replant"]          = _replant;
 	}
 
 	public override void LoadData(TagCompound tag)
@@ -248,11 +379,28 @@ public sealed class BlockBreakerMachine : TieredEnergyMachine, IControllable
 		_targetY          = tag.GetInt("targetY");
 		_hasTarget        = tag.GetBool("hasTarget");
 		_lastDepth        = tag.GetInt("lastDepth");
+		_mode             = (BreakerMode)tag.GetByte("mode");
+		_replant          = !tag.ContainsKey("replant") || tag.GetBool("replant");
 	}
 
 	public override void AppendTooltip(List<string> lines)
 	{
 		base.AppendTooltip(lines);
+		if (_mode == BreakerMode.CutTrees)
+		{
+			lines.Add("Mode: Cut Trees");
+			lines.Add($"Area: {CutWidth} wide x {Size.Height + CutBandAbove} tall band");
+			lines.Add($"Draw: {EnergyPerTick:N0} EU/t");
+			if (_active)
+				lines.Add($"Cutting trees ({RecipeStatusText.FormatProgressSeconds(_progress, TicksPerTreeTile)})");
+			else if (!_isWorkingEnabled)
+				lines.Add("Disabled");
+			else
+				lines.Add("Idle: no trees in range");
+			return;
+		}
+
+		lines.Add("Mode: Mine Down");
 		lines.Add($"Range: {Range} tiles below");
 		lines.Add($"Speed: {TicksPerTile} ticks / tile");
 		lines.Add($"Draw: {EnergyPerTick:N0} EU/t");

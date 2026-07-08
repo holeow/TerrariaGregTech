@@ -10,10 +10,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Resolves a MachineFamily to its single registered ModTileEntity prototype.
-// Post-collapse there are ~8 family entity classes, each autoloaded once; a
-// definition-driven tile uses this to Place the correct entity for its
-// machine's family.
 public static class MachineFamilyEntity
 {
 	public static MetaMachine For(MachineFamily family) => family switch
@@ -58,7 +54,6 @@ public static class MachineFamilyEntity
 		MachineFamily.AutoMaintenanceHatch     => ModContent.GetInstance<AutoMaintenanceHatchPartMachine>(),
 		MachineFamily.CleaningMaintenanceHatch => ModContent.GetInstance<CleaningMaintenanceHatchPartMachine>(),
 		MachineFamily.MultiblockCleanroom      => ModContent.GetInstance<Multiblock.Electric.CleanroomMachine>(),
-		MachineFamily.Diode                    => ModContent.GetInstance<DiodePartMachine>(),
 		MachineFamily.MultiblockEBF            => ModContent.GetInstance<Multiblock.Electric.ElectricBlastFurnaceMachine>(),
 		MachineFamily.MultiblockElectricStandard => ModContent.GetInstance<Multiblock.WorkableElectricMultiblockMachine>(),
 		MachineFamily.MultiblockCoilStandard     => ModContent.GetInstance<Multiblock.CoilWorkableElectricMultiblockMachine>(),
@@ -78,7 +73,6 @@ public static class MachineFamilyEntity
 		MachineFamily.MultiblockActiveTransformer     => ModContent.GetInstance<Multiblock.Electric.ActiveTransformerMachine>(),
 		MachineFamily.LaserHatch                      => ModContent.GetInstance<Multiblock.Part.LaserHatchPartMachine>(),
 		MachineFamily.MultiblockPowerSubstation       => ModContent.GetInstance<Multiblock.Electric.PowerSubstationMachine>(),
-		// Research / computation subsystem
 		MachineFamily.MultiblockHPCA            => ModContent.GetInstance<Multiblock.Electric.Research.HPCAMachine>(),
 		MachineFamily.MultiblockDataBank        => ModContent.GetInstance<Multiblock.Electric.Research.DataBankMachine>(),
 		MachineFamily.MultiblockNetworkSwitch   => ModContent.GetInstance<Multiblock.Electric.Research.NetworkSwitchMachine>(),
@@ -88,9 +82,13 @@ public static class MachineFamilyEntity
 		MachineFamily.ObjectHolder              => ModContent.GetInstance<Multiblock.Part.ObjectHolderMachine>(),
 		MachineFamily.OpticalComputationHatch   => ModContent.GetInstance<Multiblock.Part.OpticalComputationHatchMachine>(),
 		MachineFamily.OpticalDataHatch          => ModContent.GetInstance<Multiblock.Part.OpticalDataHatchMachine>(),
-		// Long-distance pipeline endpoints
 		MachineFamily.LongDistanceItemEndpoint  => ModContent.GetInstance<Pipelike.LongDistance.LDItemEndpointMachine>(),
 		MachineFamily.LongDistanceFluidEndpoint => ModContent.GetInstance<Pipelike.LongDistance.LDFluidEndpointMachine>(),
+		MachineFamily.MeStorage                 => ModContent.GetInstance<AppliedEnergistics.MeStorageMachine>(),
+		MachineFamily.QuantumComputer           => ModContent.GetInstance<AppliedEnergistics.QuantumComputerMachine>(),
+		MachineFamily.PatternProvider           => ModContent.GetInstance<AppliedEnergistics.PatternProviderMachine>(),
+		MachineFamily.MeInterface               => ModContent.GetInstance<AppliedEnergistics.MeInterfaceMachine>(),
+		MachineFamily.MeModularTerminal         => ModContent.GetInstance<AppliedEnergistics.MeModularTerminalMachine>(),
 		_ => throw new ArgumentOutOfRangeException(nameof(family), family, "unmapped MachineFamily"),
 	};
 }

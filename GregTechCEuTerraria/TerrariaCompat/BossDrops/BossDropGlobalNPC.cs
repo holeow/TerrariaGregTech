@@ -10,7 +10,7 @@ public sealed class BossDropGlobalNPC : GlobalNPC
 {
 	private static readonly BossDropCondition Condition = new();
 	private static readonly BossDropLastPartCondition LastPartCondition = new();
-	private const int BagDropChance = 100;
+	private const int BagDropChance = 1000;
 
 	public override void ModifyNPCLoot(NPC npc, NPCLoot npcLoot)
 	{

@@ -73,7 +73,6 @@ public class LargeBoilerMachine : WorkableMultiblockMachine
 		int waterDrained = maxDrain - waterRemaining;
 		SteamGenerated = waterDrained * SteamPerWater;
 
-		// Post-load rebind window (~3 ticks), skip the explosion check on world-join
 		if (tanksSeen == 0) return;
 
 		if (waterDrained > 0)
@@ -124,6 +123,7 @@ public class LargeBoilerMachine : WorkableMultiblockMachine
 		base.SaveData(tag);
 		tag["lb_temp"] = CurrentTemperature;
 		tag["lb_throttle"] = Throttle;
+		tag["lb_steam"] = SteamGenerated;
 	}
 
 	public override void LoadData(TagCompound tag)
@@ -131,6 +131,7 @@ public class LargeBoilerMachine : WorkableMultiblockMachine
 		base.LoadData(tag);
 		if (tag.ContainsKey("lb_temp"))     CurrentTemperature = tag.GetInt("lb_temp");
 		if (tag.ContainsKey("lb_throttle")) Throttle           = tag.GetInt("lb_throttle");
+		if (tag.ContainsKey("lb_steam"))    SteamGenerated     = tag.GetInt("lb_steam");
 		if (Throttle < 25 || Throttle > 100) Throttle = 100;
 	}
 

@@ -336,6 +336,6 @@ public sealed class ProspectorItem : ModItem, IElectricItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "ProspectorHint5",
 			$"While tracking an ore: 4x drain ({4L * _energyDrawBase:N0} EU/s), streams particles to it"));
 		tooltips.Add(new TooltipLine(Mod, "ProspectorHint6",
-			$"Each scan costs {ScanCost:N0} EU (5%)  *  Scan radius: {_rangeTiles} tiles"));
+			$"Each scan costs {ScanCost:N0} EU (5%)   Scan radius: {_rangeTiles} tiles"));
 	}
 }

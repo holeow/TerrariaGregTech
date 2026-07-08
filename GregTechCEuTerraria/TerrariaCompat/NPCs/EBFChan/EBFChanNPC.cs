@@ -191,9 +191,10 @@ public class EBFChanNPC : ModNPC
 
 		shop.Add(new Item(ModContent.ItemType<GregTechMultitool>()) { shopCustomPrice = Item.buyPrice(gold: 1) });
 
+		AddIfPresent(shop, "me_modular_terminal", Item.buyPrice(gold: 25));
+
 		AddHydrogenCell(shop, Item.buyPrice(gold: 2));
 
-		AddIfPresent(shop, "aluminium_dust", Item.buyPrice(silver: 20));
 		AddIfPresent(shop, "iron_dust", Item.buyPrice(silver: 8));
 		AddIfPresent(shop, "copper_dust", Item.buyPrice(silver: 8));
 		AddIfPresent(shop, "tin_dust", Item.buyPrice(silver: 8));
@@ -204,8 +205,6 @@ public class EBFChanNPC : ModNPC
 		AddIfPresent(shop, "raw_rubber_dust", Item.buyPrice(silver: 15));
 
 		AddIfPresent(shop, "steel_ingot", Item.buyPrice(gold: 10));
-		AddIfPresent(shop, "aluminium_ingot", Item.buyPrice(gold: 50));
-		AddIfPresent(shop, "kanthal_ingot", Item.buyPrice(platinum: 1));
 
 		shop.Register();
 	}

@@ -12,11 +12,16 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Items.Fluids;
 
-// One bucket item per registered FluidType with HasBucket - creative/testing
-// fluid source. RMB on a machine fluid slot fills (UIFluidSlot); not consumed.
 public sealed class FluidBucketItem : ModItem, ITextureWarmUp, IFluidHandlerItem
 {
 	private const int BucketCapacity = 1000;
+
+	private static readonly HashSet<string> GimmickFluids = new()
+	{
+		"steam", "air", "sulfuric_acid", "neutronium"
+	};
+
+	internal static int GimmickHeadSlot = -1;
 
 	[CloneByReference] private readonly FluidType? _fluid;
 
@@ -25,10 +30,8 @@ public sealed class FluidBucketItem : ModItem, ITextureWarmUp, IFluidHandlerItem
 
 	public FluidType? Fluid => _fluid;
 
-	// Read-only IFluidHandlerItem view so any walker (e.g. recipe browser's
-	// "Have ingredients" filter) treats buckets and cells uniformly. Fill/Drain
-	// are no-ops - buckets transfer via UIFluidSlot's bucket-specific path;
-	// auto-transfer / pipes must NOT pull from them.
+	private bool IsGimmick => _fluid != null && GimmickFluids.Contains(_fluid.Id);
+
 	public Item Container => Item;
 	public int TankCount => 1;
 	public FluidStack GetTank(int tank) =>
@@ -39,7 +42,6 @@ public sealed class FluidBucketItem : ModItem, ITextureWarmUp, IFluidHandlerItem
 	public FluidStack Drain(FluidStack fluidStack, bool simulate) => default;
 
 	public override string Name => _fluid != null ? $"{_fluid.Id}_bucket" : nameof(FluidBucketItem);
-	// Placeholder; PreDraw installs the procedural icon via FluidBucketRenderer.
 	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsItem";
 	public override bool IsLoadingEnabled(Mod mod) => _fluid != null;
 	protected override bool CloneNewInstances => true;
@@ -53,11 +55,33 @@ public sealed class FluidBucketItem : ModItem, ITextureWarmUp, IFluidHandlerItem
 
 	public override void SetDefaults()
 	{
-		// Match vanilla Empty Bucket physics - icon is composited from it.
 		Item.CloneDefaults(ItemID.EmptyBucket);
 		Item.maxStack = Item.CommonMaxStack;
 		Item.value = 0;
 		Item.rare = ItemRarityID.Blue;
+		Item.defense = 0;
+		Item.headSlot = IsGimmick ? GimmickHeadSlot : -1;
+	}
+
+	public override void UpdateEquip(Player player)
+	{
+		if (_fluid is null) return;
+		switch (_fluid.Id)
+		{
+			case "steam":
+				player.slowFall = true;
+				break;
+			case "air":
+				player.accFlipper = true;
+				player.accDivingHelm = true;
+				break;
+			case "sulfuric_acid":
+				player.AddBuff(BuffID.OnFire3, 6);
+				break;
+			case "neutronium":
+				player.AddBuff(BuffID.Regeneration, 6);
+				break;
+		}
 	}
 
 	public void WarmUpTexture()

@@ -26,6 +26,7 @@ public static class GregithItemLoader
 		foreach (var (_, material) in MaterialRegistry.All)
 		{
 			if (!material.HasTool()) continue;
+			if (ToolItemLoader.ExcludedMaterials.Contains(material.Id)) continue;
 
 			var ingredients = new List<int>();
 			foreach (var typeName in material.Tool!.Types)

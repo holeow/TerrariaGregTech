@@ -16,9 +16,8 @@ internal static class TextInputFocus
 	internal static void Set(ITextInput input)
 	{
 		if (_current == input) return;
-		ITextInput? prev = _current;
+		_current?.CommitInput();
 		_current = input;
-		prev?.CommitInput();
 	}
 
 	internal static void Clear(ITextInput input)
@@ -28,9 +27,8 @@ internal static class TextInputFocus
 
 	internal static void UnfocusAll()
 	{
-		ITextInput? c = _current;
+		_current?.CommitInput();
 		_current = null;
-		c?.CommitInput();
 	}
 }
 

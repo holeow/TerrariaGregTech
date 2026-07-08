@@ -43,7 +43,7 @@ public abstract class LongDistancePipeItem : ModItem, ITextureWarmUp
 		tooltips.Add(new TooltipLine(Mod, "PipeUse4",
 			"[c/AAAAAA:3. Screwdriver an endpoint to set it as Input or Output.]"));
 		tooltips.Add(new TooltipLine(Mod, "PipeUse5",
-			"[c/888888:Cuts with a wrench or right-click while held. Endpoints must be far apart.]"));
+			"[c/888888:Cuts with a wrench or right-click while held. Endpoints must be 10+ blocks apart in a straight line.]"));
 		Tools.GregTechMultitool.AppendHint(Mod, tooltips);
 	}
 

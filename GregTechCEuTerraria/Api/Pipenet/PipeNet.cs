@@ -5,25 +5,13 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.Api.Pipenet;
 
-// Verbatim port of com.gregtechceu.gtceu.api.pipenet.PipeNet - the abstract
-// per-network instance. Holds a sparse map of nodes by 2D position +
-// per-chunk index for fast getNetFromPos. Subclasses (ItemPipeNet,
-// FluidPipeNet, ...) override writeNodeData/readNodeData + the network-level
-// callbacks (onPipeConnectionsUpdate, onNeighbourUpdate).
-//
-// Adaptations from upstream (already-established across this codebase):
-//   - BlockPos -> (int x, int y) tuple
-//   - Direction -> CoverSide (4 cardinal sides; bit positions match ordinals)
-//   - ChunkPos -> (int cx, int cy) = (pos.x / 16, pos.y / 16) - same idea
-//   - ServerLevel reference dropped (no per-level state to grab from here;
-//     subclasses query Terraria.Main directly when needed)
 public abstract class PipeNet<TData> where TData : notnull
 {
 	protected readonly ILevelPipeNet<TData> WorldData;
 	private readonly Dictionary<(int x, int y), Node<TData>> _nodeByPos = new();
 	private readonly Dictionary<(int cx, int cy), int> _ownedChunks = new();
 	private long _lastUpdate;
-	internal bool IsValidInternal;  // set by LevelPipeNet on add/remove
+	internal bool IsValidInternal;
 
 	public PipeNet(ILevelPipeNet<TData> level)
 	{
@@ -38,13 +26,10 @@ public abstract class PipeNet<TData> where TData : notnull
 
 	public bool IsValid => IsValidInternal;
 
-	// Called on connection-only updates (open/closed sides flip).
 	protected virtual void OnNodeConnectionsUpdate() { _lastUpdate = System.Environment.TickCount64; }
 
-	// Called when a node's data field is replaced.
 	protected virtual void OnNodeDataUpdate() { }
 
-	// Called when any pipe in the net changes its block-level connections.
 	public virtual void OnPipeConnectionsUpdate() { }
 
 	public virtual void OnNeighbourUpdate((int x, int y) fromPos) { }
@@ -133,7 +118,6 @@ public abstract class PipeNet<TData> where TData : notnull
 
 		if (pipeNetAtOffset == this)
 		{
-			// Same net both sides - re-checking connectivity may split.
 			if (isBlocked)
 			{
 				SetBlocked(selfNode, facing, false);
@@ -323,9 +307,6 @@ public abstract class PipeNet<TData> where TData : notnull
 
 	protected internal virtual bool CanAttachNode(TData nodeData) => true;
 
-	// Called during a net split. Default implementation: copy all nodes into
-	// this net. Subclasses override to also transfer per-net state (fluid
-	// tank contents, etc.).
 	protected internal virtual void TransferNodeData(
 		Dictionary<(int x, int y), Node<TData>> transferredNodes,
 		PipeNet<TData> parentNet)
@@ -335,7 +316,6 @@ public abstract class PipeNet<TData> where TData : notnull
 		WorldData.SetDirty();
 	}
 
-	// -- NBT (TagCompound) serialization - verbatim shape against upstream --
 	protected abstract void WriteNodeData(TData nodeData, TagCompound tagCompound);
 	protected abstract TData ReadNodeData(TagCompound tagCompound);
 
@@ -381,8 +361,6 @@ public abstract class PipeNet<TData> where TData : notnull
 		var compound = new TagCompound();
 		var allNodesList  = new List<TagCompound>();
 		var wirePropsList = new List<TagCompound>();
-		// Identity-based dedup so equal NodeDataType instances share one
-		// payload index (mirrors upstream's Object2IntOpenHashMap usage).
 		var alreadyWritten = new Dictionary<TData, int>(EqualityComparer<TData>.Default);
 		int currentIndex = 0;
 
@@ -419,14 +397,7 @@ public abstract class PipeNet<TData> where TData : notnull
 	// -- Helpers --------------------------------------------------------
 	private static (int x, int y) Offset((int x, int y) pos, CoverSide side)
 	{
-		var (dx, dy) = side switch
-		{
-			CoverSide.Up    => (0, -1),
-			CoverSide.Down  => (0, +1),
-			CoverSide.Left  => (-1, 0),
-			CoverSide.Right => (+1, 0),
-			_               => (0, 0),
-		};
+		var (dx, dy) = CoverSides.Offset(side);
 		return (pos.x + dx, pos.y + dy);
 	}
 

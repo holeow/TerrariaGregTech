@@ -23,9 +23,13 @@ public sealed class MachineUIState : UIModalWindow
 {
 	private const float SlotGap = 1f;
 
+	public static bool ShowCoversOutputs = false;
+
 	private MetaMachine? _entity;
 	private MachineUILayout? _layout;
 	private float _leftStackOffsetPx;
+	private bool _pendingRebuild;
+	private (float W, float H)? _uiDims;
 	private CoverSide? _openCoverSide;
 	private UIElement? _coverPopup;
 	private CoverSide? _pendingCoverOpen;
@@ -42,6 +46,7 @@ public sealed class MachineUIState : UIModalWindow
 		_coverPopup = null;
 		_pendingCoverOpen = null;
 		_machinePanel = null;
+		_uiDims = null;
 		RemoveAllChildren();
 		BuildPanel();
 	}
@@ -54,6 +59,7 @@ public sealed class MachineUIState : UIModalWindow
 		_coverPopup = null;
 		_pendingCoverOpen = null;
 		_machinePanel = null;
+		_uiDims = null;
 		RemoveAllChildren();
 	}
 
@@ -97,9 +103,29 @@ public sealed class MachineUIState : UIModalWindow
 		_openCoverSide = null;
 	}
 
+	public void RequestRebuild() => _pendingRebuild = true;
+
+	private void Rebuild()
+	{
+		if (_entity is null || _layout is null) return;
+		Widgets.UITextField.UnfocusAll();
+		_openCoverSide = null;
+		_coverPopup = null;
+		_pendingCoverOpen = null;
+		_machinePanel = null;
+		RemoveAllChildren();
+		BuildPanel();
+	}
+
 	public override void Update(GameTime gameTime)
 	{
 		base.Update(gameTime);
+		if (_pendingRebuild && !Main.mouseLeft && !Main.mouseRight)
+		{
+			_pendingRebuild = false;
+			Rebuild();
+			return;
+		}
 		if (_pendingCoverOpen is { } pending)
 		{
 			_pendingCoverOpen = null;
@@ -123,6 +149,12 @@ public sealed class MachineUIState : UIModalWindow
 	{
 		if (_entity is null || _layout is null) return;
 
+		if (_layout.BuildOverride is { } custom)
+		{
+			custom(this, _entity);
+			return;
+		}
+
 		float s = _layout.Scale;
 		_leftStackOffsetPx = 0f;
 
@@ -140,6 +172,7 @@ public sealed class MachineUIState : UIModalWindow
 			{
 				Left = StyleDimension.FromPixels(8 * s),
 				Top = StyleDimension.FromPixels(6 * s),
+				TextColor = Common.Energy.VoltageTiers.TextColor(_entity.Tier),
 			};
 			panel.Append(title);
 		}
@@ -171,40 +204,38 @@ public sealed class MachineUIState : UIModalWindow
 		if (_layout.BottomPanel is not null)
 			AppendBottomSidePanel(_layout.BottomPanel);
 
-		AppendIOConfigPanel(_entity, panel);
+		if (ShowCoversOutputs)
+			AppendIOConfigPanel(_entity, panel);
 
-		if (_entity is TieredEnergyMachine em)
-			AppendChargerSlot(em, panel);
-
-		if (_entity.SupportsWorkingEnabledToggle)
-			AppendPowerTogglePanel(_entity, panel);
-
-		if (_entity is Machine.Multiblock.MultiblockControllerMachine)
-			AppendCoverPanelLeft(_entity);
-
-		if (_entity is Api.Machine.Feature.Multiblock.IDistinctPart dp
-			&& _entity is Machine.Multiblock.Part.TieredIOPartMachine iop
-			&& iop.Io == Api.Capability.Recipe.IO.IN)
-			AppendDistinctTogglePanel(_entity, dp);
+		AppendMachineControlsPanel(_entity);
 
 		if (_entity is TerrariaCompat.Machine.Multiblock.WorkableMultiblockMachine wmm
 			&& wmm.GetRecipeTypes().Length > 1)
 			AppendModeSelectPanel(wmm, panel);
 
-		if (_entity is IRecipeLogicMachine proc)
-			AppendRecipeBrowser(proc);
-		else if (_entity is Machine.Multiblock.MultiblockControllerMachine ctrl
-			&& ctrl.Definition?.RecipeType is { } rt
-			&& rt != Common.Recipe.GTRecipeTypes.DUMMY)
-			AppendRecipeBrowser(() => rt.RegistryName, _ => true, isMultiMode: false);
+		bool hasArrow = _layout.Widgets.Any(w => w is ProgressArrowWidgetSpec);
+		if (!hasArrow && RecipeBrowserLauncher.CanOpen(_entity))
+		{
+			var entity = _entity;
+			const int boxW = 112, boxH = 22;
+			var showBtn = new Widgets.UITextButton(
+				() => RecipeBrowserLauncher.ButtonLabel,
+				() => RecipeBrowserLauncher.OpenForMachine(entity),
+				null,
+				RecipeBrowserLauncher.ArrowTooltip, boxW, boxH)
+			{
+				Left = StyleDimension.FromPixels(_layout.Width * s - boxW - 8f),
+				Top = StyleDimension.FromPixels(6f * s),
+			};
+			panel.Append(showBtn);
+		}
 	}
 
 	private void AppendIOConfigPanel(MetaMachine entity, UITerrariaPanel machinePanel)
 	{
 		bool wantsItem  = entity.SupportsAutoOutputItems;
 		bool wantsFluid = entity.SupportsAutoOutputFluids;
-		bool wantsCover = entity.SupportsCovers
-			&& entity is not Machine.Multiblock.MultiblockControllerMachine;
+		bool wantsCover = entity.SupportsCovers;
 		var part        = entity as Machine.Multiblock.Part.TieredIOPartMachine;
 		bool wantsPart  = part is not null;
 
@@ -217,13 +248,11 @@ public sealed class MachineUIState : UIModalWindow
 		int clusterCount = (wantsCover ? 1 : 0) + (wantsItem ? 1 : 0) + (wantsFluid ? 1 : 0) + (wantsPart ? 1 : 0);
 		if (clusterCount == 0) return;
 		int innerW = ClusterSize * clusterCount + Gap * (clusterCount - 1);
-		int innerH = ClusterSize + Gap + ToggleSize;
+		int innerH = ClusterSize;
 		int outerW = innerW + Padding * 2;
 		int outerH = innerH + Padding * 2;
 
-		float uiH = Main.screenHeight / (Main.UIScale <= 0 ? 1f : Main.UIScale);
-		float machineH  = _layout.Height * s;
-		float machineTop = 0.3f * (uiH - machineH);
+		var (_, machineTop, _) = MachinePanelScreenAnchor();
 		float ioH       = outerH * s;
 		const float GapAbove = 6f;
 		float ioTop = System.Math.Max(8f, machineTop - ioH - GapAbove);
@@ -258,7 +287,8 @@ public sealed class MachineUIState : UIModalWindow
 				() => entity.AutoOutput?.ItemOutputDirection ?? IODirection.None,
 				d => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfDirection(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.ItemOutputSide, d), entity),
 				() => entity.AutoOutput?.IsAutoOutputItems ?? false,
-				b => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.ItemAutoOutput, b), entity))
+				b => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.ItemAutoOutput, b), entity),
+				autoOutputToggleable: false)
 			{
 				Left = StyleDimension.FromPixels(colX * s),
 				Top  = StyleDimension.FromPixels(Padding * s),
@@ -267,18 +297,28 @@ public sealed class MachineUIState : UIModalWindow
 			};
 			ioPanel.Append(itemCluster);
 
-			var allowItemIn = new UIToggleButton(
-				"GregTechCEuTerraria/Content/Textures/gui/overlay/tool_allow_input",
-				() => entity.AutoOutput?.AllowItemInputFromOutputSide ?? false,
-				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.AllowItemInputFromOutput, v), entity),
-				"Allow item insertion from the output side\n(pipes/hoppers can backfill output slots)")
+			ioPanel.Append(new UIPowerToggle(
+				() => entity.AutoOutput?.IsAutoOutputItems ?? false,
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.ItemAutoOutput, v), entity))
 			{
-				Left = StyleDimension.FromPixels((colX + (ClusterSize - ToggleSize) / 2) * s),
-				Top  = StyleDimension.FromPixels((Padding + ClusterSize + Gap) * s),
+				Left = StyleDimension.FromPixels(colX * s),
+				Top  = StyleDimension.FromPixels((Padding + ClusterSize - ToggleSize) * s),
 				Width = StyleDimension.FromPixels(ToggleSize * s),
 				Height = StyleDimension.FromPixels(ToggleSize * s),
-			};
-			ioPanel.Append(allowItemIn);
+				TooltipFor = on => $"Auto-output items: {(on ? "ON" : "OFF")}",
+			});
+
+			ioPanel.Append(new UIOverlayToggle(
+				"GregTechCEuTerraria/Content/Textures/gui/overlay/tool_allow_input",
+				() => entity.AutoOutput?.AllowItemInputFromOutputSide ?? false,
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.AllowItemInputFromOutput, v), entity))
+			{
+				Left = StyleDimension.FromPixels((colX + ClusterSize - ToggleSize) * s),
+				Top  = StyleDimension.FromPixels((Padding + ClusterSize - ToggleSize) * s),
+				Width = StyleDimension.FromPixels(ToggleSize * s),
+				Height = StyleDimension.FromPixels(ToggleSize * s),
+				TooltipFor = on => $"Allow input from output side: {(on ? "ON" : "OFF")}\nShould be ON if you want Pattern Provider to push from that side",
+			});
 			colX += ClusterSize + Gap;
 		}
 
@@ -289,7 +329,8 @@ public sealed class MachineUIState : UIModalWindow
 				() => entity.AutoOutput?.FluidOutputDirection ?? IODirection.None,
 				d => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfDirection(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.FluidOutputSide, d), entity),
 				() => entity.AutoOutput?.IsAutoOutputFluids ?? false,
-				b => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.FluidAutoOutput, b), entity))
+				b => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.FluidAutoOutput, b), entity),
+				autoOutputToggleable: false)
 			{
 				Left = StyleDimension.FromPixels(colX * s),
 				Top  = StyleDimension.FromPixels(Padding * s),
@@ -298,18 +339,28 @@ public sealed class MachineUIState : UIModalWindow
 			};
 			ioPanel.Append(fluidCluster);
 
-			var allowFluidIn = new UIToggleButton(
-				"GregTechCEuTerraria/Content/Textures/gui/overlay/tool_allow_input",
-				() => entity.AutoOutput?.AllowFluidInputFromOutputSide ?? false,
-				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.AllowFluidInputFromOutput, v), entity),
-				"Allow fluid insertion from the output side\n(pipes can backfill output tanks)")
+			ioPanel.Append(new UIPowerToggle(
+				() => entity.AutoOutput?.IsAutoOutputFluids ?? false,
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.FluidAutoOutput, v), entity))
 			{
-				Left = StyleDimension.FromPixels((colX + (ClusterSize - ToggleSize) / 2) * s),
-				Top  = StyleDimension.FromPixels((Padding + ClusterSize + Gap) * s),
+				Left = StyleDimension.FromPixels(colX * s),
+				Top  = StyleDimension.FromPixels((Padding + ClusterSize - ToggleSize) * s),
 				Width = StyleDimension.FromPixels(ToggleSize * s),
 				Height = StyleDimension.FromPixels(ToggleSize * s),
-			};
-			ioPanel.Append(allowFluidIn);
+				TooltipFor = on => $"Auto-output fluids: {(on ? "ON" : "OFF")}",
+			});
+
+			ioPanel.Append(new UIOverlayToggle(
+				"GregTechCEuTerraria/Content/Textures/gui/overlay/tool_allow_input",
+				() => entity.AutoOutput?.AllowFluidInputFromOutputSide ?? false,
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(TerrariaCompat.Net.Actions.IOConfigSetAction.OfBool(TerrariaCompat.Net.Actions.IOConfigSetAction.Field.AllowFluidInputFromOutput, v), entity))
+			{
+				Left = StyleDimension.FromPixels((colX + ClusterSize - ToggleSize) * s),
+				Top  = StyleDimension.FromPixels((Padding + ClusterSize - ToggleSize) * s),
+				Width = StyleDimension.FromPixels(ToggleSize * s),
+				Height = StyleDimension.FromPixels(ToggleSize * s),
+				TooltipFor = on => $"Allow input from output side: {(on ? "ON" : "OFF")}\nShould be ON if you want Pattern Provider to push from that side",
+			});
 		}
 
 		if (wantsPart)
@@ -319,7 +370,8 @@ public sealed class MachineUIState : UIModalWindow
 				() => part.IoDirection,
 				d => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.PartIoDirectionSetAction(d), entity),
 				() => part.WorkingEnabled,
-				b => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.PowerToggleAction(b), entity))
+				b => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.PowerToggleAction(b), entity),
+				autoOutputToggleable: false)
 			{
 				Left = StyleDimension.FromPixels(colX * s),
 				Top  = StyleDimension.FromPixels(Padding * s),
@@ -332,47 +384,131 @@ public sealed class MachineUIState : UIModalWindow
 		Append(ioPanel);
 	}
 
-	private void AppendPowerTogglePanel(MetaMachine entity, UITerrariaPanel machinePanel)
+	private static bool HasIOConfigClusters(MetaMachine entity)
+	{
+		bool wantsItem  = entity.SupportsAutoOutputItems;
+		bool wantsFluid = entity.SupportsAutoOutputFluids;
+		bool wantsCover = entity.SupportsCovers;
+		bool wantsPart  = entity is Machine.Multiblock.Part.TieredIOPartMachine;
+		return wantsCover || wantsItem || wantsFluid || wantsPart;
+	}
+
+	private void AppendMachineControlsPanel(MetaMachine entity)
 	{
 		float s = _layout!.Scale;
 		const int BtnSize = 22;
-		const int LabelHeight = 9;
 		const int Padding = 4;
+		const int RowGap = 4;
+		const float PanelGap = 6f;
+
+		bool hasPower   = entity.SupportsWorkingEnabledToggle;
+		bool hasCovers  = HasIOConfigClusters(entity);
+		bool hasCharger = entity.GetSlotGroup(Machine.SlotGroup.Charger) is not null;
+		var distinctPart = entity is Api.Machine.Feature.Multiblock.IDistinctPart dp
+			&& entity is Machine.Multiblock.Part.TieredIOPartMachine iop
+			&& iop.Io == Api.Capability.Recipe.IO.IN ? dp : null;
+
+		int count = (hasPower ? 1 : 0) + (hasCovers ? 1 : 0) + (hasCharger ? 1 : 0) + (distinctPart != null ? 1 : 0);
+		if (count == 0) return;
+
 		int outerW = BtnSize + Padding * 2;
-		int outerH = LabelHeight + BtnSize + Padding * 2 + 2;
-		const float Gap = 6f;
+		int outerH = BtnSize * count + RowGap * (count - 1) + Padding * 2;
 
 		var (machineLeft, machineTop, _) = MachinePanelScreenAnchor();
 
-		var togglePanel = new UITerrariaPanel
+		var panel = new UITerrariaPanel
 		{
 			Width  = StyleDimension.FromPixels(outerW * s),
 			Height = StyleDimension.FromPixels(outerH * s),
 			HAlign = 0f,
 			VAlign = 0f,
-			Left = StyleDimension.FromPixels(machineLeft - outerW * s - Gap),
+			Left = StyleDimension.FromPixels(machineLeft - outerW * s - PanelGap),
 			Top  = StyleDimension.FromPixels(machineTop + _leftStackOffsetPx),
 		};
-		Append(togglePanel);
-		_leftStackOffsetPx += outerH * s + Gap;
+		Append(panel);
+		_leftStackOffsetPx += outerH * s + PanelGap;
 
-		var label = new UIText("Power", 0.55f)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels(Padding * s),
-		};
-		togglePanel.Append(label);
+		int rowY = Padding;
 
-		var toggle = new Widgets.UIPowerToggle(
-			() => entity.WorkingEnabled,
-			v => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.PowerToggleAction(v), entity),
-			width: (int)(BtnSize * s),
-			height: (int)(BtnSize * s))
+		if (hasPower)
 		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels((Padding + LabelHeight + 2) * s),
-		};
-		togglePanel.Append(toggle);
+			panel.Append(new Widgets.UIPowerToggle(
+				() => entity.WorkingEnabled,
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.PowerToggleAction(v), entity),
+				width: (int)(BtnSize * s),
+				height: (int)(BtnSize * s))
+			{
+				Left = StyleDimension.FromPixels(Padding * s),
+				Top  = StyleDimension.FromPixels(rowY * s),
+			});
+			rowY += BtnSize + RowGap;
+		}
+
+		if (hasCovers)
+		{
+			panel.Append(new Widgets.UIShowCoversToggle(
+				() => ShowCoversOutputs,
+				v => { ShowCoversOutputs = v; RequestRebuild(); },
+				width: (int)(BtnSize * s),
+				height: (int)(BtnSize * s))
+			{
+				Left = StyleDimension.FromPixels(Padding * s),
+				Top  = StyleDimension.FromPixels(rowY * s),
+			});
+			rowY += BtnSize + RowGap;
+		}
+
+		if (hasCharger)
+		{
+			var bgTex = ModContent.Request<Microsoft.Xna.Framework.Graphics.Texture2D>(
+				"GregTechCEuTerraria/Content/Textures/gui/overlay/charger_slot_overlay");
+			panel.Append(new UIImage(bgTex)
+			{
+				Left = StyleDimension.FromPixels(Padding * s),
+				Top  = StyleDimension.FromPixels(rowY * s),
+				Width  = StyleDimension.FromPixels(BtnSize * s),
+				Height = StyleDimension.FromPixels(BtnSize * s),
+				ScaleToFit = true,
+				AllowResizingDimensions = false,
+			});
+			panel.Append(new Widgets.UISlot(entity, Machine.SlotGroup.Charger, slotIndex: 0)
+			{
+				Left = StyleDimension.FromPixels(Padding * s),
+				Top  = StyleDimension.FromPixels(rowY * s),
+				Width  = StyleDimension.FromPixels(BtnSize * s),
+				Height = StyleDimension.FromPixels(BtnSize * s),
+				EmptyHint = $"Can charge tools and batteries up to {Common.Energy.VoltageTiers.ShortName(entity.Tier)} energy tier",
+			});
+			rowY += BtnSize + RowGap;
+		}
+
+		if (distinctPart is not null)
+		{
+			var btn = new Widgets.UIToggleButton(
+				"GregTechCEuTerraria/Content/Textures/gui/widget/button_distinct_buses",
+				() => distinctPart.IsDistinct(),
+				v => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.DistinctSetAction(v), entity),
+				"")
+			{
+				Left = StyleDimension.FromPixels(Padding * s),
+				Top  = StyleDimension.FromPixels(rowY * s),
+				Width  = StyleDimension.FromPixels(BtnSize * s),
+				Height = StyleDimension.FromPixels(BtnSize * s),
+			};
+			btn.IconSrcRectFor = on =>
+			{
+				var tex = ModContent.Request<Texture2D>(
+					"GregTechCEuTerraria/Content/Textures/gui/widget/button_distinct_buses",
+					ReLogic.Content.AssetRequestMode.ImmediateLoad).Value;
+				int half = tex.Height / 2;
+				return on
+					? new Rectangle(0, 0,    tex.Width, half)
+					: new Rectangle(0, half, tex.Width, half);
+			};
+			btn.TooltipFor = on => "Distinct Buses: " + (on ? "Yes" : "No");
+			panel.Append(btn);
+			rowY += BtnSize + RowGap;
+		}
 	}
 
 	private void AppendTopSidePanel(MachineUILayout.SatellitePanelSpec spec)
@@ -496,104 +632,6 @@ public sealed class MachineUIState : UIModalWindow
 		_leftStackOffsetPx += outerH + Gap;
 	}
 
-
-	private void AppendCoverPanelLeft(MetaMachine entity)
-	{
-		float s = _layout!.Scale;
-		const int ClusterSize = UIDirectionSelector.ClusterSize; // 54
-		const int LabelHeight = 9;
-		const int Padding = 4;
-		int outerW = ClusterSize + Padding * 2;
-		int outerH = LabelHeight + ClusterSize + Padding * 2 + 2;
-		const float Gap = 6f;
-
-		var (machineLeft, machineTop, _) = MachinePanelScreenAnchor();
-
-		var coverPanel = new UITerrariaPanel
-		{
-			Width  = StyleDimension.FromPixels(outerW * s),
-			Height = StyleDimension.FromPixels(outerH * s),
-			HAlign = 0f,
-			VAlign = 0f,
-			Left = StyleDimension.FromPixels(machineLeft - outerW * s - Gap),
-			Top  = StyleDimension.FromPixels(machineTop + _leftStackOffsetPx),
-		};
-
-		coverPanel.Append(new UIText("Covers", 0.55f)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels(Padding * s),
-		});
-
-		coverPanel.Append(new UICoverPanel(entity, RequestCoverSettings)
-		{
-			Left   = StyleDimension.FromPixels(Padding * s),
-			Top    = StyleDimension.FromPixels((Padding + LabelHeight + 2) * s),
-			Width  = StyleDimension.FromPixels(ClusterSize * s),
-			Height = StyleDimension.FromPixels(ClusterSize * s),
-		});
-
-		Append(coverPanel);
-
-		_leftStackOffsetPx += outerH * s + Gap;
-	}
-
-	private void AppendDistinctTogglePanel(MetaMachine entity, Api.Machine.Feature.Multiblock.IDistinctPart part)
-	{
-		float s = _layout!.Scale;
-		const int BtnSize = 22;
-		const int LabelHeight = 9;
-		const int Padding = 4;
-		int outerW = BtnSize + Padding * 2;
-		int outerH = LabelHeight + BtnSize + Padding * 2 + 2;
-		const float Gap = 6f;
-
-		var (machineLeft, machineTop, _) = MachinePanelScreenAnchor();
-
-		var distinctPanel = new UITerrariaPanel
-		{
-			Width  = StyleDimension.FromPixels(outerW * s),
-			Height = StyleDimension.FromPixels(outerH * s),
-			HAlign = 0f,
-			VAlign = 0f,
-			Left = StyleDimension.FromPixels(machineLeft - outerW * s - Gap),
-			Top  = StyleDimension.FromPixels(machineTop + _leftStackOffsetPx),
-		};
-		Append(distinctPanel);
-		_leftStackOffsetPx += outerH * s + Gap;
-
-		var label = new UIText("Distinct", 0.55f)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels(Padding * s),
-		};
-		distinctPanel.Append(label);
-
-		var btn = new Widgets.UIToggleButton(
-			"GregTechCEuTerraria/Content/Textures/gui/widget/button_distinct_buses",
-			() => part.IsDistinct(),
-			v => TerrariaCompat.Net.Actions.MachineActions.Send(new TerrariaCompat.Net.Actions.DistinctSetAction(v), entity),
-			"")
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels((Padding + LabelHeight + 2) * s),
-			Width  = StyleDimension.FromPixels(BtnSize * s),
-			Height = StyleDimension.FromPixels(BtnSize * s),
-		};
-		btn.IconSrcRectFor = on =>
-		{
-			var tex = ModContent.Request<Texture2D>(
-				"GregTechCEuTerraria/Content/Textures/gui/widget/button_distinct_buses",
-				ReLogic.Content.AssetRequestMode.ImmediateLoad).Value;
-			int half = tex.Height / 2;
-			return on
-				? new Rectangle(0, 0,    tex.Width, half)
-				: new Rectangle(0, half, tex.Width, half);
-		};
-		btn.TooltipFor = on => "Distinct Buses: " + (on ? "Yes" : "No");
-		distinctPanel.Append(btn);
-	}
-
 	private void AppendModeSelectPanel(
 		TerrariaCompat.Machine.Multiblock.WorkableMultiblockMachine multi,
 		UITerrariaPanel machinePanel)
@@ -610,7 +648,9 @@ public sealed class MachineUIState : UIModalWindow
 		int outerH  = innerH + Padding * 2;
 		const float Gap = 6f;
 
-		var (machineLeft, machineTop, _) = MachinePanelScreenAnchor();
+		var (machineLeft, machineTop, machineW) = MachinePanelScreenAnchor();
+		float left = machineLeft + (machineW - outerW * s) / 2f;
+		float top  = System.Math.Max(8f, machineTop - outerH * s - Gap);
 
 		var modePanel = new UITerrariaPanel
 		{
@@ -618,11 +658,10 @@ public sealed class MachineUIState : UIModalWindow
 			Height = StyleDimension.FromPixels(outerH * s),
 			HAlign = 0f,
 			VAlign = 0f,
-			Left = StyleDimension.FromPixels(machineLeft - outerW * s - Gap),
-			Top  = StyleDimension.FromPixels(machineTop + _leftStackOffsetPx),
+			Left = StyleDimension.FromPixels(left),
+			Top  = StyleDimension.FromPixels(top),
 		};
 		Append(modePanel);
-		_leftStackOffsetPx += outerH * s + Gap;
 
 		var label = new UIText("Mode", 0.55f)
 		{
@@ -635,16 +674,16 @@ public sealed class MachineUIState : UIModalWindow
 		for (int i = 0; i < recipeTypes.Length; i++)
 		{
 			int captured = i;
-			string typeName = recipeTypes[i].RegistryName;
+			string typeName = Api.Machine.Multiblock.MultiblockDisplayText.Tr($"gtceu.{recipeTypes[i].RegistryName}");
 			var btn = new Widgets.UITextButton(
-				() => multi.ActiveRecipeType == captured
-					? $"[c/55FFFF:{typeName}]" : typeName,
+				() => typeName,
 				onLeft: () => TerrariaCompat.Net.Actions.MachineActions.Send(
 					new TerrariaCompat.Net.Actions.ActiveRecipeTypeSetAction(captured), multi),
 				tooltip: $"Switch to {typeName}",
 				width: (int)(InnerW * s),
 				height: (int)(RowH * s))
 			{
+				IsActive = () => multi.ActiveRecipeType == captured,
 				Left = StyleDimension.FromPixels(Padding * s),
 				Top  = StyleDimension.FromPixels((rowsTop + captured * (RowH + RowGap)) * s),
 			};
@@ -652,12 +691,19 @@ public sealed class MachineUIState : UIModalWindow
 		}
 	}
 
+	private (float W, float H) UiDimensions()
+	{
+		if (_uiDims is { } d) return d;
+		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
+		var dims = (Main.screenWidth / uiScale, Main.screenHeight / uiScale);
+		_uiDims = dims;
+		return dims;
+	}
+
 	private (float Left, float Top, float MachineWidth) MachinePanelScreenAnchor()
 	{
 		float s = _layout!.Scale;
-		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
-		float uiW = Main.screenWidth / uiScale;
-		float uiH = Main.screenHeight / uiScale;
+		var (uiW, uiH) = UiDimensions();
 		float machineW = _layout.Width * s;
 		float machineH = _layout.Height * s;
 		float machineLeft = 0.5f * (uiW - machineW);
@@ -665,252 +711,4 @@ public sealed class MachineUIState : UIModalWindow
 		return (machineLeft, machineTop, machineW);
 	}
 
-	private void AppendChargerSlot(MetaMachine entity, UITerrariaPanel machinePanel)
-	{
-		var slots = entity.GetSlotGroup(Machine.SlotGroup.Charger);
-		if (slots is null) return;
-		float s = _layout!.Scale;
-		const int SlotSize = 22;
-		const int LabelHeight = 9;
-		const int Padding = 4;
-		int outerW = SlotSize + Padding * 2;
-		int outerH = LabelHeight + SlotSize + Padding * 2 + 2;
-		const float Gap = 6f;
-		var (machineLeft, machineTop, machineW) = MachinePanelScreenAnchor();
-		var chargerPanel = new UITerrariaPanel
-		{
-			Width  = StyleDimension.FromPixels(outerW * s),
-			Height = StyleDimension.FromPixels(outerH * s),
-			HAlign = 0f,
-			VAlign = 0f,
-			Left = StyleDimension.FromPixels(machineLeft + machineW + Gap),
-			Top  = StyleDimension.FromPixels(machineTop),
-		};
-		Append(chargerPanel);
-
-		var label = new UIText("Charge", 0.55f)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels(Padding * s),
-		};
-		chargerPanel.Append(label);
-		var bgTex = ModContent.Request<Microsoft.Xna.Framework.Graphics.Texture2D>(
-			"GregTechCEuTerraria/Content/Textures/gui/overlay/charger_slot_overlay");
-		var bg = new UIImage(bgTex)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels((Padding + LabelHeight + 2) * s),
-			Width  = StyleDimension.FromPixels(SlotSize * s),
-			Height = StyleDimension.FromPixels(SlotSize * s),
-			ScaleToFit = true,
-			AllowResizingDimensions = false,
-		};
-		chargerPanel.Append(bg);
-
-		var charger = new Widgets.UISlot(entity, Machine.SlotGroup.Charger, slotIndex: 0)
-		{
-			Left = StyleDimension.FromPixels(Padding * s),
-			Top  = StyleDimension.FromPixels((Padding + LabelHeight + 2) * s),
-			Width  = StyleDimension.FromPixels(SlotSize * s),
-			Height = StyleDimension.FromPixels(SlotSize * s),
-		};
-		chargerPanel.Append(charger);
-	}
-
-	private void AppendRecipeBrowser(IRecipeLogicMachine proc)
-	{
-		bool isMultiMode = proc is TerrariaCompat.Machine.Multiblock.WorkableMultiblockMachine wmmMode
-			&& wmmMode.GetRecipeTypes().Length > 1;
-		AppendRecipeBrowser(() => proc.GetRecipeType().RegistryName, proc.ShowsInRecipeBrowser, isMultiMode);
-	}
-
-	private void AppendRecipeBrowser(System.Func<string> stationGetter,
-		System.Func<GTRecipe, bool> filter, bool isMultiMode)
-	{
-		string currentStation = stationGetter();
-		var allRecipes = RecipeRegistry.ForStation(currentStation)
-			.Where(filter).ToList();
-		if (allRecipes.Count == 0 && !isMultiMode) return;
-
-		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
-		float uiW = Main.screenWidth / uiScale;
-		float uiH = Main.screenHeight / uiScale;
-		float browserW = System.Math.Clamp(uiW * 0.28f, 380f, 560f);
-		float browserTop = uiH * 0.08f;
-		float browserHalfH = (uiH * 0.78f - 8f) / 2f;
-
-		ModLoader.GetMod("GregTechCEuTerraria").Logger.Info(
-			$"[recipe-browser] open for {currentStation} (recipes={allRecipes.Count}) " +
-			$"uiW={uiW:F0} uiH={uiH:F0} panelW={browserW:F0} halfH={browserHalfH:F0}");
-
-		string[] queryTokens = System.Array.Empty<string>();
-		List<GTRecipe> searchFiltered = allRecipes;
-		void ApplySearchFilter()
-		{
-			if (queryTokens.Length == 0) { searchFiltered = allRecipes; return; }
-			searchFiltered = new List<GTRecipe>();
-			foreach (var r in allRecipes)
-				if (RecipeSearch.Matches(r, queryTokens)) searchFiltered.Add(r);
-
-			if (searchFiltered.Count > 1)
-			{
-				var ranks = new int[searchFiltered.Count];
-				for (int i = 0; i < searchFiltered.Count; i++)
-					ranks[i] = RecipeSearch.MatchesOutputs(searchFiltered[i], queryTokens) ? 0 : 1;
-				for (int i = 1; i < searchFiltered.Count; i++)
-				{
-					var r = searchFiltered[i];
-					int rank = ranks[i];
-					int j = i - 1;
-					while (j >= 0 && ranks[j] > rank)
-					{
-						searchFiltered[j + 1] = searchFiltered[j];
-						ranks[j + 1] = ranks[j];
-						j--;
-					}
-					searchFiltered[j + 1] = r;
-					ranks[j + 1] = rank;
-				}
-			}
-		}
-		void OnSearchChanged(string text)
-		{
-			queryTokens = RecipeSearch.Tokenize(text);
-			ApplySearchFilter();
-		}
-		bool RebuildIfStationChanged()
-		{
-			string s = stationGetter();
-			if (s == currentStation) return false;
-			currentStation = s;
-			allRecipes = RecipeRegistry.ForStation(s).Where(filter).ToList();
-			ApplySearchFilter();
-			return true;
-		}
-
-		var allPanel = BuildBrowserPanelWithSearch(
-			browserTop, browserW, browserHalfH,
-			countLabel: () => $"{searchFiltered.Count} / {allRecipes.Count}  *  {currentStation}",
-			list: new UIRecipeList(() => { RebuildIfStationChanged(); return searchFiltered; }, emptyHint: "No recipes match this search"),
-			searchPlaceholder: "Search...  *  RMB to clear",
-			onSearchChanged: OnSearchChanged);
-		Append(allPanel);
-		HoverItemTracker.Kind cachedKind = HoverItemTracker.Kind.None;
-		int cachedType = -1;
-		string? cachedFluid = null;
-		List<GTRecipe>? cachedFiltered = null;
-		IReadOnlyList<GTRecipe> FilteredSource()
-		{
-			bool stationChanged = RebuildIfStationChanged();
-			var kind = HoverItemTracker.LastKind;
-			int t = HoverItemTracker.LastHoveredItemType;
-			string? fid = HoverItemTracker.LastHoveredFluidId;
-
-			bool sameAsCache = !stationChanged
-				&& kind == cachedKind
-				&& (kind != HoverItemTracker.Kind.Item || t == cachedType)
-				&& (kind != HoverItemTracker.Kind.Fluid || fid == cachedFluid);
-			if (sameAsCache && cachedFiltered != null) return cachedFiltered;
-
-			cachedKind = kind;
-			cachedType = t;
-			cachedFluid = fid;
-			cachedFiltered = new List<GTRecipe>();
-
-			switch (kind)
-			{
-				case HoverItemTracker.Kind.Item when t > 0:
-					foreach (var r in allRecipes)
-						if (RecipeRowRenderer.ItemTypesInRecipe(r).Contains(t))
-							cachedFiltered.Add(r);
-					break;
-				case HoverItemTracker.Kind.Fluid when !string.IsNullOrEmpty(fid):
-					foreach (var r in allRecipes)
-						if (RecipeRowRenderer.FluidIdsInRecipe(r).Contains(fid!))
-							cachedFiltered.Add(r);
-					break;
-			}
-			return cachedFiltered;
-		}
-
-		var hoverPanel = BuildBrowserPanel(
-			browserTop + browserHalfH + 8f, browserW, browserHalfH,
-			title: "Hover item to see relevant recipes",
-			list: new UIRecipeList(FilteredSource, emptyHint: "Hover an item anywhere to filter"));
-		Append(hoverPanel);
-	}
-
-	private static UIElement BuildBrowserPanel(float y, float w, float h, string title, UIRecipeList list)
-	{
-		var panel = new UITerrariaPanel
-		{
-			HAlign = 1f,
-			Left = StyleDimension.FromPixels(-8f),
-			Top = StyleDimension.FromPixels(y),
-			Width = StyleDimension.FromPixels(w),
-			Height = StyleDimension.FromPixels(h),
-		};
-
-		var titleText = new UIText(title, 0.85f)
-		{
-			Left = StyleDimension.FromPixels(8),
-			Top = StyleDimension.FromPixels(6),
-		};
-		panel.Append(titleText);
-
-		list.Left = StyleDimension.FromPixels(4);
-		list.Top = StyleDimension.FromPixels(28);
-		list.Width = StyleDimension.FromPixels(w - 8);
-		list.Height = StyleDimension.FromPixels(h - 32);
-		panel.Append(list);
-		return panel;
-	}
-
-	private static UIElement BuildBrowserPanelWithSearch(
-		float y, float w, float h,
-		System.Func<string> countLabel,
-		UIRecipeList list,
-		string searchPlaceholder,
-		System.Action<string> onSearchChanged)
-	{
-		var panel = new UITerrariaPanel
-		{
-			HAlign = 1f,
-			Left = StyleDimension.FromPixels(-8f),
-			Top = StyleDimension.FromPixels(y),
-			Width = StyleDimension.FromPixels(w),
-			Height = StyleDimension.FromPixels(h),
-		};
-
-		const int SearchH    = 22;
-		const int CountW     = 110;
-		const int HeaderPad  = 6;
-
-		var search = new Widgets.UISearchBar(searchPlaceholder, onSearchChanged)
-		{
-			Left = StyleDimension.FromPixels(HeaderPad),
-			Top  = StyleDimension.FromPixels(HeaderPad),
-			Width = StyleDimension.FromPixels(w - HeaderPad * 2 - CountW - 6),
-			Height = StyleDimension.FromPixels(SearchH),
-		};
-		panel.Append(search);
-		list.OnStationFilter = s => search.SetText("@" + s);
-
-		var count = new Widgets.UIDynamicLabel(countLabel, 0.75f)
-		{
-			HAlign = 1f,
-			Left   = StyleDimension.FromPixels(-HeaderPad),
-			Top    = StyleDimension.FromPixels(HeaderPad + 3),
-			Width  = StyleDimension.FromPixels(CountW),
-			Height = StyleDimension.FromPixels(SearchH),
-		};
-		panel.Append(count);
-
-		list.Left = StyleDimension.FromPixels(4);
-		list.Top  = StyleDimension.FromPixels(HeaderPad + SearchH + 4);
-		list.Width  = StyleDimension.FromPixels(w - 8);
-		list.Height = StyleDimension.FromPixels(h - (HeaderPad + SearchH + 8));
-		panel.Append(list);
-		return panel;
-	}
 }

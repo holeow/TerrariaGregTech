@@ -40,6 +40,8 @@ public abstract class SteamBoilerMachine : SteamWorkableMachine
 
 	public override bool SupportsWorkingEnabledToggle => false;
 
+	public override bool SupportsCovers => false;
+
 	public int CurrentTemperature { get; protected set; }
 	protected int TimeBeforeCoolingDown { get; set; }
 	protected bool HasNoWater { get; set; }

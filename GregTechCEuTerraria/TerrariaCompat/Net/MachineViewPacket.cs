@@ -6,9 +6,6 @@ using Terraria.DataStructures;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// View-begin / view-end membership gates per-tick MachineStateSync
-// broadcasts (no viewers = no traffic). Begin also ships an immediate full
-// snapshot so the joining GUI has data on its first frame.
 public static class MachineViewPacket
 {
 	public static void SendBegin(Point16 pos)
@@ -32,10 +29,8 @@ public static class MachineViewPacket
 			return;
 		}
 		machine.AddViewer(whoAmI);
+		if (machine is AppliedEnergistics.MeTerminalMachine term) term.ResetViewerSync(whoAmI);
 		MachineStateSyncPacket.SendTo(machine, whoAmI);
-		// The state blob no longer carries energyStored (synced on its own compact
-		// channel) - seed the fresh viewer's energy explicitly so the bar isn't 0
-		// until the next periodic energy broadcast.
 		MachineEnergySyncPacket.SendTo(machine, whoAmI);
 		EnderChannelSyncPacket.SendChannelsTo(machine, whoAmI);
 	}

@@ -11,16 +11,13 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Mirrors upstream registerSimpleMachines data rows.
 public static class MachineDefinitions
 {
 	private static readonly VoltageTier[] AllTiers = (VoltageTier[])Enum.GetValues(typeof(VoltageTier));
 
-	// Steam boilers aren't voltage-tiered - they register a single variant
 	private static readonly VoltageTier[] OneTier = { VoltageTier.LV };
 	private static readonly VoltageTier[] MaxTier = { VoltageTier.MAX };
 
-	// Transformer steps tier<->tier+1
 	private static readonly VoltageTier[] TransformerTiers =
 	{
 		VoltageTier.ULV, VoltageTier.LV,  VoltageTier.MV,  VoltageTier.HV,
@@ -29,9 +26,6 @@ public static class MachineDefinitions
 		VoltageTier.UXV, VoltageTier.OpV,
 	};
 
-	// The Quantum Tank / Quantum Chest family splits its voltage range across
-	// two upstream ids: LV..EV register as `super_tank` / `super_chest`,
-	// IV..OpV as `quantum_tank` / `quantum_chest`
 	private static readonly VoltageTier[] SuperTiers =
 		{ VoltageTier.LV, VoltageTier.MV, VoltageTier.HV, VoltageTier.EV };
 
@@ -93,7 +87,6 @@ public static class MachineDefinitions
 		VoltageTier.OpV,
 	};
 
-	// Used by the steam macerator, steam grinder/oven, and the simple generators
 	private static Func<VoltageTier, IReadOnlyDictionary<object, int>> ConstOutputLimit(
 		params (object cap, int n)[] entries)
 	{
@@ -385,6 +378,56 @@ public static class MachineDefinitions
 
 		MachineRegistry.Register(new MachineDefinition
 		{
+			Id = "me_storage", Label = "ME Storage",
+			Family = MachineFamily.MeStorage,
+			Tiered = false, Tiers = OneTier,
+			OverlayDir = "block/overlay/machine", OverlayBasename = "overlay_qchest",
+			CustomFaceAssetPath = "GregTechCEuTerraria/Content/TerrariaCompat/me_storage",
+			LayoutKey = "me_storage",
+		});
+
+		MachineRegistry.Register(new MachineDefinition
+		{
+			Id = "quantum_computer", Label = "Quantum Computer",
+			Family = MachineFamily.QuantumComputer,
+			Tiered = false, Tiers = OneTier,
+			OverlayDir = "block/overlay/machine", OverlayBasename = "overlay_qchest",
+			CustomFaceAssetPath = "GregTechCEuTerraria/Content/TerrariaCompat/me_quantum_computer",
+			LayoutKey = "none",
+		});
+
+		MachineRegistry.Register(new MachineDefinition
+		{
+			Id = "me_modular_terminal", Label = "ME Terminal",
+			Family = MachineFamily.MeModularTerminal,
+			Tiered = false, Tiers = OneTier,
+			OverlayDir = "block/overlay/machine", OverlayBasename = "overlay_qchest",
+			CustomFaceAssetPath = "GregTechCEuTerraria/Content/TerrariaCompat/me_terminal",
+			LayoutKey = "me_modular_terminal",
+		});
+
+		MachineRegistry.Register(new MachineDefinition
+		{
+			Id = "me_pattern_provider", Label = "ME Pattern Provider",
+			Family = MachineFamily.PatternProvider,
+			Tiered = false, Tiers = OneTier,
+			OverlayDir = "block/overlay/machine", OverlayBasename = "overlay_qchest",
+			CustomFaceAssetPath = "GregTechCEuTerraria/Content/TerrariaCompat/me_pattern_provider",
+			LayoutKey = "me_pattern_provider",
+		});
+
+		MachineRegistry.Register(new MachineDefinition
+		{
+			Id = "me_interface", Label = "ME Interface",
+			Family = MachineFamily.MeInterface,
+			Tiered = false, Tiers = OneTier,
+			OverlayDir = "block/overlay/machine", OverlayBasename = "overlay_qchest",
+			CustomFaceAssetPath = "GregTechCEuTerraria/Content/TerrariaCompat/me_interface",
+			LayoutKey = "me_interface",
+		});
+
+		MachineRegistry.Register(new MachineDefinition
+		{
 			Id = "creative_chest", Label = "Creative Chest",
 			Family = MachineFamily.CreativeChest,
 			Tiered = false, Tiers = MaxTier,
@@ -595,9 +638,6 @@ public static class MachineDefinitions
 			EmissiveOverlayBasename = "overlay_maintenance_cleaning_emissive",
 			LayoutKey = "none",
 		});
-
-		// TODO tiers and paththrough maybe
-		Diode("diode", "Diode");
 
 		MachineRegistry.Register(new MachineDefinition
 		{
@@ -1200,23 +1240,6 @@ public static class MachineDefinitions
 			OverlayBasename         = io == IO.IN ? "overlay_dual_hatch_input" : "overlay_dual_hatch_output",
 			EmissiveOverlayBasename = $"overlay_pipe_{ioTok}_emissive",
 			LayoutKey = "dual_hatch",
-		});
-	}
-
-	private static void Diode(string id, string label)
-	{
-		MachineRegistry.Register(new MachineDefinition
-		{
-			Id = id, Label = label,
-			Family = MachineFamily.Diode,
-			Tiers = ElectricTiers,
-			PartAbilities = new[] { Api.Machine.Multiblock.PartAbility.PASSTHROUGH_HATCH },
-			Casing = MachineCasing.Voltage,
-			OverlayDir = PartOverlayDir,
-			TintedOverlayBasename   = "overlay_energy_1a_tinted",
-			OverlayBasename         = "overlay_energy_1a_in",
-			EmissiveOverlayBasename = "overlay_energy_1a_in_emissive",
-			LayoutKey = "none",
 		});
 	}
 
@@ -2245,17 +2268,12 @@ public static class MachineDefinitions
 
 	private static IBlockPattern BuildCleanroomPattern()
 	{
-		// Cleanroom doesn't use autoAbilities upstream - its walls accept PASSTHROUGH_HATCH
-		// (max 30) + INPUT_ENERGY (min 1, max 3) + MAINTENANCE (exact 1) alongside
-		// the casing
 		var cleanroomDef = MachineRegistry.Get("cleanroom")!;
 		var wallPred = Predicates.Blocks("plascrete", "cleanroom_glass")
 			.Or(Predicates.Abilities(Api.Machine.Multiblock.PartAbility.INPUT_ENERGY)
 				.SetMinGlobalLimited(1).SetMaxGlobalLimited(3))
 			.Or(Predicates.Abilities(Api.Machine.Multiblock.PartAbility.MAINTENANCE)
-				.SetExactLimit(1))
-			.Or(Predicates.Abilities(Api.Machine.Multiblock.PartAbility.PASSTHROUGH_HATCH)
-				.SetMaxGlobalLimited(30));
+				.SetExactLimit(1));
 
 		return new RepeatableBlockPattern(MultiblockShapes.Cleanroom, new Dictionary<char, TraceabilityPredicate>
 		{

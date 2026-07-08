@@ -65,18 +65,10 @@ public static class ItemPipeFlow
 				var np = Api.Pipenet.PipePassthrough.EffectiveNeighbor(cx, cy, dx, dy);
 				if (!layer.CellAt(np.x, np.y).HasValue) continue;
 				if (_outflow.ContainsKey(np)) continue;
-				_outflow[np] = Opposite(side);
+				_outflow[np] = CoverSides.Opposite(side);
 				q.Enqueue(np);
 			}
 		}
 	}
 
-	private static CoverSide Opposite(CoverSide s) => s switch
-	{
-		CoverSide.Up    => CoverSide.Down,
-		CoverSide.Down  => CoverSide.Up,
-		CoverSide.Left  => CoverSide.Right,
-		CoverSide.Right => CoverSide.Left,
-		_               => s,
-	};
 }

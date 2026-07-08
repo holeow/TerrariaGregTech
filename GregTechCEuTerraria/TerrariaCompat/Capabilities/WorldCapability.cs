@@ -7,11 +7,8 @@ using GregTechCEuTerraria.TerrariaCompat.Machine;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Capabilities;
 
-// Forge-capability emulation narrowed to our 2-layer world
-// Centralizes the resolution of multi-cell origin
 public static class WorldCapability
 {
-	// T = any interface a MetaMachine implements (IEnergyContainer / IItemHandler / IFluidHandler).
 	public static T? Get<T>(int x, int y) where T : class
 	{
 		if (!MachineCellResolver.TryFindMachineAt(x, y, out var machine))
@@ -56,6 +53,56 @@ public static class WorldCapability
 		return null; // vanilla Terraria has no fluid-container tiles TODO sink
 	}
 
+	public static bool HasInventoryAt(int x, int y, IODirection arrivalSide)
+		=> ItemHandlerAt(x, y, arrivalSide) != null || FluidHandlerAt(x, y, arrivalSide) != null;
+
+	public static string TileDisplayName(int x, int y)
+	{
+		if (x < 0 || y < 0 || x >= Terraria.Main.maxTilesX || y >= Terraria.Main.maxTilesY) return "Empty";
+		if (MachineCellResolver.TryFindMachineAt(x, y, out var mach))
+			return mach.Definition?.Label ?? mach.Name;
+		Terraria.Tile tile = Terraria.Main.tile[x, y];
+		if (!tile.HasTile) return "Empty";
+		var modTile = Terraria.ModLoader.TileLoader.GetTile(tile.TileType);
+		if (modTile is not null) return modTile.Name;
+		bool container = Terraria.Main.tileContainer[tile.TileType];
+		int style = container ? tile.TileFrameX / 36 : 0;
+		string name = MapObjectName(tile.TileType, style);
+		if (string.IsNullOrEmpty(name) && container)
+			name = ContainerItemName(tile.TileType, style);
+		return string.IsNullOrEmpty(name) ? "Tile" : name;
+	}
+
+	private static Dictionary<(int Tile, int Style), int>? _containerItems;
+
+	private static string ContainerItemName(int tileType, int style)
+	{
+		_containerItems ??= BuildContainerItemMap();
+		return _containerItems.TryGetValue((tileType, style), out int itemType)
+			? Terraria.Lang.GetItemNameValue(itemType)
+			: "Chest";
+	}
+
+	private static Dictionary<(int, int), int> BuildContainerItemMap()
+	{
+		var map = new Dictionary<(int, int), int>();
+		foreach (var kv in Terraria.ID.ContentSamples.ItemsByType)
+		{
+			Terraria.Item it = kv.Value;
+			if (it is null || it.IsAir) continue;
+			if ((uint)it.createTile >= (uint)Terraria.Main.tileContainer.Length) continue;
+			if (!Terraria.Main.tileContainer[it.createTile]) continue;
+			map.TryAdd((it.createTile, it.placeStyle), it.type);
+		}
+		return map;
+	}
+
+	public static string MapObjectName(int tileType, int style = 0)
+	{
+		try { return Terraria.Lang.GetMapObjectName(Terraria.Map.MapHelper.TileToLookup(tileType, style)) ?? ""; }
+		catch { return ""; }
+	}
+
 	public static IODirection ToIODirection(Api.Cover.CoverSide side) => side switch
 	{
 		Api.Cover.CoverSide.Up => IODirection.Up,
@@ -63,6 +110,15 @@ public static class WorldCapability
 		Api.Cover.CoverSide.Left => IODirection.Left,
 		Api.Cover.CoverSide.Right => IODirection.Right,
 		_ => IODirection.None,
+	};
+
+	public static Api.Cover.CoverSide? ToCoverSide(IODirection side) => side switch
+	{
+		IODirection.Up    => Api.Cover.CoverSide.Up,
+		IODirection.Down  => Api.Cover.CoverSide.Down,
+		IODirection.Left  => Api.Cover.CoverSide.Left,
+		IODirection.Right => Api.Cover.CoverSide.Right,
+		_                 => null,
 	};
 
 	public static IEnumerable<(IODirection side, int x, int y)> Perimeter(

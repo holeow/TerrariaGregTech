@@ -5,15 +5,12 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Steam;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Verbatim port of SteamParallelMultiblockMachine.addDisplayText (java:131-162).
-// Steam multis have no EU container - recipe EU is paid as steam from the
-// bound SteamHatchPartMachine via SteamEnergyRecipeHandler.
 public static class SteamParallelMultiblockLayout
 {
 	private const int Padding = 12;
 	private const int TitleH  = 14;
-	private const int BodyW   = 280;
-	private const int BodyH   = 14 * 12;
+	private const int BodyW   = 190;
+	private const int BodyH   = 120;
 
 	public static MachineUILayout Build(SteamParallelMultiblockMachine machine)
 	{
@@ -27,7 +24,8 @@ public static class SteamParallelMultiblockLayout
 
 		layout.Widgets.Add(new MultiLineDynamicLabelWidgetSpec(
 			X: Padding, Y: baseY,
-			Getter: () => BuildDisplayLines(machine)));
+			Getter: () => BuildDisplayLines(machine),
+			Width: BodyW, Height: BodyH));
 
 		return layout;
 	}
@@ -37,18 +35,14 @@ public static class SteamParallelMultiblockLayout
 		var lines = new List<string>();
 		var recipeLogic = machine.Recipe;
 
-		// DEVIATION: prepended matcher error when
-		// unformed (upstream emits nothing). Consistent with Generic / EBF / etc.
 		if (!machine.IsFormed)
 			lines.Add(Machine.RecipeStatusText.StatusLineForMulti(machine, recipeLogic));
 
-		// Verbatim java:133 - IDisplayUIMachine.super.addDisplayText (no-op today).
 		foreach (var part in machine.GetParts())
 			part.AddMultiText(lines);
 
 		if (machine.IsFormed)
 		{
-			// Only emit steam-stored once a hatch is bound.
 			long capacity = machine.SteamCapacity;
 			if (capacity > 0)
 			{

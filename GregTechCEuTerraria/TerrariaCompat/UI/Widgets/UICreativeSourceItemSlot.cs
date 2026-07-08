@@ -10,11 +10,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Minimal phantom slot for the Creative Chest source-type setter. Click with
-// a held item -> setter fires with a count-1 clone (held stack unconsumed).
-// Click with empty cursor -> setter fires with null/Air to clear. Right-click
-// also clears, matching vanilla phantom-slot UX. Display via vanilla
-// `ItemSlot.Draw` like every other slot widget.
 public sealed class UICreativeSourceItemSlot : UIElement
 {
 	private const int Native = 22;
@@ -36,7 +31,10 @@ public sealed class UICreativeSourceItemSlot : UIElement
 	{
 		base.LeftMouseDown(evt);
 		var cursor = Main.mouseItem;
-		if (cursor is null || cursor.IsAir) _setter(null);
+		if (cursor is null || cursor.IsAir)
+		{
+			ItemPickerSystem.OpenForItem(it => _setter(it));
+		}
 		else
 		{
 			var clone = cursor.Clone();
@@ -57,6 +55,16 @@ public sealed class UICreativeSourceItemSlot : UIElement
 	{
 		_render[0] = _getter() ?? new Item();
 		var bounds = GetDimensions().ToRectangle();
+
+		if (ItemDrag.TryDropItem(bounds, out int dropped))
+		{
+			var it = new Item();
+			it.SetDefaults(dropped);
+			it.stack = 1;
+			_setter(it);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+		}
+
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = bounds.Width / VanillaNativeSlotPixels;
 		try

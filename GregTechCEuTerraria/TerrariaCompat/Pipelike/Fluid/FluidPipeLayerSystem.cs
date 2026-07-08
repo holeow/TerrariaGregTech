@@ -9,8 +9,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Fluid;
 
-// Per-world FluidPipeLayer. Save format = co-indexed lists; numeric pipe
-// properties are denormalised so load doesn't need MaterialRegistry first.
 public sealed class FluidPipeLayerSystem : ModSystem
 {
 	public static FluidPipeLayer Pipes { get; } = new();
@@ -99,6 +97,7 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		foreach (var c in _sides.Values) ((ICoverable)c).OnCoversUnload();
 		_sides.Clear();
 		_states.Clear();
+		ClientTankSnapshots.Clear();
 	}
 
 	public override void PostDrawTiles()
@@ -107,7 +106,8 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		if (held is null) return;
 		bool fluidLayer = held.ModItem is Items.Pipes.SimpleFluidPipeItem
 		                  || (held.ModItem is Items.Pipes.PipeItem pipe && pipe.Kind == PipeKind.Fluid)
-		                  || (held.ModItem is Items.Tools.ToolItem tool && tool.IsWrench);
+		                  || (held.ModItem is Items.Tools.ToolItem tool && tool.IsWrench)
+		                  || Items.Tools.Multitool.MultitoolState.IsActiveLayer(Main.LocalPlayer, "fluid_pipe");
 		if (!fluidLayer) return;
 		PipeRenderer.DrawFluidForegroundOverlay();
 	}

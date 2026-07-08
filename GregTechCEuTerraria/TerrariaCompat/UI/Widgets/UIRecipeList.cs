@@ -26,39 +26,17 @@ public sealed class UIRecipeList : UIElement
 	public void IgnoreHeldClick() => _awaitRelease = true;
 
 	private int _scrollOffsetPx;
-	private bool _leftDown;
-	private bool _rightDown;
+
+	public int ScrollOffsetPx { get => _scrollOffsetPx; set => _scrollOffsetPx = value < 0 ? 0 : value; }
 
 	public int ScrollBottomInset;
 
-	private bool _dragging;
-	private int  _dragAnchorOffsetPx;
+	private readonly Scrollbar _bar = new();
 
-	private const int ScrollbarWidth = VanillaScrollbar.Width;
+	private const int ScrollbarWidth = Scrollbar.Width;
 	private const int Margin = 6;
 	private const int MinThumbHeight = 28;
-	private const int SelectGutter = 44;
-	private const int SelectBtnSize = 36;
-
-	private static void DrawPlusButton(SpriteBatch sb, Rectangle rect, bool hot)
-	{
-		var px = TextureAssets.MagicPixel.Value;
-		float t = (float)(0.5 + 0.5 * Math.Sin(Main.GameUpdateCount * 0.12));
-		var bg = Color.Lerp(new Color(36, 130, 60), new Color(96, 232, 122), t);
-		if (hot) bg = Color.Lerp(bg, Color.White, 0.25f);
-		sb.Draw(px, rect, bg);
-		var border = hot ? new Color(200, 255, 215) : new Color(28, 90, 45);
-		sb.Draw(px, new Rectangle(rect.X, rect.Y, rect.Width, 1), border);
-		sb.Draw(px, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), border);
-		sb.Draw(px, new Rectangle(rect.X, rect.Y, 1, rect.Height), border);
-		sb.Draw(px, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), border);
-		var font = FontAssets.MouseText.Value;
-		const float scale = 1.9f;
-		var size = font.MeasureString("+") * scale;
-		Terraria.Utils.DrawBorderString(sb, "+",
-			new Vector2(rect.X + (rect.Width - size.X) / 2f, rect.Y + (rect.Height - size.Y) / 2f - 2),
-			Color.White, scale);
-	}
+	private const int SelectGutter = RecipeRowRenderer.SelectGutter;
 
 	public UIRecipeList(Func<IReadOnlyList<GTRecipe>> sourceProvider, string emptyHint = "No recipes")
 	{
@@ -66,87 +44,10 @@ public sealed class UIRecipeList : UIElement
 		_emptyHint = emptyHint;
 	}
 
-	private static void ResolveCell(Api.Recipe.Content.Content content,
-		out int itemType, out int itemAmount,
-		out FluidType? fluid, out int fluidAmountMb,
-		out string? tagLabel, out HashSet<int>? tagMembers)
-	{
-		itemType = 0; itemAmount = 1; fluid = null; fluidAmountMb = 0;
-		tagLabel = null; tagMembers = null;
-
-		var raw = (Ingredient)content.Payload;
-		itemAmount = raw switch
-		{
-			SizedIngredient s         => s.Amount,
-			IntProviderIngredient ipi => ipi.RollSampledCount(),
-			_                         => 1,
-		};
-		if (itemAmount <= 0) itemAmount = 1;
-		var inner = Inner(raw);
-		if (inner is TagIngredient tag && tag.GetItems().Count > 0)
-		{
-			var members = new HashSet<int>();
-			foreach (var m in tag.GetItems())
-				if (m.type > Terraria.ID.ItemID.None) members.Add(m.type);
-			if (members.Count >= 2)
-			{
-				tagLabel = StripNs(tag.TagName);
-				tagMembers = members;
-				return;
-			}
-			itemType = tag.GetItems()[0].type;
-			return;
-		}
-
-		switch (inner)
-		{
-			case FluidIngredient fi:
-				fluid = fi.ExactType
-				     ?? (fi.GetFluids().Count > 0 ? fi.GetFluids()[0] : null);
-				fluidAmountMb = fi.Amount;
-				return;
-			case ItemStackIngredient isi when isi.ItemType > 0:    itemType = isi.ItemType; return;
-			case NBTPredicateIngredient nbt when nbt.ItemType > 0: itemType = nbt.ItemType; return;
-			case FluidContainerIngredient fc:
-				fluid = fc.Fluid.ExactType
-				     ?? (fc.Fluid.GetFluids().Count > 0 ? fc.Fluid.GetFluids()[0] : null);
-				fluidAmountMb = fc.Fluid.Amount;
-				return;
-		}
-
-		if (Inner((Ingredient)content.Payload) is IntProviderFluidIngredient ipfi)
-			fluidAmountMb = ipfi.RollSampledCount();
-	}
-
-	private static string StripNs(string id)
-	{
-		int colon = id.IndexOf(':');
-		return colon >= 0 ? id.Substring(colon + 1) : id;
-	}
-
-	private static void RecordHover(Api.Recipe.Content.Content content)
-	{
-		ResolveCell(content, out int itemType, out _, out var fluid, out _,
-			out string? tagLabel, out var tagMembers);
-		if (tagLabel is not null && tagMembers is not null)
-			BrowserHover.SetTag(tagLabel, tagMembers);
-		else if (itemType > 0) BrowserHover.SetItem(itemType);
-		else if (fluid is not null) BrowserHover.SetFluid(fluid.Id, fluid.DisplayName);
-	}
-
-	private static Ingredient Inner(Ingredient ing) => ing switch
-	{
-		SizedIngredient sized      => Inner(sized.Inner),
-		IntProviderIngredient ipi  => Inner(ipi.Inner),
-		IntProviderFluidIngredient ipfi => ipfi.Inner,
-		_                          => ing,
-	};
-
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
-		_scrollOffsetPx -= evt.ScrollWheelValue;
-		_scrollOffsetPx = Math.Max(0, _scrollOffsetPx);
+		Scrollbar.Wheel(evt, ref _scrollOffsetPx);
 	}
 
 	protected override void DrawSelf(SpriteBatch spriteBatch)
@@ -177,8 +78,6 @@ public sealed class UIRecipeList : UIElement
 			Terraria.Utils.DrawBorderString(spriteBatch, _emptyHint,
 				new Vector2(content.X + 8, content.Y + 8),
 				Color.LightGray, 0.85f);
-			_leftDown  = Main.mouseLeft;
-			_rightDown = Main.mouseRight;
 			return;
 		}
 
@@ -186,55 +85,21 @@ public sealed class UIRecipeList : UIElement
 		int totalH = src.Count * rowH;
 		int viewH = content.Height;
 		int maxOffset = Math.Max(0, totalH - viewH);
-		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
+		var mouse = ModalEscape.PollCursor();
 
-		int firstRow = _scrollOffsetPx / rowH;
-		int lastRow = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
-
-		var mouse = GlobalRecipeBrowserState.BrowserCursor();
-
-		bool draggingThisFrame = false;
-		Rectangle trackRect = Rectangle.Empty;
-		Rectangle thumbRect = Rectangle.Empty;
+		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
 			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
 			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
-
-			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
-			int travel = barH - thumbH;
-			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
-			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-
-			if (Main.mouseLeft && !_leftDown && trackRect.Contains(mouse))
-			{
-				_dragging = true;
-				_dragAnchorOffsetPx = thumbRect.Contains(mouse) ? mouse.Y - thumbY : thumbH / 2;
-			}
-
-			if (_dragging && Main.mouseLeft)
-			{
-				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax   = Math.Max(1, barH - thumbH);
-				int clampedTop  = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
-				_scrollOffsetPx = (int)((float)clampedTop / travelMax * maxOffset);
-				draggingThisFrame = true;
-			}
-			else if (!Main.mouseLeft)
-			{
-				_dragging = false;
-			}
-
-			if (draggingThisFrame)
-			{
-				thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scrollOffsetPx / maxOffset)) : 0);
-				thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-				firstRow = _scrollOffsetPx / rowH;
-				lastRow  = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
-			}
+			thumbRect = _bar.Update(trackRect, maxOffset, (float)viewH / totalH, ref _scrollOffsetPx, mouse);
 		}
+		bool draggingThisFrame = _bar.Dragging;
+		if (_scrollOffsetPx > maxOffset) _scrollOffsetPx = maxOffset;
+
+		int firstRow = _scrollOffsetPx / rowH;
+		int lastRow = Math.Min(src.Count - 1, (_scrollOffsetPx + viewH - 1) / rowH);
 
 		int hoveredRow = -1;
 		bool picked = false;
@@ -260,14 +125,14 @@ public sealed class UIRecipeList : UIElement
 
 			if (selGutter > 0)
 			{
-				var selBtn = new Rectangle(rowBounds.X + 4, yTop + (rowH - SelectBtnSize) / 2, SelectBtnSize, SelectBtnSize);
+				var selBtn = RecipeRowRenderer.SelectButtonRect(rowBounds);
 				bool overSel = !draggingThisFrame && content.Contains(mouse) && selBtn.Contains(mouse);
-				DrawPlusButton(spriteBatch, selBtn, overSel);
+				RecipeRowRenderer.DrawSelectButton(spriteBatch, selBtn, overSel);
 				if (overSel)
 				{
 					Main.LocalPlayer.mouseInterface = true;
 					Main.instance.MouseText("Select this recipe");
-					if (!_awaitRelease && Main.mouseLeft && !_leftDown && !_dragging)
+					if (!_awaitRelease && MouseClick.LeftPressed && !_bar.Dragging)
 					{
 						OnSelectRecipe!(src[i]);
 						picked = true;
@@ -296,7 +161,7 @@ public sealed class UIRecipeList : UIElement
 			{
 				int qty = ItemSlot.ShiftInUse ? 10 : 1;
 				Main.instance.MouseText($"Craft {qty}x {craftRecipe!.createItem.Name}");
-				if (Main.mouseLeft && !_leftDown && !_dragging)
+				if (MouseClick.LeftPressed && !_bar.Dragging)
 				{
 					for (int n = 0; n < qty; n++)
 					{
@@ -318,49 +183,11 @@ public sealed class UIRecipeList : UIElement
 			}
 			else
 			{
-				RecipeRowRenderer.EmitTooltipFor(src[hoveredRow], rowBounds, mouse);
-
-				string? chipStation = OnStationFilter == null
-					? null
-					: RecipeRowRenderer.StationChipAt(src[hoveredRow], rowBounds, mouse);
-				if (chipStation is not null)
-				{
-					if (!_awaitRelease && Main.mouseLeft && !_leftDown && !_dragging)
-						OnStationFilter!(chipStation);
-				}
-				else
-				{
-					var ing = RecipeRowRenderer.IngredientAt(src[hoveredRow], rowBounds, mouse);
-					if (ing is not null) RecordHover(ing);
-					if (ing is not null && !_dragging)
-					{
-						var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
-						ResolveCell(ing, out int itemType, out int itemAmt,
-							out var fluid, out int fluidAmt,
-							out string? tagLabel, out var tagMembers);
-						if (tagLabel is not null && tagMembers is not null)
-							BrowserSlotInteraction.HandleTag(click, tagLabel, tagMembers,
-								recipeAmount: itemAmt);
-						else if (fluid is not null)
-							BrowserSlotInteraction.HandleFluid(click, fluid,
-								fluidAmt > 0 ? fluidAmt : (int?)null, inFavoritesPane: false);
-						else if (itemType > 0)
-							BrowserSlotInteraction.HandleItem(click,
-								RecipeRowRenderer.BuildDisplayItem(ing, itemType),
-								inFavoritesPane: false,
-								recipeAmount: itemAmt);
-					}
-				}
+				RecipeRowRenderer.HandleQueryClick(src[hoveredRow], rowBounds, mouse,
+					_bar.Dragging, !_awaitRelease && !_bar.Dragging, OnStationFilter);
 			}
 		}
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-
 		if (totalH > viewH)
-		{
-			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			VanillaScrollbar.Draw(spriteBatch, trackRect, thumbRect, thumbHot);
-			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
-		}
+			_bar.Draw(spriteBatch, trackRect, thumbRect, mouse);
 	}
 }

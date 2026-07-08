@@ -64,12 +64,17 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 		return Terraria.ID.ItemID.Search.TryGetName(type, out var name) ? "terraria:" + name : "";
 	}
 
+	string IIngredientResolver.StableItemId(int itemType) => StableItemId(itemType);
+
 	public IReadOnlyList<int> ResolveItemTag(string tagName)
 	{
 		if (string.IsNullOrEmpty(tagName)) return Array.Empty<int>();
 
 		if (Items.Tools.ToolItemLoader.CraftingTagItems.TryGetValue(tagName, out var catalystItems))
 			return catalystItems;
+
+		if (VanillaItemMap.TryGetFungibleGroupView(tagName, out var groupView))
+			return groupView;
 
 		var types = new List<int>();
 

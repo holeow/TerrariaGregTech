@@ -1,9 +1,10 @@
 #nullable enable
 using System;
+using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.Api.Cover.Filter;
+using GregTechCEuTerraria.TerrariaCompat.UI.MeCraft;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
@@ -11,14 +12,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// One phantom matcher slot of the item magnet's SimpleItemFilter - a "ghost"
-// item (type + a configured count), never a real stack. Verbatim
-// PhantomSlotWidget click semantics via ItemFilterEdit (LMB sets count = held
-// count, RMB sets 1, empty-handed LMB/RMB step -1/+1, Shift halves/doubles,
-// middle-click clears).
-//
-// Unlike the cover phantom slot this edits client-side directly - the magnet is
-// a private inventory item, persisted per-stack through the magnet ModItem.
 public sealed class UIMagnetPhantomSlot : UIElement
 {
 	public const int NativeUnscaledSize = 22;
@@ -28,7 +21,6 @@ public sealed class UIMagnetPhantomSlot : UIElement
 	private readonly int _index;
 	private readonly Item[] _render = { new() };
 
-	private bool _leftDown, _rightDown, _midDown;
 
 	public UIMagnetPhantomSlot(Func<SimpleItemFilter?> filter, int index)
 	{
@@ -45,6 +37,16 @@ public sealed class UIMagnetPhantomSlot : UIElement
 			? filter.Matches[_index] : new Item();
 
 		var bounds = GetDimensions().ToRectangle();
+
+		if (ItemDrag.TryDropItem(bounds, out int dropped) && filter is not null)
+		{
+			var it = new Item();
+			it.SetDefaults(dropped);
+			it.stack = 1;
+			ItemFilterEdit.MatcherClick(filter, _index, 0, false, it);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+		}
+
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = bounds.Width / VanillaNativeSlotPixels;
 		try
@@ -52,12 +54,7 @@ public sealed class UIMagnetPhantomSlot : UIElement
 			if (IsMouseHovering)
 			{
 				Main.LocalPlayer.mouseInterface = true;
-				HandleClicks(filter);
 				ItemSlot.MouseHover(_render, ItemSlot.Context.ChestItem, 0);
-			}
-			else
-			{
-				_leftDown = _rightDown = _midDown = false;
 			}
 			ItemSlot.Draw(spriteBatch, _render, ItemSlot.Context.ChestItem, 0, new Vector2(bounds.X, bounds.Y));
 		}
@@ -67,21 +64,49 @@ public sealed class UIMagnetPhantomSlot : UIElement
 		}
 	}
 
-	private void HandleClicks(SimpleItemFilter? filter)
+	public override void LeftMouseDown(UIMouseEvent evt)  { base.LeftMouseDown(evt);  HandleLeft(); }
+	public override void RightMouseDown(UIMouseEvent evt) { base.RightMouseDown(evt); HandleClear(); }
+
+	private void HandleLeft()
 	{
-		bool shift = Main.keyState.IsKeyDown(Keys.LeftShift) || Main.keyState.IsKeyDown(Keys.RightShift);
-		bool leftPress  = Main.mouseLeft   && !_leftDown;
-		bool rightPress = Main.mouseRight  && !_rightDown;
-		bool midPress   = Main.mouseMiddle && !_midDown;
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-		_midDown   = Main.mouseMiddle;
+		var filter = _filter();
+		if (filter is null) return;
+		Item slot = _index < filter.Matches.Length ? filter.Matches[_index] : new Item();
 
-		// Button ordinal - 0 left, 1 right, 2 middle - matching slotClickPhantom.
-		int button = leftPress ? 0 : rightPress ? 1 : midPress ? 2 : -1;
-		if (button < 0 || filter is null) return;
+		if (!Main.mouseItem.IsAir)
+		{
+			ItemFilterEdit.MatcherClick(filter, _index, 0, false, Main.mouseItem);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
 
-		ItemFilterEdit.MatcherClick(filter, _index, button, shift, Main.mouseItem);
+		if (slot.IsAir)
+		{
+			ItemPickerSystem.OpenForItem(it => ItemFilterEdit.MatcherClick(filter, _index, 0, false, it));
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
+
+		if (filter.MaxStackSize <= 1) return;
+
+		MeCraftSystem.OpenForAmount(AEItemKey.Of(slot)!, slot.stack, 1, "Set Amount", "Set",
+			"Amount this slot matches", SetLocalAmount, parentLayer: UILayers.TopModal);
+		SoundEngine.PlaySound(SoundID.MenuTick);
+	}
+
+	private void SetLocalAmount(long amt)
+	{
+		var f = _filter();
+		if (f is null || _index >= f.Matches.Length || f.Matches[_index].IsAir) return;
+		f.Matches[_index].stack = (int)Math.Clamp(amt, 1, f.MaxStackSize);
+		f.OnUpdated();
+	}
+
+	private void HandleClear()
+	{
+		var filter = _filter();
+		if (filter is null) return;
+		ItemFilterEdit.MatcherClick(filter, _index, 2, false, new Item());
 		SoundEngine.PlaySound(SoundID.MenuTick);
 	}
 }

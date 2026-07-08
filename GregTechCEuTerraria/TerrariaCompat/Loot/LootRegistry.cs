@@ -135,7 +135,7 @@ public static class LootRegistry
 				try { desc = c.GetConditionDescription(); }
 				catch { desc = ""; }
 				if (string.IsNullOrWhiteSpace(desc)) continue;
-				sb.Append("  *  ").Append(desc);
+				sb.Append("   ").Append(desc);
 			}
 		}
 		return sb.ToString();
@@ -177,7 +177,6 @@ public static class LootRegistry
 		}
 	}
 
-	// === NPC shops ====================================================
 	private static void CollectShops(List<LootEntry> list)
 	{
 		foreach (var shop in NPCShopDatabase.AllShops)
@@ -220,7 +219,7 @@ public static class LootRegistry
 			if (cond is null) continue;
 			string desc = cond.Description?.Value ?? "";
 			if (string.IsNullOrWhiteSpace(desc)) continue;
-			sb.Append(first ? "  *  " : ", ");
+			sb.Append(first ? "   " : ", ");
 			sb.Append(desc);
 			first = false;
 		}

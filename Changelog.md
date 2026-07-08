@@ -1,3 +1,71 @@
+## 0.0.7 (todo)
+
+Logistics update! Meet barebones AE2 port for proper gregtech automation. Barebones means you can't use it as a storage solution by itself, Magic Storage heart, crates, super tanks can be connected with storage bus to use them in ME network. Let me know if there are other mods that you think should be supported by storage buses.
+
+Its very minimalistic (no channels, no energy consumption, no drives, no spatial, no quantum, no p2p). Nothing else expect maybe wireless terminals and level emitters isn't planned to be ported. Perchance, when we get to proper endgame playtesting we will encounter some logistical issues that will force us to port more of AE2 but for now it seems okay. But keep in mind that current AE features are already extremely powerful and may break the game balance completely (which they in fact do to 99% of existing Minecraft modpacks) so this is most likely some eternal problem that is yet to be solved by humankind
+
+Important:
+- Added ae2 cables, terminals, pattern provider, interface, import/export/storage bus integrated into cable
+- Added missing molten metals recipes (thanks Bup Supreme)
+- Added tree farming mode to block breaker (thanks all who asked for infinite wood)
+- Added bootleg XP crafting with terraria money
+
+QOL:
+- Added simple pipes support to gregtech multitool (thanks CloneCreatesClassics)
+- Added debuff to hot ingots (thanks Bup Supreme)
+- Added terraria superconductors conversion recipes (thanks Bup Supreme)
+- Added gregtech toilet, one of the final machines
+- Added item picker to empty filters
+- Added clicking to questbook requirement icons (thanks holeow)
+- Added paint to dye conversion recipes for easier lenses (thanks hhhhhhhhhhhhhhh)
+- Added simple trinket effects to exquisite gems (thanks holeow)
+- Added toggle for output settings widget, changed its buttons layout
+- Added grid-aligned placement for all 2x2 tiles when holding mouse
+- Added fluid bucket requirements skip button into the questbook (thanks Bup Supreme)
+- Added usecase for paracetamol and radaway
+- Added dropdown on clicking onto colliding interactable things
+- Added damascus steel recipe (thanks Bup Supreme)
+- Added output to any side to drums (thanks hhhhhhhhhhhhhhh)
+- Added Neon Sign
+- Added warning when trying to put cells, drums with fluid into Magic Storage (thanks Bup Supreme)
+- Changed long distance pipes to require less distance (thanks Bup Supreme)
+- Changed some wood-related recipes so it accepts more terraria wood types
+- Changed undervoltage machines manual toggle behavior (thanks TheBobster)
+- Changed how integrated recipe browser is shown
+- Changed extractinator to be slower
+- Changed pipes filter slots UI
+- Changed Queen Slime to have HV loot table (thanks Bup Supreme)
+- Changed creative tank/chest slots to support item picker
+- Changed recipe browser search logic for more relevant results
+- Fixed treated wooden pipe multitool interaction (thanks Sanya268)
+- Fixed input hatches fluid containers UI interaction (thanks Bup Supreme)
+- Fixed mining and damage tiers of tools (thanks Bup Supreme)
+- Fixed bug where platforms under machines got machines UI hover
+- Removed cleanroom diodes (thanks Bup Supreme)
+- Removed tape and some other dummy items
+- Removed cover support from some steam machines to remove early game visual clutter
+- Removed some of boss drops, this is the end of early playtesting so it doesn't fit the balance anymore
+- Removed netherite tools (thanks Bup Supreme)
+
+Visuals:
+- Added foreground pipe render to gregtech multitool (thanks Flungus)
+- Added custom multitool and terminal upgrade card textures (thanks Flareguy)
+- Added creosote overflow tooltip to coke oven
+- Added output side rendering
+- Changed fluid and tag items hover in recipe browser
+- Changed energy bar renderer as a first step of UI overhaul
+- Changed UI scale of some machines
+- Changed multiblock ghost tips so its more brief
+- Fixed long distance pipes tooltip on rejoin (thanks Bup Supreme)
+- Fixed solar panel covers tooltip
+- Fixed block breaker tooltip
+- Fixed iv multis mode selection locale
+- Fixed boiler steam output tooltip (thanks holeow)
+- Fixed recipe browser edge case with wrong ingredients amount render (thanks holeow)
+- Fixed rock breaker recipe browser icon
+- Fixed fluid buckets equipped rendering
+- Fixed fluid slots amount abbreviation for big numbers
+
 ## 0.0.6
 
 QoL update! Basically a small intermediate update with lots of random stuff that will hopefully make the gameplay a bit smoother. AE2 will be next update

@@ -37,6 +37,9 @@ public static class MultitoolState
 	public static bool IsHeld(Player player) =>
 		player.HeldItem is { IsAir: false } it && it.type == ModContent.ItemType<GregTechMultitool>();
 
+	public static bool IsActiveLayer(Player? player, string layerId) =>
+		player is not null && IsHeld(player) && ActiveLayerId == layerId;
+
 	public const int MaxPathTiles = 2000;
 
 	public static List<Point> LPath(Point a, Point b, int direction)

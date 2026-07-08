@@ -14,7 +14,7 @@ public sealed class GregTechMultitool : ModItem
 	private const string AnyWireCutter = "GregTechCEuTerraria:gtceu:tools/crafting_wire_cutters";
 	private const string AnyScrewdriver = "GregTechCEuTerraria:gtceu:tools/crafting_screwdrivers";
 
-	public override string Texture => "Terraria/Images/Item_3611"; // Grand Design
+	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/multitool";
 
 	public override void SetStaticDefaults()
 	{

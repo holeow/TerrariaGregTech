@@ -3,11 +3,6 @@ using Terraria.Localization;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.LongDistance;
 
-// English fallbacks for the long-distance endpoint item tooltips. The universal
-// TieredMachineItem hover path reads numbered `MachineTooltip.<id>_N` keys
-// (MachineTooltipLookup). These endpoints are MachineDefinition rows, not custom
-// ModItems, so there's no ModifyTooltips override to carry usage text - we register
-// the lines at Mod.Load instead (port-locale.py would emit them, but needs runData).
 public static class LongDistanceLocale
 {
 	public static void RegisterAll()
@@ -34,6 +29,6 @@ public static class LongDistanceLocale
 		Language.GetOrRegister($"{prefix}_5", () =>
 			"[c/888888:Feed the Input from any side; it exits into a chest next to the Output.]");
 		Language.GetOrRegister($"{prefix}_6", () =>
-			"[c/888888:Endpoints must be at least 50 blocks apart.]");
+			"[c/888888:The two endpoints must be 10+ blocks apart in a straight line - a winding pipe run needs more.]");
 	}
 }

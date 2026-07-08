@@ -22,6 +22,8 @@ public static class MultiblockDisplayText
 
 	public static Func<string, string> KeyResolver { get; set; } = k => k;
 
+	public static string? UnformedHint { get; set; }
+
 	internal static string Tr(string key, params object[] args)
 	{
 		LocalizedText text = Language.GetText(KeyResolver(key));
@@ -57,7 +59,8 @@ public static class MultiblockDisplayText
 			if (!isStructureFormed && showIncompleteStructureWarning)
 			{
 				textList.Add(Tr("gtceu.multiblock.invalid_structure"));
-				textList.Add(Tr("gtceu.multiblock.invalid_structure.tooltip"));
+				if (UnformedHint != null)
+					textList.Add(UnformedHint);
 			}
 		}
 

@@ -266,6 +266,10 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 
 	public virtual Item[]? GetSlotGroup(SlotGroup group) => null;
 
+	public virtual bool IsItemValidForSlot(SlotGroup group, int index, Item item) => true;
+
+	public virtual bool AcceptsOutputDeposit(int index, Item item) => false;
+
 	public virtual void NotifySlotGroupChanged(SlotGroup group)
 	{
 		if (group == SlotGroup.Charger) return;
@@ -324,14 +328,8 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 	IFluidHandler? ISidedCapabilityProvider.GetFluidHandler(IODirection side) =>
 		GetFluidHandlerCap(side, useCoverCapability: true);
 
-	private static CoverSide? CoverSideOf(IODirection side) => side switch
-	{
-		IODirection.Up    => CoverSide.Up,
-		IODirection.Down  => CoverSide.Down,
-		IODirection.Left  => CoverSide.Left,
-		IODirection.Right => CoverSide.Right,
-		_                 => null,
-	};
+	private static CoverSide? CoverSideOf(IODirection side)
+		=> Capabilities.WorldCapability.ToCoverSide(side);
 
 	public System.Func<Item, bool> GetItemCapFilter(IODirection side, IO io)
 	{

@@ -8,7 +8,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Port of ItemCollectorMachine.createTemplate
 public static class ItemCollectorLayout
 {
 	private const int SlotSize = 22;
@@ -22,7 +21,6 @@ public static class ItemCollectorLayout
 
 	public static MachineUILayout Build(ItemCollectorMachine machine)
 	{
-		// rowSize = sqrtinventorySize: LV(9)=3x3, MV(16)=4x4, HV/EV(25)=5x5.
 		int inventorySize = machine.Output.Storage.SlotCount;
 		int rowSize = (int)Math.Round(Math.Sqrt(inventorySize));
 
@@ -95,7 +93,7 @@ public static class ItemCollectorLayout
 				current:     () => machine.TagFilter.OreDictFilterExpression ?? "",
 				onConfirm:   txt => MachineActions.Send(MachineFilterAction.TagExpr(txt ?? ""), machine),
 				maxLength:   64,
-				placeholder: "tag expression  *  e.g.  *dusts/gold | !*lv",
+				placeholder: "tag expression   e.g.  *dusts/gold | !*lv",
 				tooltip:     TagFilterInfo)
 			{
 				Left   = StyleDimension.FromPixels(0),
@@ -176,9 +174,9 @@ public static class ItemCollectorLayout
 
 	private const string TagFilterInfo =
 		"Accepts complex expressions:\n"
-		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"
-		+ "!a = NOT   *   (a) for grouping\n"
-		+ "* = wildcard   *   $ = untagged\n"
+		+ "a & b = AND   a | b = OR   a ^ b = XOR\n"
+		+ "!a = NOT   (a) for grouping\n"
+		+ "* = wildcard   $ = untagged\n"
 		+ "Tags are 'namespace:tag/subtype'.\n"
 		+ "The 'forge:' namespace is assumed if one isn't given.\n"
 		+ "Example: *dusts/gold | (gtceu:circuits & !*lv)\n"

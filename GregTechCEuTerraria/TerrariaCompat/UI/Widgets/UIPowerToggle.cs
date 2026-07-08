@@ -11,17 +11,13 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Two-state on/off button mirroring upstream's IControllable toggle.
-// Upstream texture button_power.png is an 18x36 sheet - top half = released
-// (working-disabled), bottom half = pressed (working-enabled). We sliced it
-// to 36x72 in Content/UI/button_power.png and pick the half at draw time
-// based on the getter's current value (matches IFancyConfiguratorButton.Toggle's
-// `pressed` semantics: pressed=true -> working enabled).
 public sealed class UIPowerToggle : UIElement
 {
 	private readonly Func<bool> _get;
 	private readonly Action<bool> _set;
 	private bool _down;
+
+	public Func<bool, string>? TooltipFor;
 
 	private static Asset<Texture2D>? _tex;
 
@@ -65,11 +61,9 @@ public sealed class UIPowerToggle : UIElement
 	{
 		base.Update(gameTime);
 		if (!IsMouseHovering) return;
-		// Suppress player item-use / attack swing while hovering, same trick
-		// vanilla slot widgets and UIChestSlot use. Without this the click
-		// gets seen by the player input loop and swings the held item /
-		// places a tile through the GUI.
 		Main.LocalPlayer.mouseInterface = true;
-		Main.instance.MouseText(_get() ? "Working: enabled (click to pause)" : "Working: paused (click to enable)");
+		Main.instance.MouseText(TooltipFor != null
+			? TooltipFor(_get())
+			: _get() ? "Working: enabled (click to pause)" : "Working: paused (click to enable)");
 	}
 }

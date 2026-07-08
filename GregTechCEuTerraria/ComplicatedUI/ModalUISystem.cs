@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Terraria;
+using Terraria.GameInput;
 using Terraria.ModLoader;
 using Terraria.UI;
 
@@ -14,6 +15,8 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 	protected abstract string LayerName { get; }
 
 	protected virtual bool CloseOnEscape => true;
+
+	protected virtual bool CloseOnClickOutside => false;
 
 	public virtual bool PinSupported => false;
 	private bool _pinned;
@@ -34,13 +37,34 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 
 	protected bool IsOpenInternal => Ui?.CurrentState != null;
 
-	protected void PushModal() => UILayers.Push(LayerName);
+	private uint _openedTick = uint.MaxValue;
+	private bool OpenedThisFrame => _openedTick == Main.GameUpdateCount;
+
+	private string? _parentLayer;
+
+	private bool _pendingClose;
+
+	protected void PushModal(string? parentLayer = null)
+	{
+		_pendingClose = false;
+		_parentLayer = parentLayer;
+		UILayers.Push(LayerName);
+		_openedTick = Main.GameUpdateCount;
+	}
 
 	protected void CloseInternal()
 	{
 		if (Ui?.CurrentState == null && _pinHidden == null) return;
+		_pendingClose = true;
+	}
+
+	private void DoCloseNow()
+	{
+		_pendingClose = false;
+		if (Ui?.CurrentState == null && _pinHidden == null) return;
 		Pinned = false;
 		_pinHidden = null;
+		_parentLayer = null;
 		OnClose();
 		Ui?.SetState(null);
 	}
@@ -52,12 +76,16 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 		UILayers.RegisterModal(LayerName, () => IsOpenInternal);
 		UILayers.RegisterModalCursorProbe(LayerName,
 			() => Ui?.CurrentState is UIModalWindow w && w.ContainsCursor());
+		UILayers.RegisterModalBoundsProbe(LayerName,
+			() => Ui?.CurrentState is UIModalWindow w ? w.OccupiedRects() : System.Array.Empty<Rectangle>());
 	}
 
 	public override void Unload() => Ui = null;
 
 	public override void UpdateUI(GameTime gameTime)
 	{
+		if (_pendingClose) DoCloseNow();
+
 		if (PinSupported && Pinned)
 		{
 			bool blocked = Main.ingameOptionsWindow || Main.gameMenu;
@@ -74,11 +102,22 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 		if (!pinned && (!Main.playerInventory || Main.ingameOptionsWindow || Main.gameMenu
 			|| ShouldAutoClose()))
 		{ CloseInternal(); return; }
+		if (!pinned && _parentLayer != null && !UILayers.IsModalOpen(_parentLayer))
+		{ CloseInternal(); return; }
+		if (CloseOnClickOutside && !pinned && !OpenedThisFrame && MouseClick.LeftPressed
+			&& state is UIModalWindow modal
+			&& (!modal.ContainsCursor() || UILayers.IsCursorOverHigherModal(LayerName)))
+		{ CloseInternal(); return; }
 		ModalEscape.SuppressVanillaUIClicks(state);
-		bool covered = UILayers.IsCursorOverHigherModal(LayerName);
-		if (covered) ModalEscape.WithCursorParked(() => Ui.Update(gameTime));
-		else         Ui.Update(gameTime);
+		if (state is UIModalWindow scrollModal && scrollModal.ContainsCursor())
+			PlayerInput.LockVanillaMouseScroll("GregTechCEuTerraria/Modal");
+		if (InputBlocked()) ModalEscape.WithCursorParked(() => Ui.Update(gameTime));
+		else                Ui.Update(gameTime);
 	}
+
+	private bool InputBlocked()
+		=> UILayers.IsCursorOverHigherModal(LayerName) || OpenedThisFrame
+			|| UILayers.PressBelongsToAnotherModal(LayerName);
 
 	public override void PostUpdateInput()
 	{
@@ -98,9 +137,8 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 		{
 			if (Ui?.CurrentState != null)
 			{
-				bool occluded = UILayers.IsCursorOverHigherModal(LayerName);
-				if (occluded) ModalEscape.WithCursorParked(() => Ui.Draw(Main.spriteBatch, new GameTime()));
-				else          Ui.Draw(Main.spriteBatch, new GameTime());
+				if (InputBlocked()) ModalEscape.WithCursorParked(() => Ui.Draw(Main.spriteBatch, new GameTime()));
+				else                Ui.Draw(Main.spriteBatch, new GameTime());
 			}
 			return true;
 		});

@@ -28,13 +28,25 @@ public static class BrowserSlotInteraction
 		public bool Ctrl { get; init; }
 	}
 
-	public static Click Poll(bool prevLeftDown, bool prevRightDown)
+	public static Click Poll()
 	{
 		var k = Main.keyState;
 		return new Click
 		{
-			Lmb  = Main.mouseLeft  && !prevLeftDown,
-			Rmb  = Main.mouseRight && !prevRightDown,
+			Lmb  = MouseClick.LeftPressed,
+			Rmb  = MouseClick.RightPressed,
+			Alt  = k.IsKeyDown(Keys.LeftAlt)     || k.IsKeyDown(Keys.RightAlt),
+			Ctrl = k.IsKeyDown(Keys.LeftControl) || k.IsKeyDown(Keys.RightControl),
+		};
+	}
+
+	public static Click PollReleased()
+	{
+		var k = Main.keyState;
+		return new Click
+		{
+			Lmb  = MouseClick.LeftReleased,
+			Rmb  = MouseClick.RightPressed,
 			Alt  = k.IsKeyDown(Keys.LeftAlt)     || k.IsKeyDown(Keys.RightAlt),
 			Ctrl = k.IsKeyDown(Keys.LeftControl) || k.IsKeyDown(Keys.RightControl),
 		};
@@ -145,7 +157,11 @@ public static class BrowserSlotInteraction
 		int? recipeAmount = null)
 	{
 		if (members.Count == 0) return;
-		if (c.Alt) return;
+		if (c.Alt)
+		{
+			if (c.Lmb) FavoritesPlayer.Local.BringTagToFront(tagLabel, members);
+			return;
+		}
 		if (c.Ctrl)
 		{
 			if ((c.Lmb || c.Rmb) && Main.GameModeInfo.IsJourneyMode)

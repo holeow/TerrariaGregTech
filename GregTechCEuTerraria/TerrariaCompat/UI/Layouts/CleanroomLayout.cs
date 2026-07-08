@@ -7,17 +7,12 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Verbatim port of CleanroomMachine.addDisplayText (java:451-500).
-// DEVIATIONS:
-//   - dimensions line uses 2D variant (`.1.2d` LxH only - no F axis).
-//   - invalid_structure hover tooltip dropped (no per-line hover).
-//   - Prepended actionable matcher error when unformed.
 public static class CleanroomLayout
 {
 	private const int Padding = 12;
 	private const int TitleH  = 14;
-	private const int BodyW   = 280;
-	private const int BodyH   = 14 * 12;
+	private const int BodyW   = 190;
+	private const int BodyH   = 120;
 
 	public static MachineUILayout Build(CleanroomMachine machine)
 	{
@@ -31,7 +26,8 @@ public static class CleanroomLayout
 
 		layout.Widgets.Add(new MultiLineDynamicLabelWidgetSpec(
 			X: Padding, Y: baseY,
-			Getter: () => BuildDisplayLines(machine)));
+			Getter: () => BuildDisplayLines(machine),
+			Width: BodyW, Height: BodyH));
 
 		return layout;
 	}
@@ -41,12 +37,8 @@ public static class CleanroomLayout
 		var lines = new List<string>();
 		var recipeLogic = machine.Recipe;
 
-		// Prepended actionable matcher error (DEVIATION).
 		if (!machine.IsFormed)
 			lines.Add(RecipeStatusText.StatusLineForMulti(machine, recipeLogic));
-
-		// Upstream cleanroom doesn't call IDisplayUIMachine.super.addDisplayText
-		// (verified) - no part-walk here.
 
 		if (machine.IsFormed)
 		{

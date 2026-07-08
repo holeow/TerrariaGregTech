@@ -279,7 +279,7 @@ public sealed class ProfilerUIState : FreeModalWindow
 			if (!_owner.IsRowVisible(this)) return;
 			var rect = GetDimensions().ToRectangle();
 			var px   = TextureAssets.MagicPixel.Value;
-			bool hover    = ContainsPoint(Main.MouseScreen);
+			bool hover    = ContainsPoint(ModalEscape.PollCursorScreen());
 			bool selected = ReferenceEquals(_owner._selected, _c);
 
 			if (selected)      sb.Draw(px, rect, new Color(80, 110, 180, 100));

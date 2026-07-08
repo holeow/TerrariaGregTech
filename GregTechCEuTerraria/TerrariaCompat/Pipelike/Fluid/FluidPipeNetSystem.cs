@@ -6,8 +6,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Fluid;
 
-// Verbatim port of LevelFluidPipeNet. Mark = material-id FNV-1a hash (same
-// scheme as ItemPipeNetSystem) so different-material pipes stay separate.
 public sealed class FluidPipeNetSystem : ModSystem
 {
 	private static LevelFluidPipeNet? _level;
@@ -23,8 +21,6 @@ public sealed class FluidPipeNetSystem : ModSystem
 
 	public override void ClearWorld() { _level = new LevelFluidPipeNet(); }
 
-	// DEVIATION: same as ItemPipeNetSystem - derived from cells,
-	// no separate save. PipeNet hierarchy itself stays verbatim.
 	public override void PostUpdateEverything() => MaybeRebuild();
 
 	public override void PostUpdateWorld()
@@ -33,13 +29,9 @@ public sealed class FluidPipeNetSystem : ModSystem
 		{
 		MaybeRebuild();
 
-		// Server-only (PostUpdateWorld is SP/server per tML); covers register
-		// Update via ConditionalSubscriptionHandler.
 		foreach (var pcv in FluidPipeLayerSystem.AllSides.Values)
 			pcv.SystemTick();
 
-		// Verbatim with upstream subscribeServerTick(this::update) on each
-		// FluidPipeBlockEntity.
 		foreach (var st in FluidPipeLayerSystem.AllStates.Values)
 			st.Update();
 
@@ -88,7 +80,7 @@ public sealed class FluidPipeNetSystem : ModSystem
 
 	public static void OnPipeRemoved(int x, int y) => Level.RemoveNode((x, y));
 
-	// FNV-1a, deterministic across runs (matches item-pipe MaterialMark).
+	// FNV-1a, deterministic across runs
 	private static int MaterialMark(string id)
 	{
 		uint h = 2166136261u;

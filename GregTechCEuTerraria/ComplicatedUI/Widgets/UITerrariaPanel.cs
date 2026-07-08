@@ -18,7 +18,7 @@ public class UITerrariaPanel : UIPanel
 	protected override void DrawSelf(SpriteBatch spriteBatch)
 	{
 		base.DrawSelf(spriteBatch);
-		if (ContainsPoint(Main.MouseScreen))
+		if (ContainsPoint(ModalEscape.PollCursorScreen()))
 			Main.LocalPlayer.mouseInterface = true;
 	}
 }

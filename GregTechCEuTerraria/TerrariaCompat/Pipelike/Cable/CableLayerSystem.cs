@@ -7,8 +7,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Cable;
 
-// Per-world CableLayer + save/load. Co-indexed lists; voltage/amps/loss
-// denormalised into the cell so load doesn't need MaterialRegistry first.
 public sealed class CableLayerSystem : ModSystem
 {
 	public static CableLayer Cables { get; } = new();
@@ -46,7 +44,8 @@ public sealed class CableLayerSystem : ModSystem
 	{
 		var held = Main.LocalPlayer?.HeldItem;
 		bool wireRelated = held?.ModItem is Items.Cables.WireItem
-			|| (held?.ModItem is Items.Tools.ToolItem tool && tool.IsWireCutter);
+			|| (held?.ModItem is Items.Tools.ToolItem tool && tool.IsWireCutter)
+			|| Items.Tools.Multitool.MultitoolState.IsActiveLayer(Main.LocalPlayer, "cable");
 		if (!wireRelated) return;
 		CableRenderer.DrawForegroundOverlay();
 	}

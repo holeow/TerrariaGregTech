@@ -6,9 +6,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Optical;
 
-// Per-world OpticalPipeLayer. Mirrors LaserPipeLayerSystem lifecycle - owns
-// the GridLayer, persists cells via Save/LoadWorldData, drives the renderer,
-// and tracks a per-cell "active" tick map for the flowing-data glow.
 public sealed class OpticalPipeLayerSystem : ModSystem
 {
 	public static OpticalPipeLayer Pipes { get; } = new();
@@ -55,7 +52,8 @@ public sealed class OpticalPipeLayerSystem : ModSystem
 	public override void PostDrawTiles()
 	{
 		var held = Main.LocalPlayer?.HeldItem;
-		if (held?.ModItem is Items.Pipes.OpticalPipeItem)
+		if (held?.ModItem is Items.Pipes.OpticalPipeItem
+			|| Items.Tools.Multitool.MultitoolState.IsActiveLayer(Main.LocalPlayer, "optical"))
 			OpticalPipeRenderer.DrawOpticalForegroundOverlay();
 	}
 

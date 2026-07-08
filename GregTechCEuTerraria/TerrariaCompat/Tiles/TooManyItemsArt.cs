@@ -3,8 +3,6 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
-using Terraria;
-using Terraria.GameContent;
 using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Tiles;
@@ -16,7 +14,6 @@ internal static class TooManyItemsArt
 
 	private static Color[]? _art;
 	private static Texture2D? _plateTex;
-	private static bool _installed;
 
 	public static Texture2D? PlateTexture
 	{
@@ -29,27 +26,6 @@ internal static class TooManyItemsArt
 			_plateTex.SetData(art);
 			return _plateTex;
 		}
-	}
-
-	public static void Install()
-	{
-		if (_installed || Main.dedServ) return;
-
-		var art = Build32();
-		if (art is null) return;   // logo not ready - retry on the next warm-up call
-		_installed = true;
-
-		int itemType  = ModContent.ItemType<Items.TooManyItemsItem>();
-		int tileType  = ModContent.TileType<TooManyItemsTile>();
-
-		var itemTex = RuntimeTextureRegistry.New(32, 32);
-		itemTex.SetData(art);
-		var itemAsset = MachineRenderer.WrapAsset(itemTex, "tmi_item");
-		TextureAssets.Item[itemType]  = itemAsset;
-
-		// Slice the 32x32 plate into the Style2x2 36x36 tile sheet.
-		var sheet = MachineRenderer.BuildSheetFrom32(art);
-		TextureAssets.Tile[tileType] = MachineRenderer.WrapAsset(sheet, "tmi_tile");
 	}
 
 	private static Color[]? Build32()

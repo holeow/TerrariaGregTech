@@ -43,6 +43,11 @@ TAG_NAMESPACES = ("gtceu", "forge", "minecraft")
 
 REMOVED_ITEM_IDS = frozenset((
     "gtceu:treated_wood_plate",
+    "gtceu:basic_tape", "gtceu:duct_tape",
+    "gtceu:invar_lighter", "gtceu:platinum_lighter",
+    "gtceu:matches", "gtceu:matchbox",
+    "gtceu:rubber_wood",
+    "gtceu:text_module", "gtceu:image_module",
 ))
 
 

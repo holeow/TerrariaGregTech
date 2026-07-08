@@ -139,7 +139,7 @@ public sealed class UISlot : UIElement
 
 		if (cursorHeld)
 		{
-			if (_isOutput) return;
+			if (_isOutput && !_entity.AcceptsOutputDeposit(_slotIndex, Main.mouseItem)) return;
 			if (!slotEmpty && (slotSnap.type != Main.mouseItem.type
 			                   || !ItemLoader.CanStack(slotSnap, Main.mouseItem)))
 				return;

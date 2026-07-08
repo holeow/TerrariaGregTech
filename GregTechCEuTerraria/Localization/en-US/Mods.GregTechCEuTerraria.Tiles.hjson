@@ -1224,7 +1224,6 @@ rubber_sign.MapEntry: Rubber Wall Sign
 rubber_slab.MapEntry: Rubber Slab
 rubber_stairs.MapEntry: Rubber Stairs
 rubber_trapdoor.MapEntry: Rubber Trapdoor
-rubber_wood.MapEntry: Rubber Wood
 secure_maceration_casing.MapEntry: Secure Maceration Casing
 shock_proof_cutting_casing.MapEntry: Shock Proof Cutting Casing
 slicing_blades.MapEntry: Slicing Blades
@@ -1861,6 +1860,11 @@ max_1024a_laser_source_hatch.MapEntry: MAX 1024A Laser Source Hatch
 max_1024a_laser_target_hatch.MapEntry: MAX 1024A Laser Target Hatch
 max_256a_laser_source_hatch.MapEntry: MAX 256A Laser Source Hatch
 max_256a_laser_target_hatch.MapEntry: MAX 256A Laser Target Hatch
+me_interface.MapEntry: ME Interface
+me_pattern_provider.MapEntry: ME Pattern Provider
+me_modular_terminal.MapEntry: ME Terminal
+quantum_computer.MapEntry: Quantum Computer
+me_storage.MapEntry: ME Storage
 ev_miner.MapEntry: EV Miner
 zpm_block_breaker.MapEntry: ZPM Block Breaker
 luv_block_breaker.MapEntry: LuV Block Breaker
@@ -2134,5 +2138,6 @@ bronze_frame.MapEntry: Bronze Frame
 blue_steel_frame.MapEntry: Blue Steel Frame
 black_steel_frame.MapEntry: Black Steel Frame
 aluminium_frame.MapEntry: Aluminium Frame
-TooManyItemsTile.MapEntry: Too Many Items
 pipe_intersection.MapEntry: Pipe Intersection
+neon_sign.MapEntry: Neon Sign
+gregtech_toilet.MapEntry: Gregtech Toilet

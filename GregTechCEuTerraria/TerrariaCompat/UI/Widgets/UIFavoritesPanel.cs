@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using GregTechCEuTerraria.Api.Fluids;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -13,25 +14,31 @@ namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 public sealed class UIFavoritesPanel : UITerrariaPanel
 {
 	private const int Cols = 4;
-	private const int CellSize = 30;
+	private const int CellSize = 36;
 	private const int CellPad = 2;
 	private const int Margin = 6;
-	private const int ScrollbarWidth = VanillaScrollbar.Width;
+	private const int ScrollbarWidth = Scrollbar.Width;
 	private const int MinThumbHeight = 28;
 	public const int PanelWidth = Cols * (CellSize + CellPad) + Margin * 2 + ScrollbarWidth;
 	private const float VanillaNativeSlotPixels = 52f;
 
 	public int ScrollBottomInset;
+	public bool DrawBackground = true;
+	public bool HideWhenDocked;
+	public bool HideWhenMagicStorageOpen;
 
 	private static readonly Item[] _slotItems = { new() };
 
 	private int _scroll;
-	private bool _leftDown;
-	private bool _rightDown;
-	private bool _drag;
-	private int _dragAnchorOffsetPx;
+	private readonly Scrollbar _bar = new();
 
-	public Func<bool>? IsOccluded;
+	public Action<int>? OnPickItem;
+	public Action<string>? OnPickFluid;
+
+	public Func<IReadOnlyList<FavoritesPlayer.Entry>>? EntriesSource;
+	public string Title = "Favorites";
+	public string EmptyHint = "Alt+click\nto pin";
+	public bool IsFavoritesPane = true;
 
 	public UIFavoritesPanel()
 	{
@@ -40,21 +47,37 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 
 	public void SetHeight(float h) => Height = StyleDimension.FromPixels(h);
 
+	private static void DrawTagBorder(SpriteBatch sb, Rectangle r)
+	{
+		var c = new Color(190, 130, 245);
+		var px = TextureAssets.MagicPixel.Value;
+		sb.Draw(px, new Rectangle(r.X, r.Y, r.Width, 2), c);
+		sb.Draw(px, new Rectangle(r.X, r.Bottom - 2, r.Width, 2), c);
+		sb.Draw(px, new Rectangle(r.X, r.Y, 2, r.Height), c);
+		sb.Draw(px, new Rectangle(r.Right - 2, r.Y, 2, r.Height), c);
+	}
+
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
 		if (!IsMouseHovering) return;
-		_scroll -= evt.ScrollWheelValue;
-		if (_scroll < 0) _scroll = 0;
+		Scrollbar.Wheel(evt, ref _scroll);
 	}
+
+	private bool Hidden =>
+		(HideWhenDocked && GlobalRecipeBrowserSystem.DockedActive)
+		|| (HideWhenMagicStorageOpen && MagicStorageUi.IsOpen);
+
+	public override bool ContainsPoint(Vector2 point) => !Hidden && base.ContainsPoint(point);
 
 	protected override void DrawSelf(SpriteBatch sb)
 	{
-		base.DrawSelf(sb);
+		if (Hidden) return;
+		if (DrawBackground) base.DrawSelf(sb);
 
 		var outer = GetDimensions().ToRectangle();
 
-		Terraria.Utils.DrawBorderString(sb, "Favorites",
+		Terraria.Utils.DrawBorderString(sb, Title,
 			new Vector2(outer.X + 6, outer.Y + 4), new Color(220, 230, 255), 0.78f);
 
 		var content = new Rectangle(
@@ -63,73 +86,41 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 			outer.Width - Margin * 2 - ScrollbarWidth,
 			outer.Height - 22 - Margin);
 
-		var entries = FavoritesPlayer.Local.Entries;
+		int cols = Math.Max(1, (content.Width + CellPad) / (CellSize + CellPad));
+
+		var entries = EntriesSource?.Invoke() ?? FavoritesPlayer.Local.Entries;
 		if (entries.Count == 0)
 		{
-			Terraria.Utils.DrawBorderString(sb, "Alt+click\nto pin",
+			Terraria.Utils.DrawBorderString(sb, EmptyHint,
 				new Vector2(content.X + 4, content.Y + 8),
 				new Color(140, 150, 180), 0.7f);
-			_leftDown  = Main.mouseLeft;
-			_rightDown = Main.mouseRight;
 			return;
 		}
 
-		int totalRows = (entries.Count + Cols - 1) / Cols;
+		int totalRows = (entries.Count + cols - 1) / cols;
 		int rowH = CellSize + CellPad;
 		int viewH = content.Height;
 		int maxScroll = System.Math.Max(0, totalRows * rowH - viewH);
 		if (_scroll > maxScroll) _scroll = maxScroll;
 
-		bool occluded = IsOccluded?.Invoke() ?? false;
-
-		var mouse = GlobalRecipeBrowserState.BrowserCursor();
-		bool inside = !occluded && content.Contains(mouse);
-		if (IsMouseHovering && !occluded)
+		var mouse = ModalEscape.PollCursor();
+		bool inside = content.Contains(mouse);
+		if (IsMouseHovering)
 		{
 			Main.LocalPlayer.mouseInterface = true;
 			PlayerInput.LockVanillaMouseScroll("GregTechCEuTerraria/FavoritesPanel");
 		}
 
 		int totalH = totalRows * rowH;
-		bool draggingThisFrame = false;
 		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
 			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
 			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
-			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
-			int travel = barH - thumbH;
-			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
-			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-
-			if (!occluded)
-			{
-				if (Main.mouseLeft && !_leftDown && trackRect.Contains(mouse))
-				{
-					_drag = true;
-					_dragAnchorOffsetPx = thumbRect.Contains(mouse) ? mouse.Y - thumbY : thumbH / 2;
-				}
-				if (_drag && Main.mouseLeft)
-				{
-					int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-					int travelMax = Math.Max(1, barH - thumbH);
-					int clampedTop = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
-					_scroll = (int)((float)clampedTop / travelMax * maxScroll);
-					draggingThisFrame = true;
-				}
-				else if (!Main.mouseLeft)
-				{
-					_drag = false;
-				}
-				if (draggingThisFrame)
-				{
-					thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
-					thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-				}
-			}
+			thumbRect = _bar.Update(trackRect, maxScroll, (float)viewH / totalH, ref _scroll, mouse);
 		}
+		bool draggingThisFrame = _bar.Dragging;
 
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = CellSize / VanillaNativeSlotPixels;
@@ -141,8 +132,8 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 			{
 			for (int i = 0; i < entries.Count; i++)
 			{
-				int col = i % Cols;
-				int row = i / Cols;
+				int col = i % cols;
+				int row = i / cols;
 				int yTop = content.Y - _scroll + row * rowH;
 				if (yTop + CellSize < content.Y || yTop > content.Bottom) continue;
 
@@ -178,6 +169,18 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 							fallbackLabel: entry.FluidLabel);
 					}
 				}
+				else if (entry.TagLabel is not null && entry.TagMembers is { Length: > 0 } tagMem)
+				{
+					_slotItems[0].SetDefaults(tagMem[0]);
+					ItemSlot.Draw(sb, _slotItems, ItemSlot.Context.CraftingMaterial, 0,
+						new Vector2(rect.X, rect.Y));
+					DrawTagBorder(sb, rect);
+					if (isHover)
+					{
+						Main.LocalPlayer.mouseInterface = true;
+						Main.instance.MouseText(entry.TagLabel);
+					}
+				}
 
 				if (isHover)
 				{
@@ -187,6 +190,8 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 						BrowserHover.SetItem(entry.ItemType);
 					else if (entry.FluidId is not null)
 						BrowserHover.SetFluid(entry.FluidId, entry.FluidLabel ?? entry.FluidId);
+					else if (entry.TagLabel is not null && entry.TagMembers is not null)
+						BrowserHover.SetTag(entry.TagLabel, new HashSet<int>(entry.TagMembers));
 				}
 			}
 			});
@@ -196,31 +201,53 @@ public sealed class UIFavoritesPanel : UITerrariaPanel
 			Main.inventoryScale = oldScale;
 		}
 
-		if (hasHovered && !_drag)
+		if (hasHovered && !_bar.Dragging)
 		{
-			var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
-			if (hovered.ItemType > 0)
+			if (MouseClick.LeftPressed)
+			{
+				if (hovered.ItemType > 0) ItemDrag.ArmItem(hovered.ItemType);
+				else if (hovered.FluidId is not null) ItemDrag.ArmFluid(hovered.FluidId, hovered.FluidLabel);
+			}
+			var click = ItemDrag.Active ? default : BrowserSlotInteraction.PollReleased();
+			if (OnPickItem != null)
+			{
+				if (hovered.ItemType > 0)
+				{
+					if (click.Alt && click.Lmb) FavoritesPlayer.Local.RemoveItem(hovered.ItemType);
+					else if (click.Lmb) OnPickItem(hovered.ItemType);
+				}
+				else if (hovered.FluidId is not null)
+				{
+					if (click.Alt && click.Lmb) FavoritesPlayer.Local.RemoveFluid(hovered.FluidId);
+					else if (click.Lmb && OnPickFluid != null) OnPickFluid(hovered.FluidId);
+				}
+			}
+			else if (hovered.ItemType > 0)
 				BrowserSlotInteraction.HandleItem(click, hovered.ItemType,
-					inFavoritesPane: true);
+					inFavoritesPane: IsFavoritesPane);
 			else if (hovered.FluidId is not null)
 			{
 				var fluid = FluidRegistry.Get(hovered.FluidId);
 				if (fluid is not null)
 					BrowserSlotInteraction.HandleFluid(click, fluid,
-						recipeAmountMb: null, inFavoritesPane: true);
+						recipeAmountMb: null, inFavoritesPane: IsFavoritesPane);
 				else if (click.Alt && click.Lmb)
 					FavoritesPlayer.Local.RemoveFluid(hovered.FluidId);
 			}
+			else if (hovered.TagLabel is not null)
+			{
+				var mem = new HashSet<int>(hovered.TagMembers ?? System.Array.Empty<int>());
+				if (click.Alt && click.Lmb)
+				{
+					if (IsFavoritesPane) FavoritesPlayer.Local.RemoveTag(hovered.TagLabel);
+					else                 FavoritesPlayer.Local.BringTagToFront(hovered.TagLabel, mem);
+				}
+				else if (click.Lmb || click.Rmb)
+					BrowserSlotInteraction.HandleTag(click, hovered.TagLabel, mem);
+			}
 		}
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-
 		if (totalH > viewH)
-		{
-			bool thumbHot = _drag || thumbRect.Contains(mouse);
-			VanillaScrollbar.Draw(sb, trackRect, thumbRect, thumbHot);
-			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
-		}
+			_bar.Draw(sb, trackRect, thumbRect, mouse);
 	}
 
 }

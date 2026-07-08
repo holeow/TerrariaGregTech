@@ -78,6 +78,7 @@ internal static class MultitoolLayers
 	{
 		if (_all.Count > 0) return;
 		_all.Add(new CableMultitoolLayer());
+		_all.Add(new MeCableMultitoolLayer());
 		_all.Add(new ItemPipeMultitoolLayer());
 		_all.Add(new FluidPipeMultitoolLayer());
 		_all.Add(new LaserMultitoolLayer());

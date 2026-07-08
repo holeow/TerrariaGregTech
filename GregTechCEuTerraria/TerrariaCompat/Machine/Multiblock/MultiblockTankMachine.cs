@@ -9,14 +9,12 @@ using GregTechCEuTerraria.Common.Materials;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock;
 
-// Port of MultiblockTankMachine. Storage-only controller: one
-// NotifiableFluidTank (IO.BOTH), capacity + optional FluidPipe filter from
-// the bound MachineDefinition. No recipe loop, no EU. TankValvePartMachine
-// binds via IMultiblockTankController.
 public class MultiblockTankMachine : MultiblockControllerMachine,
 	IMultiblockTankController, IFluidHandler
 {
 	protected override string Label => "Multiblock Tank";
+
+	public override bool SupportsCovers => false;
 
 	private NotifiableFluidTank? _tank;
 
@@ -26,7 +24,6 @@ public class MultiblockTankMachine : MultiblockControllerMachine,
 		return _tank!;
 	}
 
-	// Wooden-tank fallback for definition-less Activator instances.
 	public int Capacity => Definition?.Capacity ?? 250_000;
 
 	public MultiblockTankMachine() : base() { }
@@ -78,6 +75,5 @@ public class MultiblockTankMachine : MultiblockControllerMachine,
 	public IFluidHandler GetTankAccess(int tank) { EnsureTankTrait(); return _tank!.Storages[0]; }
 	public override int  ResolveFluidTank(IO direction, int localIndex) => localIndex;
 
-	// Upstream TankWidget(tank.getStorages()[0], 68, 23, true, true).
 	public (bool AllowFill, bool AllowDrain) GetTankClickCaps(int tank) => (true, true);
 }

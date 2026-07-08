@@ -9,16 +9,11 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of CokeOvenHatch. Single I/O face for the Coke Oven multi - 3 proxy
-// traits (input items / output items / output creosote) bound to the controller
-// on AddedToController. Auto-output every 5 ticks on the configured IoDirection.
-//
-// Item input+output collapsed into one IoFacadeHandler (operation-type
-// dispatch); upstream uses per-side Forge caps. ICokeOvenController decouples
-// us from the unported CokeOvenMachine class.
 public class CokeOvenHatch : MultiblockPartMachine
 {
 	protected override string Label => "Coke Oven Hatch";
+
+	public override bool SupportsCovers => false;
 
 	public ItemHandlerProxyTrait? InputInventory  { get; protected set; }
 	public ItemHandlerProxyTrait? OutputInventory { get; protected set; }
@@ -46,8 +41,6 @@ public class CokeOvenHatch : MultiblockPartMachine
 		EnsureAutoIOSubscription();
 	}
 
-	// Traits must exist before the controller's OnStructureFormed binds them;
-	// per-part Configure() doesn't fire so first-tick init is the wire-up point.
 	protected override void OnTick()
 	{
 		EnsureTraits();
@@ -77,8 +70,6 @@ public class CokeOvenHatch : MultiblockPartMachine
 	public override void AddedToController(MultiblockControllerMachine controller)
 	{
 		base.AddedToController(controller);
-		// TileEntity.ByID iteration order isn't guaranteed - controller may
-		// form + bind us before our OnTick has fired.
 		EnsureTraits();
 		if (controller is ICokeOvenController cokeOven)
 		{
@@ -120,8 +111,6 @@ public class CokeOvenHatch : MultiblockPartMachine
 		EnsureAutoIOSubscription();
 	}
 
-	// Virtual slot space: [0, input.SlotCount) = input, rest = output.
-	// Inserts route to input only; extracts to output only.
 	private sealed class IoFacadeHandler : IItemHandler
 	{
 		private readonly ItemHandlerProxyTrait _input;

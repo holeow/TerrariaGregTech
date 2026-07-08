@@ -5,17 +5,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.Api.Pipenet;
 
-// Verbatim port of com.gregtechceu.gtceu.api.pipenet.LevelPipeNet -
-// the per-level container of PipeNet instances. Drives add / remove /
-// merge / split lifecycle. Subclasses (ItemPipeNetSystem, FluidPipeNetSystem)
-// provide `CreateNetInstance` and host an instance from a ModSystem.
-//
-// Adaptations:
-//   - Generic on `TNet` covariance dropped - kept the constraint but use a
-//     plain List<TNet> like upstream.
-//   - SavedData replaced with explicit Save/Load (called from the host
-//     ModSystem's SaveWorldData / LoadWorldData).
-//   - ServerLevel reference dropped (we have no analogue).
 public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 	where TData : notnull
 	where TNet  : PipeNet<TData>
@@ -23,8 +12,6 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 	protected List<TNet> PipeNets = new();
 	protected readonly Dictionary<(int cx, int cy), List<TNet>> PipeNetsByChunk = new();
 
-	// Dirty flag - upstream's `setDirty()` schedules a save. Hosts inspect
-	// + clear this whenever they emit save data.
 	private bool _dirty;
 	public bool IsDirty => _dirty;
 	public void SetDirty() => _dirty = true;
@@ -32,9 +19,6 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 
 	protected virtual void Init()
 	{
-		// Mirror upstream's `pipeNets.forEach(PipeNet::onNodeConnectionsUpdate)`
-		// via the protected hook - subclasses can extend if they need per-net
-		// post-load fix-up.
 	}
 
 	public void AddNode((int x, int y) pos, TData nodeData, int mark, int openConnections, bool isActive)
@@ -46,10 +30,6 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 			var offsetPos = Offset(pos, facing);
 			var pipeNet = GetNetFromPos(offsetPos);
 			var secondNode = pipeNet?.GetNodeAt(offsetPos);
-			// Upstream-verbatim: pass null as `secondPipeNet` - the new
-			// `node` isn't in any net yet, so there's nothing to identify.
-			// `areNodesCustomContactable` overrides that consult the second
-			// net must handle null on the add path.
 			if (pipeNet != null && pipeNet.CanAttachNode(nodeData) &&
 				pipeNet.CanNodesConnect(secondNode!, CoverSides.Opposite(facing), node, null))
 			{
@@ -123,8 +103,6 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 		return null;
 	}
 
-	// Interface-required base-typed surface - return-type covariance lets
-	// the TNet-typed property above remain available to direct callers.
 	PipeNet<TData>? ILevelPipeNet<TData>.GetNetFromPos((int x, int y) pos) => GetNetFromPos(pos);
 
 	public IReadOnlyList<TNet> AllPipeNets => PipeNets;
@@ -148,16 +126,10 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 		SetDirty();
 	}
 
-	// ILevelPipeNet's CreateNetInstance returns the base type; the
-	// concrete TNet variant stays on the subclass.
 	PipeNet<TData> ILevelPipeNet<TData>.CreateNetInstance() => CreateNetInstance();
 
-	// Each subclass returns a fresh per-net instance - caller wires up the
-	// LevelPipeNet ref (the subclass picks how, since C# can't pass `this`
-	// generically to a parameterized constructor).
 	protected internal abstract TNet CreateNetInstance();
 
-	// -- NBT save / load (called from host ModSystem) -------------------
 	public TagCompound Save()
 	{
 		var compound = new TagCompound();
@@ -191,14 +163,7 @@ public abstract class LevelPipeNet<TData, TNet> : ILevelPipeNet<TData>
 	// -- Helpers -------------------------------------------------------
 	private static (int x, int y) Offset((int x, int y) pos, CoverSide side)
 	{
-		var (dx, dy) = side switch
-		{
-			CoverSide.Up    => (0, -1),
-			CoverSide.Down  => (0, +1),
-			CoverSide.Left  => (-1, 0),
-			CoverSide.Right => (+1, 0),
-			_               => (0, 0),
-		};
+		var (dx, dy) = CoverSides.Offset(side);
 		return (pos.x + dx, pos.y + dy);
 	}
 

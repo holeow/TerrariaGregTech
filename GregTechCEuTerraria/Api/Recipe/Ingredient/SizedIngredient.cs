@@ -4,7 +4,6 @@ using Terraria;
 
 namespace GregTechCEuTerraria.Api.Recipe.Ingredient;
 
-// port of com.gregtechceu.gtceu.api.recipe.ingredient.SizedIngredient.
 public class SizedIngredient : Ingredient
 {
 	public Ingredient Inner { get; }
@@ -27,6 +26,23 @@ public class SizedIngredient : Ingredient
 
 	public static SizedIngredient Create(Ingredient inner, int amount) => new(inner, amount);
 	public static SizedIngredient Create(Ingredient inner) => new(inner, 1);
+
+	public static Ingredient Copy(Ingredient ingredient)
+	{
+		if (ingredient is SizedIngredient sized)
+		{
+			if (sized.Inner is IntProviderIngredient) return Copy(sized.Inner);
+			return Create(sized.Inner, sized.Amount);
+		}
+		if (ingredient is IntCircuitIngredient) return ingredient;
+		if (ingredient is IntProviderIngredient ipi)
+		{
+			var copied = IntProviderIngredient.Of(ipi.Inner, ipi.CountProvider);
+			if (ipi.SampledCount != -1) copied.SampledCount = ipi.SampledCount;
+			return copied;
+		}
+		return ingredient;
+	}
 
 	public override bool Test(Item item) => Inner.Test(item);
 

@@ -35,6 +35,8 @@ public class TieredMachineItem : TieredItem, Rendering.ITextureWarmUp
 	{
 		int tileType = Mod.TryFind<ModTile>(Name, out var t) ? t.Type : 0;
 		Item.DefaultToPlaceableTile(tileType);
+		Item.useTime = Players.CenteredPlacementPlayer.PlaceUseTime;
+		Item.useAnimation = Players.CenteredPlacementPlayer.PlaceUseAnimation;
 		Item.maxStack = 99;
 		Item.width = 32;
 		Item.height = 32;

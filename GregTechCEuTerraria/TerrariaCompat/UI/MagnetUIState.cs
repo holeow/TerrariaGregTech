@@ -162,7 +162,7 @@ public sealed class MagnetUIState : UIModalWindow
 			() => Mi?.TagFilter.OreDictFilterExpression ?? "",
 			txt => Mi?.TagFilter.SetOreDict(TagItemFilter.NormalizeExpression(txt)),
 			maxLength: 64,
-			placeholder: "tag expression  *  e.g.  *dusts/gold | !*lv",
+			placeholder: "tag expression   e.g.  *dusts/gold | !*lv",
 			tooltip: TagFilterInfo)
 		{
 			Left   = StyleDimension.FromPixels(x * Scale),
@@ -180,9 +180,9 @@ public sealed class MagnetUIState : UIModalWindow
 
 	private const string TagFilterInfo =
 		"Accepts complex expressions:\n"
-		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"
-		+ "!a = NOT   *   (a) for grouping\n"
-		+ "* = wildcard   *   $ = untagged\n"
+		+ "a & b = AND   a | b = OR   a ^ b = XOR\n"
+		+ "!a = NOT   (a) for grouping\n"
+		+ "* = wildcard   $ = untagged\n"
 		+ "Tags are 'namespace:tag/subtype'.\n"
 		+ "The 'forge:' namespace is assumed if one isn't given.\n"
 		+ "Example: *dusts/gold | (gtceu:circuits & !*lv)\n"

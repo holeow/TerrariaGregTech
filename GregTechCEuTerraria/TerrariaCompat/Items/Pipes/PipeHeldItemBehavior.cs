@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using GregTechCEuTerraria.Api.Pipenet;
 using GregTechCEuTerraria.TerrariaCompat.Pipelike;
@@ -13,45 +14,53 @@ public static class PipeHeldItemBehavior
 {
 	public static void Tick(
 		Player player,
+		string heldKindLabel,
+		IGridLayerHandle layer,
+		Func<int, int, string?> hoverBody,
+		ref int removeCooldown,
+		int useTime)
+	{
+		if (Main.myPlayer != player.whoAmI) return;
+		Hover(player, heldKindLabel, hoverBody);
+		HandleRmbCut(player, layer, ref removeCooldown, useTime);
+	}
+
+	public static void Tick(
+		Player player,
 		PipeKind kind,
 		string heldKindLabel,
 		IGridLayerHandle layer,
 		ref int removeCooldown,
 		int useTime)
-	{
-		if (Main.myPlayer != player.whoAmI) return;
-		Hover(player, kind, heldKindLabel);
-		HandleRmbCut(player, layer, ref removeCooldown, useTime);
-	}
+		=> Tick(player, heldKindLabel, layer, (x, y) => PipeBody(kind, x, y), ref removeCooldown, useTime);
 
-	private static void Hover(Player player, PipeKind kind, string heldKindLabel)
+	private static void Hover(Player player, string heldKindLabel, Func<int, int, string?> hoverBody)
 	{
-		if (player.mouseInterface || Main.gameMenu) return;
+		if (player.mouseInterface || Main.gameMenu || UI.UILayers.IsCursorOverAnyModal()) return;
 		int x = (int)(Main.MouseWorld.X / 16);
 		int y = (int)(Main.MouseWorld.Y / 16);
 		if (x <= 0 || x >= Main.maxTilesX - 1 || y <= 0 || y >= Main.maxTilesY - 1) return;
 
 		string controlsLine = $"[c/A0E0FF:LMB]: Place {heldKindLabel}   [c/FFA0A0:RMB]: Remove {heldKindLabel}";
+		string? body = hoverBody(x, y);
+		UI.WorldHoverTooltip.Set(body is null ? controlsLine : controlsLine + "\n" + body);
+	}
 
-		string? line1 = null;
-		string? line2 = null;
+	private static string? PipeBody(PipeKind kind, int x, int y)
+	{
 		if (kind == PipeKind.Laser)
 		{
-			if (!Pipelike.Laser.LaserPipeLayerSystem.Pipes.Has(x, y))
-			{
-				UI.WorldHoverTooltip.Set(controlsLine); return;
-			}
-			line1 = "Laser Pipe";
+			if (!Pipelike.Laser.LaserPipeLayerSystem.Pipes.Has(x, y)) return null;
 			bool active = Pipelike.Laser.LaserPipeLayerSystem.IsActive(x, y);
-			line2 = active ? "[c/55FF55:Active]" : "[c/AAAAAA:Idle]";
+			return "Laser Pipe\n" + (active ? "[c/55FF55:Active]" : "[c/AAAAAA:Idle]");
 		}
-		else if (kind == PipeKind.Fluid)
+		if (kind == PipeKind.Fluid)
 		{
 			var c = FluidPipeLayerSystem.Pipes.CellAt(x, y);
-			if (c is null) { UI.WorldHoverTooltip.Set(controlsLine); return; }
+			if (c is null) return null;
 			var f = c.Value;
 			string sizeWord = PipeSizes.Word(f.Size);
-			line1 = f.IsSimple
+			string line1 = f.IsSimple
 				? "Simple Fluid Pipe"
 				: $"{HumanizeMaterial(f.MaterialId)} {Capitalize(sizeWord)} Fluid Pipe";
 			var proofs = new List<string>();
@@ -59,31 +68,25 @@ public static class PipeHeldItemBehavior
 			if (f.CryoProof)   proofs.Add("cryo");
 			if (f.PlasmaProof) proofs.Add("plasma");
 			if (f.AcidProof)   proofs.Add("acid");
-			string proofLine = proofs.Count == 0 ? "" : $"  *  {string.Join(" / ", proofs)}-proof";
-			line2 = $"{f.Throughput:N0} mB/t  *  {f.Channels} channel{(f.Channels == 1 ? "" : "s")}  *  max {f.MaxFluidTemperature}K{proofLine}";
-		}
-		else
-		{
-			var c = ItemPipeLayerSystem.Pipes.CellAt(x, y);
-			if (c is null) { UI.WorldHoverTooltip.Set(controlsLine); return; }
-			var i = c.Value;
-			string sizeWord = PipeSizes.Word(i.Size);
-			string kindWord = i.Restrictive ? "Restrictive Item Pipe" : "Item Pipe";
-			line1 = i.IsSimple
-				? "Simple Item Pipe"
-				: $"{HumanizeMaterial(i.MaterialId)} {Capitalize(sizeWord)} {kindWord}";
-			float rate = i.TransferRate;
-			line2 = $"[c/55FFFF:Transfer Rate:] {(int)((rate * 64f) + 0.5f)} items/s";
+			string proofLine = proofs.Count == 0 ? "" : $"   {string.Join(" / ", proofs)}-proof";
+			return $"{line1}\n{f.Throughput:N0} mB/t   {f.Channels} channel{(f.Channels == 1 ? "" : "s")}   max {f.MaxFluidTemperature}K{proofLine}";
 		}
 
-		UI.WorldHoverTooltip.Set(line2 is null
-			? string.Join("\n", controlsLine, line1)
-			: string.Join("\n", controlsLine, line1, line2));
+		var ci = ItemPipeLayerSystem.Pipes.CellAt(x, y);
+		if (ci is null) return null;
+		var i = ci.Value;
+		string isizeWord = PipeSizes.Word(i.Size);
+		string kindWord = i.Restrictive ? "Restrictive Item Pipe" : "Item Pipe";
+		string iline1 = i.IsSimple
+			? "Simple Item Pipe"
+			: $"{HumanizeMaterial(i.MaterialId)} {Capitalize(isizeWord)} {kindWord}";
+		float rate = i.TransferRate;
+		return $"{iline1}\n[c/55FFFF:Transfer Rate:] {(int)((rate * 64f) + 0.5f)} items/s";
 	}
 
 	private static void HandleRmbCut(Player player, IGridLayerHandle layer, ref int removeCooldown, int useTime)
 	{
-		if (player.mouseInterface || Main.gameMenu) { removeCooldown = 0; return; }
+		if (player.mouseInterface || Main.gameMenu || UI.UILayers.IsCursorOverAnyModal()) { removeCooldown = 0; return; }
 		if (!Main.mouseRight) { removeCooldown = 0; return; }
 		if (removeCooldown > 0) { removeCooldown--; return; }
 
@@ -93,7 +96,7 @@ public static class PipeHeldItemBehavior
 			removeCooldown = useTime;
 	}
 
-	private static string HumanizeMaterial(string materialId)
+	internal static string HumanizeMaterial(string materialId)
 	{
 		string key = $"Mods.GregTechCEuTerraria.Materials.{materialId}";
 		string text = Language.GetTextValue(key);

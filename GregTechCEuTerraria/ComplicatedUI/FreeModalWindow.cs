@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -32,6 +33,10 @@ public abstract class FreeModalWindow : UIModalWindow
 
 	protected abstract void RebuildWindow();
 	protected abstract void ApplyOffsetLive();
+
+	protected void MarkGeometryDirty() => _geometryDirty = true;
+
+	protected void ForceRebuild() => DoRebuild();
 
 	protected virtual void OnModalUpdate(GameTime gameTime) { }
 
@@ -109,22 +114,19 @@ public abstract class FreeModalWindow : UIModalWindow
 
 	protected virtual float HeaderDragHeight => 36f;
 
-	private bool _prevLeft;
-
 	private void MaybeStartHeaderDrag()
 	{
 		if (_dragMode != DragMode.None) return;
 		float hH = HeaderDragHeight;
 		if (hH <= 0f) return;
-		bool pressEdge = Main.mouseLeft && !_prevLeft;
-		if (!pressEdge) return;
+		if (!MouseClick.LeftPressed) return;
 
 		UIElement? panel = null;
 		foreach (var c in Children) { panel = c; break; }
 		if (panel is null || panel == _dragVeil) return;
 
 		var pr = panel.GetDimensions();
-		var mouse = Main.MouseScreen;
+		var mouse = ModalEscape.UiCursor;
 		if (mouse.X < pr.X || mouse.X > pr.X + pr.Width
 			|| mouse.Y < pr.Y || mouse.Y > pr.Y + hH) return;
 
@@ -165,7 +167,7 @@ public abstract class FreeModalWindow : UIModalWindow
 	protected void StartDrag(DragMode mode)
 	{
 		_dragMode = mode;
-		_dragLast = Main.MouseScreen;
+		_dragLast = ModalEscape.UiCursor;
 		if (mode == DragMode.Resize)
 		{
 			if (UserW <= 0f) UserW = CurW;
@@ -180,7 +182,7 @@ public abstract class FreeModalWindow : UIModalWindow
 		DragActive = true;
 		Main.LocalPlayer.mouseInterface = true;
 
-		var cur = Main.MouseScreen;
+		var cur = ModalEscape.UiCursor;
 		var delta = cur - _dragLast;
 		_dragLast = cur;
 		if (delta == Vector2.Zero) return;
@@ -199,6 +201,16 @@ public abstract class FreeModalWindow : UIModalWindow
 			OffsetY += (nh - UserH) / 2f;
 			UserW = nw; UserH = nh;
 			_geometryDirty = true;
+		}
+	}
+
+	public override IEnumerable<Rectangle> OccupiedRects()
+	{
+		foreach (var e in Elements)
+		{
+			if (e == _dragVeil) continue;
+			var r = e.GetDimensions().ToRectangle();
+			if (r.Width > 0 && r.Height > 0) yield return r;
 		}
 	}
 
@@ -245,9 +257,8 @@ public abstract class FreeModalWindow : UIModalWindow
 		base.Update(gameTime);
 		MaybeStartHeaderDrag();
 		ProcessDrag();
+		OnModalUpdate(gameTime);
 		if (ScreenChanged() || _geometryDirty) { _geometryDirty = false; DoRebuild(); }
 		SyncDragVeil();
-		OnModalUpdate(gameTime);
-		_prevLeft = Main.mouseLeft;
 	}
 }

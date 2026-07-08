@@ -503,6 +503,25 @@ def _mc_to_terraria(s):
     return text.strip()
 
 
+_TOOLTIP_2D_OVERRIDES = {
+    "Place Water and Lava horizontally adjacent": None,
+    "Can be used to pick up crates without dropping their items": None,
+    "Mines block on front face and collects its drops":
+        "§7Mines a column of blocks below it, or fells and replants trees to its sides",
+}
+
+
+def _convert_tooltip(v):
+    """_mc_to_terraria + the 2D-deviation override. Returns None to drop the line."""
+    key = re.sub("§.", "", v).strip()
+    if key in _TOOLTIP_2D_OVERRIDES:
+        repl = _TOOLTIP_2D_OVERRIDES[key]
+        if repl is None:
+            return None
+        v = repl
+    return _mc_to_terraria(v)
+
+
 def _item_tooltip(lang, iid):
     if not lang:
         return None
@@ -517,7 +536,8 @@ def _item_tooltip(lang, iid):
             n += 1
         if raw:
             text = "\n".join(raw)
-            return "\n".join(_mc_to_terraria(ln) for ln in text.split("\n"))
+            out = [c for ln in text.split("\n") if (c := _convert_tooltip(ln)) is not None]
+            return "\n".join(out) if out else None
     return None
 
 
@@ -544,14 +564,20 @@ def emit_machine_tooltips(lines, indent, lang):
                 continue
             # includes available_recipe_map_N templates (appended by
             # MachineTooltipLookup to multi-type defs).
-            out[_MACHINE_TOOLTIP_ALIASES.get(mid, mid)] = _mc_to_terraria(v)
+            conv = _convert_tooltip(v)
+            if conv is None:
+                continue
+            out[_MACHINE_TOOLTIP_ALIASES.get(mid, mid)] = conv
             continue
         m = re.fullmatch(r"([a-z0-9_]+)\.tooltip\.(\d+)", rest)
         if not m:
             continue
         mid, n = m.group(1), int(m.group(2))
         mid = _MACHINE_TOOLTIP_ALIASES.get(mid, mid)
-        out[f"{mid}_{n}"] = _mc_to_terraria(v)
+        conv = _convert_tooltip(v)
+        if conv is None:
+            continue
+        out[f"{mid}_{n}"] = conv
         n_numbered += 1
     for mid in sorted(out):
         lines.append(f"{indent}\t{mid}: {json.dumps(out[mid], ensure_ascii=False)}")

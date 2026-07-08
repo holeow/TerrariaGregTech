@@ -7,6 +7,7 @@ using Terraria.Audio;
 using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.UI;
+using Terraria.UI.Chat;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
@@ -16,6 +17,7 @@ public sealed class UITextButton : UIElement
 	private readonly Action? _onLeft;
 	private readonly Action? _onRight;
 	private readonly string? _tooltip;
+	private readonly float _textScale;
 
 	public Func<bool>? IsActive { get; set; }
 
@@ -25,12 +27,13 @@ public sealed class UITextButton : UIElement
 	public Func<bool>? IsVisible { get; set; }
 
 	public UITextButton(Func<string> label, Action? onLeft = null, Action? onRight = null,
-		string? tooltip = null, int width = 64, int height = 18)
+		string? tooltip = null, int width = 64, int height = 18, float textScale = 0.72f)
 	{
 		_label = label;
 		_onLeft = onLeft;
 		_onRight = onRight;
 		_tooltip = tooltip;
+		_textScale = textScale;
 		Width = StyleDimension.FromPixels(width);
 		Height = StyleDimension.FromPixels(height);
 	}
@@ -68,11 +71,12 @@ public sealed class UITextButton : UIElement
 
 		string text = _label();
 		var font = FontAssets.MouseText.Value;
-		const float scale = 0.72f;
-		var size = font.MeasureString(text) * scale;
+		float scale = _textScale;
+		float textW = ChatManager.GetStringSize(font, text, new Vector2(scale)).X;
+		float textH = font.MeasureString(text).Y * scale;
 		var pos = new Vector2(
-			bounds.X + (bounds.Width - size.X) / 2f,
-			bounds.Y + (bounds.Height - size.Y) / 2f);
+			bounds.X + (bounds.Width - textW) / 2f,
+			bounds.Y + (bounds.Height - textH) / 2f);
 		Color textColor = disabled ? new Color(140, 140, 145) : Color.White;
 		Terraria.Utils.DrawBorderString(sb, text, pos, textColor, scale);
 
@@ -84,18 +88,18 @@ public sealed class UITextButton : UIElement
 		}
 	}
 
-	public override void LeftMouseDown(UIMouseEvent evt)
+	public override void LeftClick(UIMouseEvent evt)
 	{
-		base.LeftMouseDown(evt);
+		base.LeftClick(evt);
 		if (IsVisible?.Invoke() == false || IsDisabled?.Invoke() == true) return;
 		if (_onLeft is null) return;
 		_onLeft();
 		SoundEngine.PlaySound(SoundID.MenuTick);
 	}
 
-	public override void RightMouseDown(UIMouseEvent evt)
+	public override void RightClick(UIMouseEvent evt)
 	{
-		base.RightMouseDown(evt);
+		base.RightClick(evt);
 		if (IsVisible?.Invoke() == false || IsDisabled?.Invoke() == true) return;
 		if (_onRight is null) return;
 		_onRight();

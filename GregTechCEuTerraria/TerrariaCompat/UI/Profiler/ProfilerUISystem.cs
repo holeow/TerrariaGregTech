@@ -51,7 +51,7 @@ public sealed class ProfilerUISystem : ModalUISystem
 
 	private static void DrawInventoryButton()
 		=> UILayers.DrawStackedButton(
-			slot: 2,
+			slot: 3,
 			background: new Color(30, 50, 40),
 			drawIcon: (sb, r) =>
 			{

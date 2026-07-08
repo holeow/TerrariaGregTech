@@ -8,16 +8,13 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Primitive;
 
-// Port of CokeOvenMachine (+ PrimitiveWorkableMachine collapsed in). Coal/log
-// -> coke/charcoal + creosote, no EU. 1 in / 1 out / 1 export-fluid (32B mB).
-// Dropped: EnvironmentalHazardEmitterTrait (CO), animateTick particles,
-// createUI, onUseWithItem bucket interaction.
 public class CokeOvenMachine : WorkableMultiblockMachine,
 	ICokeOvenController, IItemHandler, IFluidHandler
 {
 	protected override string Label => "Coke Oven";
 
-	// Upstream 32 * FluidType.BUCKET_VOLUME.
+	public override bool SupportsCovers => false;
+
 	private const int CREOSOTE_TANK_CAPACITY = 32 * 1000;
 
 	private NotifiableItemStackHandler? _importItems;
@@ -73,8 +70,6 @@ public class CokeOvenMachine : WorkableMultiblockMachine,
 		};
 	}
 
-	// IFluidHandler - export-only (creosote). No fluid input; Fill is no-op.
-
 	public override int ResolveFluidTank(IO direction, int localIndex) => localIndex;
 
 	public int        TankCount             { get { EnsurePrimitiveTraits(); return 1; } }
@@ -93,10 +88,7 @@ public class CokeOvenMachine : WorkableMultiblockMachine,
 
 	public IFluidHandler GetTankAccess(int tank) { EnsurePrimitiveTraits(); return _exportFluids!.Storages[0]; }
 
-	// Upstream CokeOvenMachine.java:53 TankWidget(..., true, false).
 	public (bool AllowFill, bool AllowDrain) GetTankClickCaps(int tank) => (false, true);
-
-	// IItemHandler - slot 0 = import, slot 1 = export.
 
 	public int  SlotCount                                     { get { EnsurePrimitiveTraits(); return 2; } }
 	public Item GetSlot(int slot)                             { EnsurePrimitiveTraits(); return slot == 0 ? _importItems!.GetSlot(0) : _exportItems!.GetSlot(0); }

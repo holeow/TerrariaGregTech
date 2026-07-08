@@ -28,23 +28,22 @@ public static class BossDropRegistry
 
 	private static readonly TierSpec[] Tiers =
 	{
-		new("Steam", new[] { "bronze", "invar" },                                              null),
-		new("LV",    new[] { "steel", "tin", "copper" },                                       new[] { "vacuum_tube", "resistor", "ender_pearl_gem" }),
-		new("MV",    new[] { "aluminium", "copper", "nickel" },                                new[] { "diode", "transistor", "capacitor" }),
-		new("HV",    new[] { "stainless_steel", "silver", "electrum" },                        new[] { "smd_diode", "smd_resistor", "smd_transistor" }),
-		new("EV",    new[] { "titanium", "aluminium", "kanthal" },                             new[] { "smd_capacitor", "smd_inductor" }),
-		new("IV",    new[] { "tungsten_steel", "tungsten", "graphene" },                       new[] { "advanced_smd_diode", "advanced_smd_resistor", "ram_wafer" }),
-		new("LuV",   new[] { "hsss", "niobium_titanium", "ruridit" },                          new[] { "advanced_smd_transistor", "advanced_smd_capacitor", "nor_memory_chip" }),
-		new("ZPM",   new[] { "osmiridium", "vanadium_gallium", "europium" },                   new[] { "advanced_smd_inductor", "nand_memory_chip", "cpu_wafer" }),
-		new("UV",    new[] { "tritanium", "yttrium_barium_cuprate", "americium" },             new[] { "nano_cpu_wafer", "hpic_wafer" }),
+		new("Steam", new[] { "copper", "tin", "sulfur" },                       null),
+		new("LV",    new[] { "iron", "nickel", "redstone", "ender_pearl_gem" }, null),
+		new("MV",    new[] { "gold", "silver", "aluminium", "ender_pearl_gem" },null),
+		new("HV",    new[] { "platinum", "bauxite" },                           null),
+		new("EV",    new[] { "magnesite", "ilmenite" },                         null),
+		new("IV",    new[] { "tungstate" },                                     null),
+		new("LuV",   new[] { "naquadah" },                                      null),
+		new("ZPM",   new[] { "bastnasite" },                                    null),
+		new("UV",    new[] { "chromite" },                                      null),
 	};
 
 	private static readonly (string item, int min, int max)[] KingSlimeOverride =
 	{
-		("bronze_dust",  64, 128),
-		("invar_dust",   16, 64),
-		("copper_dust",  64, 256),
-		("tin_dust",     64, 256)
+		("raw_copper",  64, 256),
+		("raw_tin",     64, 256),
+		("raw_sulfur",  16, 64)
 	};
 
 	private static readonly Dictionary<short, (string item, int min, int max)[]> BossExtraDrops = new()
@@ -58,51 +57,51 @@ public static class BossDropRegistry
 		(NPCID.KingSlime,         0, false),
 
 		// LV
-		(NPCID.EyeofCthulhu,      1, true),
-		(NPCID.EaterofWorldsHead, 1, true),
-		(NPCID.EaterofWorldsBody, 1, true),
-		(NPCID.EaterofWorldsTail, 1, true),
-		(NPCID.BrainofCthulhu,    1, true),
+		(NPCID.EyeofCthulhu,      1, false),
+		(NPCID.EaterofWorldsHead, 1, false),
+		(NPCID.EaterofWorldsBody, 1, false),
+		(NPCID.EaterofWorldsTail, 1, false),
+		(NPCID.BrainofCthulhu,    1, false),
 		(NPCID.Deerclops,         1, false),
 
 		// MV
 		(NPCID.QueenBee,          2, false),
-		(NPCID.SkeletronHead,     2, true),
-		(NPCID.WallofFlesh,       2, true),
+		(NPCID.SkeletronHead,     2, false),
+		(NPCID.WallofFlesh,       2, false),
 
 		// HV
+		(NPCID.QueenSlimeBoss,    3, false),
 		(NPCID.PirateShip,        3, false),
-		(NPCID.TheDestroyer,      3, true),
-		(NPCID.Retinazer,         3, true),
-		(NPCID.Spazmatism,        3, true),
-		(NPCID.SkeletronPrime,    3, true),
+		(NPCID.TheDestroyer,      3, false),
+		(NPCID.Retinazer,         3, false),
+		(NPCID.Spazmatism,        3, false),
+		(NPCID.SkeletronPrime,    3, false),
 
 		// EV
-		(NPCID.QueenSlimeBoss,    4, false),
-		(NPCID.Plantera,          4, true),
+		(NPCID.Plantera,          4, false),
 
 		// IV
 		(NPCID.MourningWood,      5, false),
 		(NPCID.Everscream,        5, false),
-		(NPCID.Pumpking,          5, true),
-		(NPCID.SantaNK1,          5, true),
-		(NPCID.IceQueen,          5, true),
+		(NPCID.Pumpking,          5, false),
+		(NPCID.SantaNK1,          5, false),
+		(NPCID.IceQueen,          5, false),
 
 		// LuV
 		(NPCID.Golem,             6, false),
-		(NPCID.MartianSaucerCore, 6, true),
+		(NPCID.MartianSaucerCore, 6, false),
 
 		// ZPM
 		(NPCID.DukeFishron,       7, false),
-		(NPCID.CultistBoss,       7, true),
+		(NPCID.CultistBoss,       7, false),
 
 		// UV
 		(NPCID.LunarTowerSolar,    8, false),
 		(NPCID.LunarTowerVortex,   8, false),
 		(NPCID.LunarTowerNebula,   8, false),
 		(NPCID.LunarTowerStardust, 8, false),
-		(NPCID.HallowBoss,         8, true), // Empress of Light
-		(NPCID.MoonLordCore,       8, true),
+		(NPCID.HallowBoss,         8, false), // Empress of Light
+		(NPCID.MoonLordCore,       8, false),
 	};
 
 	private static readonly HashSet<short> MultiPartBosses = new()
@@ -264,6 +263,7 @@ public static class BossDropRegistry
 	{
 		if (MaterialItemRegistry.TryGetByUpstreamId("raw_" + material, out itemType)) { isRaw = true;  return true; }
 		if (MaterialItemRegistry.TryGetByUpstreamId(material + "_dust", out itemType)) { isRaw = false; return true; }
+		if (TryResolveBareId(material, out itemType)) { isRaw = false; return true; }
 		itemType = 0;
 		isRaw = false;
 		return false;

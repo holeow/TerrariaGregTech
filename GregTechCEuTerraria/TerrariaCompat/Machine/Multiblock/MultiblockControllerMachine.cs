@@ -79,7 +79,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 	internal static void ClearFootprintRegistry() => _formedControllers.Clear();
 
 	private string?       _persistedUnformedReason;
-	private List<string>? _persistedUnformedDetails;
 	private int _persistedUnformedX = int.MinValue;
 	private int _persistedUnformedY = int.MinValue;
 	private int[]? _persistedSwapTypes;
@@ -192,14 +191,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 		return _persistedUnformedReason;
 	}
 
-	public virtual IReadOnlyList<string> GetUnformedDetailLines()
-	{
-		var liveErr = GetMultiblockState().Error;
-		if (liveErr is not null && liveErr != MultiblockState.UNINIT_ERROR)
-			return new List<string>(MultiblockErrorText.DescribeLines(liveErr));
-		return _persistedUnformedDetails ?? (IReadOnlyList<string>)System.Array.Empty<string>();
-	}
-
 	public virtual IReadOnlyList<int>? GetSwapCandidateTypes()
 	{
 		if (GetMultiblockState().Error is SinglePredicateError spe
@@ -230,10 +221,9 @@ public abstract class MultiblockControllerMachine : MetaMachine
 		return null;
 	}
 
-	protected void SetUnformedReason(string reason, System.Collections.Generic.IReadOnlyList<string>? details = null)
+	protected void SetUnformedReason(string reason)
 	{
-		_persistedUnformedReason  = reason;
-		_persistedUnformedDetails = details is null ? null : new List<string>(details);
+		_persistedUnformedReason = reason;
 	}
 
 	public virtual Comparison<IMultiPart> GetPartSorter() =>
@@ -276,15 +266,8 @@ public abstract class MultiblockControllerMachine : MetaMachine
 			AppendUnformedStructureBlock(lines);
 	}
 
-	protected void AppendUnformedStructureBlock(System.Collections.Generic.List<string> lines)
-	{
-		AppendUnformedStatusIfNeeded(lines);
-		foreach (var detail in GetUnformedDetailLines())
-			lines.Add($"[c/FF8888:{detail}]");
-	}
-
-	protected virtual void AppendUnformedStatusIfNeeded(System.Collections.Generic.List<string> lines) =>
-		lines.Add("[c/FFAA44:Structure not formed]");
+	protected void AppendUnformedStructureBlock(System.Collections.Generic.List<string> lines) =>
+		lines.Add(RecipeStatusText.StatusLineForMulti(this, null));
 
 	public IReadOnlyList<IMultiPart> GetParts()
 	{
@@ -363,7 +346,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 		if (ok)
 		{
 			_persistedUnformedReason  = null;
-			_persistedUnformedDetails = null;
 			_persistedUnformedX = int.MinValue;
 			_persistedUnformedY = int.MinValue;
 			_persistedSwapTypes = null;
@@ -374,7 +356,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 			if (liveErr is not null && liveErr != MultiblockState.UNINIT_ERROR)
 			{
 				_persistedUnformedReason  = MultiblockErrorText.Describe(liveErr);
-				_persistedUnformedDetails = new List<string>(MultiblockErrorText.DescribeLines(liveErr));
 				if (liveErr.GetType() == typeof(PatternError))
 				{
 					_persistedUnformedX = liveErr.GetX();
@@ -427,8 +408,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 		tag["mb_flipped"] = IsFlipped;
 		if (_persistedUnformedReason is not null)
 			tag["mb_unformed_reason"] = _persistedUnformedReason;
-		if (_persistedUnformedDetails is { Count: > 0 })
-			tag["mb_unformed_details"] = new List<string>(_persistedUnformedDetails);
 		if (_persistedUnformedX != int.MinValue)
 		{
 			tag["mb_unformed_x"] = _persistedUnformedX;
@@ -469,7 +448,6 @@ public abstract class MultiblockControllerMachine : MetaMachine
 		if (tag.ContainsKey("mb_formed"))  IsFormed  = tag.GetBool("mb_formed");
 		if (tag.ContainsKey("mb_flipped")) IsFlipped = tag.GetBool("mb_flipped");
 		_persistedUnformedReason  = tag.ContainsKey("mb_unformed_reason")  ? tag.GetString("mb_unformed_reason") : null;
-		_persistedUnformedDetails = tag.ContainsKey("mb_unformed_details") ? tag.GetList<string>("mb_unformed_details").ToList() : null;
 		_persistedUnformedX = tag.ContainsKey("mb_unformed_x") ? tag.GetInt("mb_unformed_x") : int.MinValue;
 		_persistedUnformedY = tag.ContainsKey("mb_unformed_y") ? tag.GetInt("mb_unformed_y") : int.MinValue;
 		_persistedSwapTypes = tag.ContainsKey("mb_swap_types") ? tag.GetList<int>("mb_swap_types").ToArray() : null;

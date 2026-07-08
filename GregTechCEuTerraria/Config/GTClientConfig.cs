@@ -16,6 +16,21 @@ public sealed class GTClientConfig : ModConfig
 	[DefaultValue(false)]
 	public bool QuestbookEditMode { get; set; } = false;
 
+	[DefaultValue(true)]
+	public bool PinAutoCraftedItems { get; set; } = true;
+
+	[DefaultValue(true)]
+	public bool OpenDockedBrowserOnLaunch { get; set; } = true;
+
+	[DefaultValue(true)]
+	public bool ShowFavoritesPanel { get; set; } = true;
+
+	[DefaultValue(true)]
+	public bool ShowHistoryPanel { get; set; } = true;
+
+	[DefaultValue(false)]
+	public bool DebugScreenLayout { get; set; } = false;
+
 	public static GTClientConfig Instance => ModContent.GetInstance<GTClientConfig>();
 
 	public void DismissDiscordInvite()

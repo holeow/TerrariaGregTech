@@ -369,7 +369,7 @@ public class ImplosionPress : ModNPC, IDebuggableBoss
 		lines.Add($"Implosion Press  [{(phase2 ? "PHASE 2" : "PHASE 1")}]  HP {NPC.life}/{NPC.lifeMax} ({hpPct:0.0}%)");
 		lines.Add($"State: {StateName(state)}   t={t}/{dur}  ({(dur > 0 ? 100f * t / dur : 0):0}%)");
 		lines.Add($"Anchor: {angDeg:0}deg    Pos: ({(int)NPC.Center.X}, {(int)NPC.Center.Y})");
-		lines.Add($"BG  CrushZone in {(int)_crushZoneTimer}t  *  CarbonFlak in {(int)_carbonFlakTimer}t");
+		lines.Add($"BG  CrushZone in {(int)_crushZoneTimer}t   CarbonFlak in {(int)_carbonFlakTimer}t");
 		if (phase2)
 		{
 			string storm = _carbonStormActive > 0

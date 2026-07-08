@@ -6,6 +6,7 @@ Mods: {
 			// OpenQuestbook.DisplayName: Open questbook
 			// RecipeBrowserHowToObtain.DisplayName: Recipe browser - how to obtain hovered item
 			// RecipeBrowserUsedAsIngredient.DisplayName: Recipe browser - recipes that use hovered item
+			// ToggleDockedBrowser.DisplayName: Toggle docked recipe browser
 		}
 
 		ArmorSet: {
@@ -127,5 +128,82 @@ Mods: {
 
 		// RecipeConditions.FluidContainer: Requires the fluid held in a cell or bucket
 		// Condition.ShimmerDupesAllowed: Shimmer duplication allowed
+
+		AppliedEnergistics: {
+			Craft: {
+				// Items: items
+				// Someone: Someone
+				// Done: "[ME] {0} crafted {1}x {2} in {3} ({4} items processed)"
+			}
+
+			CraftSubmit: {
+				// MissingGeneric: Missing an ingredient
+				// Missing: Missing {0}x {1}
+				// CpuTooSmall: Crafting CPU is too small for this job
+				// CpuOffline: Crafting CPU is offline
+				// CpuBusy: Crafting CPU is busy
+				// NoCpu: No Crafting CPU available
+				// IncompletePlan: Missing items - cannot craft
+				// Ok: Crafting started
+			}
+
+			Storage: {
+				// External: External Storage
+				// MENetwork: ME Network Storage
+			}
+
+			KeyType: {
+				// Fluids: Fluids
+				// Items: Items
+			}
+
+			// SelectItemFluid: Select item/fluid
+
+			Terminal: {
+				// StorageDevices: "{0} storage devices"
+				// NotConnected: Not connected
+			}
+		}
+
+		ExquisiteGem: {
+			Effect: {
+				// emerald: +{0} defense
+				// almandine: 10% thorns
+				// amethyst: +4% magic damage
+				// andradite: +2% melee critical strike chance
+				// apatite: +5 fishing power
+				// blue_topaz: +2% magic critical strike chance
+				// certus_quartz: +2% magic critical strike chance
+				// cinnabar: Immune to Poisoned
+				// coal: Emits light
+				// coke: Immune to On Fire!
+				// diamond: 2% damage reduction
+				// echo_shard: Grants Dangersense
+				// glass: +25% critical strike chance, but take 50% more damage
+				// green_sapphire: Higher jumps
+				// lapis: +15 max mana
+				// lazurite: +10 max mana
+				// malachite: +8% mining speed
+				// monazite: +1 minion capacity
+				// nether_quartz: +3% magic damage
+				// olivine: +3% movement speed
+				// opal: +2% damage
+				// pyrope: +5 max life
+				// quartzite: +2 tile reach
+				// realgar: +3% melee damage
+				// red_garnet: +4% melee damage
+				// ruby: +5 max life
+				// salt: Reduced enemy aggression
+				// sapphire: +10 max mana
+				// sodalite: 3% reduced mana cost
+				// spessartine: +4% summon damage
+				// topaz: +4% ranged damage
+				// uvarovite: +2% summon damage
+				// yellow_garnet: +2% ranged critical strike chance
+			}
+
+			// Scaling: Effect scales with equipped stack: 10 / 100 / 1000
+			// Equip: Equip as an accessory
+		}
 	}
 }

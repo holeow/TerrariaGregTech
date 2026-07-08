@@ -146,7 +146,7 @@ public abstract class TieredEnergyMachine : MetaMachine, IEnergyContainer
 
 		var net = FindConnectedNetwork();
 		if (net != null)
-			lines.Add($"Network: {net.Cells.Count} cables * {VoltageTiers.ShortName(net.EffectiveTier)} * cap {net.PerTickCapacity:N0} EU/t ({net.MaxAmperage}A, loss {net.MaxLossPerAmp}/A)");
+			lines.Add($"Network: {net.Cells.Count} cables   {VoltageTiers.ShortName(net.EffectiveTier)}   cap {net.PerTickCapacity:N0} EU/t ({net.MaxAmperage}A, loss {net.MaxLossPerAmp}/A)");
 	}
 
 	private EnergyNet? FindConnectedNetwork()

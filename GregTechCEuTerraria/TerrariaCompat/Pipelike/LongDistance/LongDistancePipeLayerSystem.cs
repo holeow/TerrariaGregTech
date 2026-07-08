@@ -6,10 +6,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.LongDistance;
 
-// Per-world LongDistancePipeLayer owner. Mirrors LaserPipeLayerSystem lifecycle -
-// owns the GridLayer, persists cells via Save/LoadWorldData, drives the renderer,
-// requests the full layer on MP late-join. Unified item + fluid layer; each cell
-// carries its Type byte.
 public sealed class LongDistancePipeLayerSystem : ModSystem
 {
 	public static LongDistancePipeLayer Pipes { get; } = new();
@@ -33,18 +29,17 @@ public sealed class LongDistancePipeLayerSystem : ModSystem
 
 	public override void ClearWorld() => Pipes.Clear();
 
-	// MP client late-join: request the full layer dump from the server.
 	public override void OnWorldLoad()
 	{
 		Net.PipePackets.SendLayerRequest(PipeKind.LongDistance);
 	}
 
-	// Held-item place-preview overlay (matches ItemPipeLayerSystem.PostDrawTiles).
 	public override void PostDrawTiles()
 	{
 		var held = Main.LocalPlayer?.HeldItem;
 		bool ldLayer = held?.ModItem is Items.Pipes.LongDistancePipeItem
-		            || (held?.ModItem is Items.Tools.ToolItem tool && tool.IsWrench);
+		            || (held?.ModItem is Items.Tools.ToolItem tool && tool.IsWrench)
+		            || Items.Tools.Multitool.MultitoolState.IsActiveLayer(Main.LocalPlayer, "long_distance");
 		if (ldLayer)
 			LongDistancePipeRenderer.DrawForegroundOverlay();
 	}

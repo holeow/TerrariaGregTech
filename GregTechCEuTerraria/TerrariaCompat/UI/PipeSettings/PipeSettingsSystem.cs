@@ -56,6 +56,17 @@ public sealed class PipeSettingsSystem : ModalUISystem
 
 	public static void Close() => ModContent.GetInstance<PipeSettingsSystem>()?.CloseInternal();
 
+	public static bool IsOpenable(int x, int y, PipeKind kind)
+	{
+		if (x <= 0 || x >= Main.maxTilesX - 1 || y <= 0 || y >= Main.maxTilesY - 1) return false;
+		return kind switch
+		{
+			PipeKind.Item  => ItemPipeLayerSystem .Pipes.Has(x, y) && PipeNeighborProbe.HasAnyLive(x, y, PipeKind.Item),
+			PipeKind.Fluid => FluidPipeLayerSystem.Pipes.Has(x, y) && PipeNeighborProbe.HasAnyLive(x, y, PipeKind.Fluid),
+			_              => false,
+		};
+	}
+
 	protected override void OnClose()
 	{
 		_state?.Unbind();
@@ -108,17 +119,9 @@ public sealed class PipeSettingsSystem : ModalUISystem
 			return;
 		}
 
-		var zoomMatrix = Main.GameViewMatrix.ZoomMatrix;
-		float zoomX = zoomMatrix.M11;
-		float zoomY = zoomMatrix.M22;
-		if (zoomX <= 0f) zoomX = 1f;
-		if (zoomY <= 0f) zoomY = 1f;
-		float halfW = Main.screenWidth * 0.5f;
-		float halfH = Main.screenHeight * 0.5f;
-		float cursorWorldX = Main.screenPosition.X + halfW + (Main.mouseX - halfW) / zoomX;
-		float cursorWorldY = Main.screenPosition.Y + halfH + (Main.mouseY - halfH) / zoomY;
-		int rawX = (int)System.Math.Floor(cursorWorldX / 16f);
-		int rawY = (int)System.Math.Floor(cursorWorldY / 16f);
+		if (UILayers.IsCursorOverAnyModal()) return;
+
+		WorldInteract.WorldCursor.RawCell(out int rawX, out int rawY);
 
 		int x, y;
 		bool TryPipeAt(int tx, int ty, out PipeKind k)
@@ -146,19 +149,6 @@ public sealed class PipeSettingsSystem : ModalUISystem
 		bool sameAsBound = IsOpen && _state is not null
 			&& _state.PipeX == x && _state.PipeY == y && _state.Layer == layer.Value;
 		if (!sameAsBound) { _hoverX = x; _hoverY = y; _hoverLayer = layer; _hoverHasOpenable = hasLiveNeighbour; }
-
-		if (hasLiveNeighbour && Main.mouseRight && Main.mouseRightRelease && !sameAsBound)
-		{
-			OpenFor(x, y, layer.Value);
-			Main.mouseRightRelease = false;
-			p.controlUseTile = false;
-			p.releaseUseTile = false;
-		}
-		else if (hasLiveNeighbour && Main.mouseRight && !sameAsBound)
-		{
-			p.controlUseTile = false;
-			p.releaseUseTile = false;
-		}
 	}
 
 	public override void UpdateUI(GameTime gameTime)
@@ -210,7 +200,7 @@ public sealed class PipeSettingsSystem : ModalUISystem
 		}
 		string state = active ? "[c/55FF55:Active]" : "[c/AAAAAA:Idle]";
 		string ep    = hasEndpoint ? "endpoint reached" : "[c/FFAA44:no endpoint]";
-		return $"Laser Pipe: {state} * {ep}";
+		return $"Laser Pipe: {state}   {ep}";
 	}
 
 	private static string OpticalStatusLine(int x, int y)
@@ -229,7 +219,7 @@ public sealed class PipeSettingsSystem : ModalUISystem
 		}
 		string state = active ? "[c/55FF55:Active]" : "[c/AAAAAA:Idle]";
 		string ep    = hasEndpoint ? "endpoint reached" : "[c/FFAA44:no endpoint]";
-		return $"Optical Pipe: {state} * {ep}";
+		return $"Optical Pipe: {state}   {ep}";
 	}
 
 	private static string EmptyWhitelistWarningLine(PipeKind layer, int x, int y)

@@ -44,4 +44,47 @@ public static class PointClampDraw
 	}
 
 	public static void Draw(SpriteBatch sb, Matrix _unused, Action body) => Draw(sb, body);
+
+	public static void DrawInScreenSpace(SpriteBatch sb, Action body)
+	{
+		var sortMode     = (SpriteSortMode)F_SortMode.GetValue(sb)!;
+		var blendState   = (BlendState)F_Blend.GetValue(sb)!;
+		var sampler      = (SamplerState)F_Sampler.GetValue(sb)!;
+		var depthStencil = (DepthStencilState)F_DepthStencil.GetValue(sb)!;
+		var rasterizer   = (RasterizerState)F_Rasterizer.GetValue(sb)!;
+		var effect       = (Effect?)F_Effect.GetValue(sb);
+		var matrix       = (Matrix)F_Matrix.GetValue(sb)!;
+
+		sb.End();
+		sb.Begin(SpriteSortMode.Deferred, blendState, SamplerState.PointClamp,
+			depthStencil, rasterizer, null, Matrix.Identity);
+		try { body(); }
+		finally
+		{
+			sb.End();
+			sb.Begin(sortMode, blendState, sampler, depthStencil, rasterizer, effect, matrix);
+		}
+	}
+
+	public static void DrawWithEffect(SpriteBatch sb, Effect effect, Action body)
+	{
+		var sortMode     = (SpriteSortMode)F_SortMode.GetValue(sb)!;
+		var blendState   = (BlendState)F_Blend.GetValue(sb)!;
+		var sampler      = (SamplerState)F_Sampler.GetValue(sb)!;
+		var depthStencil = (DepthStencilState)F_DepthStencil.GetValue(sb)!;
+		var rasterizer   = (RasterizerState)F_Rasterizer.GetValue(sb)!;
+		var effect0      = (Effect?)F_Effect.GetValue(sb);
+		var matrix       = (Matrix)F_Matrix.GetValue(sb)!;
+
+		sb.End();
+		sb.Begin(SpriteSortMode.Immediate, blendState, SamplerState.PointClamp,
+			depthStencil, rasterizer, null, matrix);
+		effect.CurrentTechnique.Passes[0].Apply();
+		try { body(); }
+		finally
+		{
+			sb.End();
+			sb.Begin(sortMode, blendState, sampler, depthStencil, rasterizer, effect0, matrix);
+		}
+	}
 }

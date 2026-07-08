@@ -16,46 +16,28 @@ public static class MultiblockErrorText
 		"UV",  "UHV","UEV","UIV","UXV","OpV","MAX",
 	};
 
-	public static string Describe(PatternError err) =>
-		err is SinglePredicateError spe ? DescribeCount(spe) : err.ErrorInfo;
-
-	public static IEnumerable<string> DescribeLines(PatternError err)
+	public static string Describe(PatternError err)
 	{
-		if (err is SinglePredicateError spe)
+		if (err is SinglePredicateError spe) return DescribeCount(spe);
+		if (err.GetType() == typeof(PatternError)) return DescribeWrongBlockLine(err);
+		return err.ErrorInfo;
+	}
+
+	private static string DescribeWrongBlockLine(PatternError err)
+	{
+		var sb = new StringBuilder();
+		int shown = 0;
+		foreach (var group in err.GetCandidates())
 		{
-			yield return DescribeCount(spe);
-			yield break;
+			if (group.Count == 0) continue;
+			if (shown > 0) sb.Append(", ");
+			sb.Append(DescribeGroup(group));
+			shown++;
 		}
-		foreach (var line in err.ErrorDetailLines())
-			yield return line;
+		return $"Wrong block, found {err.FoundBlockDescriptor()}, expected {sb}";
 	}
 
-	private static string DescribeCount(SinglePredicateError spe)
-	{
-		bool tooMany  = spe.Type == 0 || spe.Type == 2;
-		bool perLayer = spe.Type == 2 || spe.Type == 3;
-		int required = spe.Type switch
-		{
-			0 => spe.Predicate.MaxCount,
-			1 => spe.Predicate.MinCount,
-			2 => spe.Predicate.MaxLayerCount,
-			3 => spe.Predicate.MinLayerCount,
-			_ => -1,
-		};
-
-		int actual = -1;
-		if (!perLayer && spe.WorldState is not null)
-			spe.WorldState.GlobalCount.TryGetValue(spe.Predicate, out actual);
-
-		string desc     = DescribeCandidates(spe.Predicate.GetCandidates());
-		string verb     = tooMany ? "Too many" : "Not enough";
-		string layer    = perLayer ? " per layer" : "";
-		string needWord = tooMany ? "max" : "need";
-		string have     = actual >= 0 ? $", have {actual}" : "";
-		return $"{verb} {desc}{layer} {needWord} {required}{have}";
-	}
-
-	private static string DescribeCandidates(List<Item> candidates)
+	public static string DescribeGroup(List<Item> candidates)
 	{
 		var bases    = new List<string>();
 		var seenBase = new HashSet<string>(StringComparer.Ordinal);
@@ -78,21 +60,61 @@ public static class MultiblockErrorText
 		if (bases.Count == 1)
 		{
 			if (maxTier < 0) return bases[0];
-			string range = minTier == maxTier
-				? TierShort[minTier]
-				: $"{TierShort[minTier]}~{TierShort[maxTier]}";
-			return $"{bases[0]} ({range})";
+			return minTier == maxTier
+				? $"{TierShort[minTier]} {bases[0]}"
+				: $"{TierShort[minTier]} {bases[0]} or better";
 		}
 
-		var sb = new StringBuilder();
-		int show = Math.Min(2, bases.Count);
-		for (int i = 0; i < show; i++)
+		string common = CommonSuffix(bases);
+		return common.Length > 0 ? common : bases[0];
+	}
+
+	private static string CommonSuffix(List<string> names)
+	{
+		string[][] words = new string[names.Count][];
+		for (int i = 0; i < names.Count; i++)
+			words[i] = names[i].Split(' ');
+
+		var suffix = new List<string>();
+		for (int back = 1; ; back++)
 		{
-			if (i > 0) sb.Append(" / ");
-			sb.Append(bases[i]);
+			string? word = null;
+			foreach (var w in words)
+			{
+				if (back > w.Length) { word = null; break; }
+				string candidate = w[w.Length - back];
+				if (word is null) word = candidate;
+				else if (!string.Equals(word, candidate, StringComparison.Ordinal)) { word = null; break; }
+			}
+			if (word is null) break;
+			suffix.Insert(0, word);
 		}
-		if (bases.Count > show) sb.Append($" +{bases.Count - show} more");
-		return sb.ToString();
+		return string.Join(" ", suffix);
+	}
+
+	private static string DescribeCount(SinglePredicateError spe)
+	{
+		bool tooMany  = spe.Type == 0 || spe.Type == 2;
+		bool perLayer = spe.Type == 2 || spe.Type == 3;
+		int required = spe.Type switch
+		{
+			0 => spe.Predicate.MaxCount,
+			1 => spe.Predicate.MinCount,
+			2 => spe.Predicate.MaxLayerCount,
+			3 => spe.Predicate.MinLayerCount,
+			_ => -1,
+		};
+
+		int actual = -1;
+		if (!perLayer && spe.WorldState is not null)
+			spe.WorldState.GlobalCount.TryGetValue(spe.Predicate, out actual);
+
+		string desc     = DescribeGroup(spe.Predicate.GetCandidates());
+		string verb     = tooMany ? "Too many" : "Not enough";
+		string layer    = perLayer ? " per layer" : "";
+		string needWord = tooMany ? "max" : "need";
+		string have     = actual >= 0 ? $", have {actual}" : "";
+		return $"{verb} {desc}{layer} {needWord} {required}{have}";
 	}
 
 	private static (int tier, string baseName) SplitTier(string name)

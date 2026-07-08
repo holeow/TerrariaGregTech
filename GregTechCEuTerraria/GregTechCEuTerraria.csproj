@@ -12,4 +12,16 @@
   <ItemGroup Condition="Exists('lib\MagicStorage.dll')">
     <Reference Include="MagicStorage" HintPath="lib\MagicStorage.dll" Private="false" />
   </ItemGroup>
+
+  <ItemGroup Condition="'$(DesignTimeBuild)' != 'true'">
+    <EffectFiles Include="Effects\**\*.fx" />
+  </ItemGroup>
+  <PropertyGroup>
+    <FxcCompilerPath>Effects\Compiler\fxc.exe</FxcCompilerPath>
+  </PropertyGroup>
+  <Target Name="BuildEffects" BeforeTargets="BuildMod"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('$(FxcCompilerPath)')"
+          Inputs="@(EffectFiles)" Outputs="@(EffectFiles->'%(RelativeDir)%(FileName).fxc')">
+    <Exec Command="@(EffectFiles->'echo ----- Compiling effect: %(Identity) ----- &amp;&amp; &quot;$(FxcCompilerPath)&quot; &quot;%(Identity)&quot; /T fx_2_0 /nologo /O2 /Fo &quot;%(RelativeDir)%(FileName).fxc&quot; &#xA;&#xD;')" IgnoreExitCode="true" />
+  </Target>
 </Project>

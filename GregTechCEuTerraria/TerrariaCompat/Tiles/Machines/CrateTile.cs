@@ -32,7 +32,6 @@ public class CrateTile : TieredMachineTile
 	{
 		if (!MachineCellResolver.TryFindAt<CrateMachine>(i, j, out var crate)) return false;
 
-		// Tape mechanic temporarily disabled to avoid dupes
 		MachineUISystem.OpenFor(crate, CrateLayout.Build(crate));
 		return true;
 	}

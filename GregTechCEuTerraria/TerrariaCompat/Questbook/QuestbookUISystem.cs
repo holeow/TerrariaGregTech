@@ -71,7 +71,7 @@ public sealed class QuestbookUISystem : ModalUISystem
 
 	private static void DrawInventoryButton()
 		=> UILayers.DrawStackedButton(
-			slot: 1,
+			slot: 2,
 			background: new Color(38, 42, 70),
 			drawIcon: (sb, r) =>
 			{

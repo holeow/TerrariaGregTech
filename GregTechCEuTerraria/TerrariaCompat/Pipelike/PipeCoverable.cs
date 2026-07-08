@@ -246,14 +246,8 @@ public sealed class PipeCoverable : ICoverable
 		return GetCoverAtSide(cs) is { } cover ? cover.GetFluidHandlerCap(raw) : raw;
 	}
 
-	private static CoverSide ToCoverSide(IODirection dir) => dir switch
-	{
-		IODirection.Up    => CoverSide.Up,
-		IODirection.Down  => CoverSide.Down,
-		IODirection.Left  => CoverSide.Left,
-		IODirection.Right => CoverSide.Right,
-		_                 => CoverSide.Up,
-	};
+	private static CoverSide ToCoverSide(IODirection dir)
+		=> Capabilities.WorldCapability.ToCoverSide(dir) ?? CoverSide.Up;
 
 	bool ICoverable.HasAnyCover()
 	{

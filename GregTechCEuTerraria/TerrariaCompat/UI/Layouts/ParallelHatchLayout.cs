@@ -7,11 +7,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Layout for `parallel_hatch`. Adapted from upstream's `IntInputWidget`
-// (ParallelHatchPartMachine.java:51-56) - Terraria has no native int-input
-// widget, so we surface the value as stepper buttons (-1 / +1 + min / max
-// shortcuts) plus a live readout. Every click ships through ParallelSetAction
-// for server-authority + clamping in SetCurrentParallel.
 public static class ParallelHatchLayout
 {
 	private const int Padding = 12;
@@ -26,7 +21,7 @@ public static class ParallelHatchLayout
 		var layout = new MachineUILayout
 		{
 			Width  = Padding + rowW + Padding,
-			Height = Padding + TitleH + 6 + 18 /* readout */ + 6 + BtnH + Padding,
+			Height = Padding + TitleH + 6 + 18 + 6 + BtnH + Padding,
 			Title  = hatch.DisplayName,
 		};
 
@@ -40,27 +35,21 @@ public static class ParallelHatchLayout
 		y += 18 + 6;
 		int x = Padding;
 		layout.Widgets.Add(new ButtonSpec(x, y, "MIN",
-			() => MachineActions.Send(new ParallelSetAction(ParallelHatchPartMachine.MIN_PARALLEL), hatch),
-			Tooltip: "Set parallel count to 1"));
+			() => MachineActions.Send(new ParallelSetAction(ParallelHatchPartMachine.MIN_PARALLEL), hatch)));
 		x += BtnW + Gap;
 		layout.Widgets.Add(new ButtonSpec(x, y, "-1",
-			() => MachineActions.Send(new ParallelSetAction(hatch.CurrentParallel - 1), hatch),
-			Tooltip: "Decrease parallel count by 1"));
+			() => MachineActions.Send(new ParallelSetAction(hatch.CurrentParallel - 1), hatch)));
 		x += BtnW + Gap;
 		layout.Widgets.Add(new ButtonSpec(x, y, "+1",
-			() => MachineActions.Send(new ParallelSetAction(hatch.CurrentParallel + 1), hatch),
-			Tooltip: "Increase parallel count by 1"));
+			() => MachineActions.Send(new ParallelSetAction(hatch.CurrentParallel + 1), hatch)));
 		x += BtnW + Gap;
 		layout.Widgets.Add(new ButtonSpec(x, y, "MAX",
-			() => MachineActions.Send(new ParallelSetAction(hatch.MaxParallel), hatch),
-			Tooltip: $"Set parallel count to max ({hatch.MaxParallel})"));
+			() => MachineActions.Send(new ParallelSetAction(hatch.MaxParallel), hatch)));
 
 		return layout;
 	}
 
-	// Inline widget spec - a text button that fires its callback on left click.
-	// Kept private here because no other layout needs a stepper-style button.
-	private sealed record ButtonSpec(int X, int Y, string Label, System.Action OnClick, string Tooltip)
+	private sealed record ButtonSpec(int X, int Y, string Label, System.Action OnClick, string? Tooltip = null)
 		: WidgetSpec(X, Y)
 	{
 		public override UIElement Create(MetaMachine entity)

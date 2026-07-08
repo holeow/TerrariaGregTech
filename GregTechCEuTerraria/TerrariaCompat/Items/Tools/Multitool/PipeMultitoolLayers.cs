@@ -49,6 +49,9 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 {
 	private static readonly (PipeSize, int)[] T = PipeUnits.Item;
 
+	private const string SimpleMat = "simple_item";
+	private static readonly string SimpleKey = EncodeKey(SimpleMat, false);
+
 	public override string Id => "item_pipe";
 	public override string Name => "Item Pipe";
 	public override IReadOnlyList<int> WidthOptions => PipeUnits.Options(T);
@@ -92,6 +95,18 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 			float sortRate = g.rep.BuildItemCellForSize(PipeSize.Normal).TransferRate;
 			rows.Add((sortRate, mat, new MultitoolVariant(EncodeKey(mat, restr), icon, label, g.units)));
 		}
+
+		int simpleUnits = MultitoolBudget.CountUnits(p, SimpleUnitOf);
+		if (simpleUnits > 0)
+		{
+			var scell = SimpleItemPipeItem.BuildCell(size);
+			int sicon = SimpleItemPipeItem.TypeFor(size);
+			if (sicon <= 0) sicon = SimpleItemPipeItem.TypeFor(PipeSize.Normal);
+			string slabel = ((int)(scell.TransferRate * 64 + 0.5f)).ToString();
+			float ssort = SimpleItemPipeItem.BuildCell(PipeSize.Normal).TransferRate;
+			rows.Add((ssort, SimpleMat, new MultitoolVariant(SimpleKey, sicon, slabel, simpleUnits)));
+		}
+
 		rows.Sort((a, b) =>
 		{
 			int c = a.rate.CompareTo(b.rate);
@@ -118,6 +133,17 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 	{
 		variant = default;
 		if (!DecodeKey(key, out string mat, out bool restr)) return false;
+		if (mat == SimpleMat)
+		{
+			PipeSize ssize = SelSize;
+			int sicon = SimpleItemPipeItem.TypeFor(ssize);
+			if (sicon <= 0) return false;
+			var scell = SimpleItemPipeItem.BuildCell(ssize);
+			variant = new MultitoolVariant(key, sicon,
+				((int)(scell.TransferRate * 64 + 0.5f)).ToString(),
+				MultitoolBudget.CountUnits(p, SimpleUnitOf));
+			return true;
+		}
 		var rep = ResolvePipeItem(mat, restr);
 		if (rep is null) return false;
 		PipeSize size = SelSize;
@@ -131,14 +157,32 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 	public override int CommitPlace(Player p, IReadOnlyList<Point> path, in MultitoolVariant v, int width)
 	{
 		if (!DecodeKey(v.Key, out string mat, out bool restr)) return 0;
+		bool simple = mat == SimpleMat;
 		PipeSize size = PipeUnits.SizeOf(T, width);
 		int unit = PipeUnits.UnitsOf(T, size);
-		var rep = ResolvePipeItem(mat, restr);
-		if (rep is null) return 0;
-		var cell = rep.BuildItemCellForSize(size);
+
+		ItemPipeCell cell;
+		System.Func<Item, int> unitOf;
+		int refundType, refundUnit;
+		if (simple)
+		{
+			cell = SimpleItemPipeItem.BuildCell(size);
+			unitOf = SimpleUnitOf;
+			refundType = SimpleItemPipeItem.TypeFor(PipeSize.Small);
+			refundUnit = PipeUnits.UnitsOf(T, PipeSize.Small);
+		}
+		else
+		{
+			var rep = ResolvePipeItem(mat, restr);
+			if (rep is null) return 0;
+			cell = rep.BuildItemCellForSize(size);
+			unitOf = it => UnitOf(it, mat, restr);
+			refundType = ResolveId(mat, restr, PipeSize.Small) ?? 0;
+			refundUnit = PipeUnits.UnitsOf(T, PipeSize.Small);
+		}
 
 		MultitoolIntersect.ResetWarning();
-		int budget = MultitoolBudget.CountUnits(p, it => UnitOf(it, mat, restr));
+		int budget = MultitoolBudget.CountUnits(p, unitOf);
 		int spent = 0, placed = 0;
 		bool acted = false;
 		foreach (var pt in path)
@@ -160,11 +204,11 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 				placed++;
 				acted = true;
 				if (existing.HasValue) RefundCellAsSmallest(p, existing.Value);
+				if (simple) SimpleItemPipeItem.AutoInsertOnAdjacentStorage(PipeKind.Item, pt.X, pt.Y);
 			}
 		}
 		if (spent > 0)
-			MultitoolBudget.SpendUnits(p, it => UnitOf(it, mat, restr), spent,
-				ResolveId(mat, restr, PipeSize.Small) ?? 0, PipeUnits.UnitsOf(T, PipeSize.Small));
+			MultitoolBudget.SpendUnits(p, unitOf, spent, refundType, refundUnit);
 		if (acted)
 			Terraria.Audio.SoundEngine.PlaySound(SoundID.Item50, new Vector2(path[0].X * 16f, path[0].Y * 16f));
 		return placed;
@@ -187,8 +231,20 @@ internal sealed class ItemPipeMultitoolLayer : MultitoolLayer
 		it.ModItem is PipeItem pi && pi.Kind == PipeKind.Item && pi.MaterialId == mat && pi.Restrictive == restr
 			? PipeUnits.UnitsOf(T, pi.Size) : 0;
 
+	private static int SimpleUnitOf(Item it) =>
+		it.ModItem is SimpleItemPipeItem && SimpleItemPipeItem.TryGetSize(it.type, out var s)
+			? PipeUnits.UnitsOf(T, s) : 0;
+
 	private static void RefundCellAsSmallest(Player p, ItemPipeCell cell)
 	{
+		if (cell.IsSimple)
+		{
+			int simpleSmall = SimpleItemPipeItem.TypeFor(PipeSize.Small);
+			if (simpleSmall <= 0) return;
+			int sn = PipeUnits.UnitsOf(T, cell.Size) / PipeUnits.UnitsOf(T, PipeSize.Small);
+			if (sn > 0) PlayerGive.Give(p, p.GetSource_ItemUse(p.HeldItem), simpleSmall, sn);
+			return;
+		}
 		int? small = ResolveId(cell.MaterialId, cell.Restrictive, PipeSize.Small);
 		if (small is null) return;
 		int n = PipeUnits.UnitsOf(T, cell.Size) / PipeUnits.UnitsOf(T, PipeSize.Small);
@@ -229,10 +285,38 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 {
 	private static readonly (PipeSize, int)[] T = PipeUnits.Fluid;
 
+	private const string SimpleMat = "simple_fluid";
+
+	private static readonly int[] SimpleWidthOptions = BuildSimpleWidthOptions();
+
 	public override string Id => "fluid_pipe";
 	public override string Name => "Fluid Pipe";
-	public override IReadOnlyList<int> WidthOptions => PipeUnits.Options(T);
+	public override IReadOnlyList<int> WidthOptions
+	{
+		get
+		{
+			var armed = MultitoolState.ArmedFor(Id);
+			if (armed == SimpleMat) return SimpleWidthOptions;
+			if (armed != null) return AvailableWidths(armed);
+			return PipeUnits.Options(T);
+		}
+	}
 	public override string WidthLabel(int units) => PipeUnits.Cap(PipeSizes.Word(PipeUnits.SizeOf(T, units)));
+
+	private static int[] BuildSimpleWidthOptions()
+	{
+		var a = new int[SimpleFluidPipeItem.Sizes.Length];
+		for (int i = 0; i < a.Length; i++) a[i] = PipeUnits.UnitsOf(T, SimpleFluidPipeItem.Sizes[i]);
+		return a;
+	}
+
+	private static int[] AvailableWidths(string mat)
+	{
+		var list = new List<int>(T.Length);
+		foreach (var (size, units) in T)
+			if (ResolveId(mat, size) != null) list.Add(units);
+		return list.Count > 0 ? list.ToArray() : PipeUnits.Options(T);
+	}
 
 	private PipeSize SelSize => PipeUnits.SizeOf(T, MultitoolState.WidthFor(Id));
 
@@ -272,6 +356,18 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 			int sort = g.rep.BuildFluidCellForSize(PipeSize.Normal)?.Throughput ?? 0;
 			rows.Add((sort, mat, new MultitoolVariant(mat, icon, label, g.units)));
 		}
+
+		int simpleUnits = MultitoolBudget.CountUnits(p, SimpleUnitOf);
+		if (simpleUnits > 0)
+		{
+			PipeSize ssize = MultitoolState.ArmedFor(Id) == SimpleMat ? size : PipeSize.Normal;
+			var scell = SimpleFluidPipeItem.BuildCell(ssize);
+			int sicon = SimpleFluidPipeItem.TypeFor(ssize);
+			if (sicon <= 0) sicon = SimpleFluidPipeItem.TypeFor(PipeSize.Normal);
+			int ssort = SimpleFluidPipeItem.BuildCell(PipeSize.Normal).Throughput;
+			rows.Add((ssort, SimpleMat, new MultitoolVariant(SimpleMat, sicon, scell.Throughput.ToString(), simpleUnits)));
+		}
+
 		rows.Sort((a, b) =>
 		{
 			int c = a.through.CompareTo(b.through);
@@ -297,6 +393,16 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 	public override bool TryBuildVariant(Player p, string key, out MultitoolVariant variant)
 	{
 		variant = default;
+		if (key == SimpleMat)
+		{
+			PipeSize ssize = SelSize;
+			int sicon = SimpleFluidPipeItem.TypeFor(ssize);
+			if (sicon <= 0) return false;
+			var scell = SimpleFluidPipeItem.BuildCell(ssize);
+			variant = new MultitoolVariant(key, sicon, scell.Throughput.ToString(),
+				MultitoolBudget.CountUnits(p, SimpleUnitOf));
+			return true;
+		}
 		var rep = ResolvePipeItem(key);
 		if (rep is null) return false;
 		PipeSize size = SelSize;
@@ -310,14 +416,32 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 	public override int CommitPlace(Player p, IReadOnlyList<Point> path, in MultitoolVariant v, int width)
 	{
 		string mat = v.Key;
+		bool simple = mat == SimpleMat;
 		PipeSize size = PipeUnits.SizeOf(T, width);
 		int unit = PipeUnits.UnitsOf(T, size);
-		var rep = ResolvePipeItem(mat);
-		var cell = rep?.BuildFluidCellForSize(size);
-		if (cell is not { } fcell) return 0;
+
+		FluidPipeCell fcell;
+		System.Func<Item, int> unitOf;
+		int refundType, refundUnit;
+		if (simple)
+		{
+			fcell = SimpleFluidPipeItem.BuildCell(size);
+			unitOf = SimpleUnitOf;
+			refundType = SimpleFluidPipeItem.TypeFor(PipeSize.Tiny);
+			refundUnit = PipeUnits.UnitsOf(T, PipeSize.Tiny);
+		}
+		else
+		{
+			var rep = ResolvePipeItem(mat);
+			var cell = rep?.BuildFluidCellForSize(size);
+			if (cell is not { } mcell) return 0;
+			fcell = mcell;
+			unitOf = it => UnitOf(it, mat);
+			(refundType, refundUnit) = SmallestRefund(mat);
+		}
 
 		MultitoolIntersect.ResetWarning();
-		int budget = MultitoolBudget.CountUnits(p, it => UnitOf(it, mat));
+		int budget = MultitoolBudget.CountUnits(p, unitOf);
 		int spent = 0, placed = 0;
 		bool acted = false;
 		foreach (var pt in path)
@@ -339,11 +463,11 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 				placed++;
 				acted = true;
 				if (existing.HasValue) RefundCellAsSmallest(p, existing.Value);
+				if (simple) SimpleItemPipeItem.AutoInsertOnAdjacentStorage(PipeKind.Fluid, pt.X, pt.Y);
 			}
 		}
 		if (spent > 0)
-			MultitoolBudget.SpendUnits(p, it => UnitOf(it, mat), spent,
-				ResolveId(mat, PipeSize.Tiny) ?? 0, PipeUnits.UnitsOf(T, PipeSize.Tiny));
+			MultitoolBudget.SpendUnits(p, unitOf, spent, refundType, refundUnit);
 		if (acted)
 			Terraria.Audio.SoundEngine.PlaySound(SoundID.Item50, new Vector2(path[0].X * 16f, path[0].Y * 16f));
 		return placed;
@@ -366,12 +490,38 @@ internal sealed class FluidPipeMultitoolLayer : MultitoolLayer
 		it.ModItem is PipeItem pi && pi.Kind == PipeKind.Fluid && pi.MaterialId == mat
 			? PipeUnits.UnitsOf(T, pi.Size) : 0;
 
+	private static int SimpleUnitOf(Item it) =>
+		it.ModItem is SimpleFluidPipeItem && SimpleFluidPipeItem.TryGetSize(it.type, out var s)
+			? PipeUnits.UnitsOf(T, s) : 0;
+
 	private static void RefundCellAsSmallest(Player p, FluidPipeCell cell)
 	{
-		int? tiny = ResolveId(cell.MaterialId, PipeSize.Tiny);
-		if (tiny is null) return;
-		int n = PipeUnits.UnitsOf(T, cell.Size) / PipeUnits.UnitsOf(T, PipeSize.Tiny);
-		if (n > 0) PlayerGive.Give(p, p.GetSource_ItemUse(p.HeldItem), tiny.Value, n);
+		if (cell.IsSimple)
+		{
+			int simpleTiny = SimpleFluidPipeItem.TypeFor(PipeSize.Tiny);
+			if (simpleTiny <= 0) return;
+			int sn = PipeUnits.UnitsOf(T, cell.Size) / PipeUnits.UnitsOf(T, PipeSize.Tiny);
+			if (sn > 0) PlayerGive.Give(p, p.GetSource_ItemUse(p.HeldItem), simpleTiny, sn);
+			return;
+		}
+		int cellUnits = PipeUnits.UnitsOf(T, cell.Size);
+		int bestUnits = int.MaxValue, bestType = 0;
+		foreach (var (size, units) in T)
+		{
+			if (units <= 0 || units > cellUnits || cellUnits % units != 0) continue;
+			int? id = ResolveId(cell.MaterialId, size);
+			if (id is null) continue;
+			if (units < bestUnits) { bestUnits = units; bestType = id.Value; }
+		}
+		if (bestType == 0) return;
+		PlayerGive.Give(p, p.GetSource_ItemUse(p.HeldItem), bestType, cellUnits / bestUnits);
+	}
+
+	private static (int type, int unit) SmallestRefund(string mat)
+	{
+		foreach (var (size, units) in T)
+			if (ResolveId(mat, size) is int t) return (t, units);
+		return (0, 1);
 	}
 
 	private static int? ResolveId(string mat, PipeSize size) =>

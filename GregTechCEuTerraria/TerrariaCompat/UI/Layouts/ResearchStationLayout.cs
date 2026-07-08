@@ -6,24 +6,12 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric.Research;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Port of ResearchStationMachine.addDisplayText (a CUSTOM override, NOT the
-// generic WEMM body) - hence its own layout rather than generic_multi:
-//   .setWorkingStatus(recipeLogic.isWorkingEnabled(), recipeLogic.isActive())
-//   .setWorkingStatusKeys("idling", "work_paused", "research_station.researching")
-//   .addEnergyUsageLine(energyContainer)
-//   .addEnergyTierLine(tier)
-//   .addWorkingStatusLine()
-//   .addProgressLineOnlyPercent(recipeLogic.getProgressPercent())
-// No parallels / machine-mode / fail-reason / output lines (upstream's research
-// addDisplayText has none). WAITING counts as active -> shows "Researching" while
-// under-powered, exactly like upstream (an under-powered station is only visible
-// as stuck 0% there - which is why the CWU line below was approved).
 public static class ResearchStationLayout
 {
 	private const int Padding = 12;
 	private const int TitleH  = 14;
-	private const int BodyW   = 320;
-	private const int BodyH   = 14 * 10;
+	private const int BodyW   = 190;
+	private const int BodyH   = 120;
 
 	public static MachineUILayout Build(ResearchStationMachine machine)
 	{
@@ -35,7 +23,8 @@ public static class ResearchStationLayout
 		};
 		layout.Widgets.Add(new MultiLineDynamicLabelWidgetSpec(
 			X: Padding, Y: Padding + TitleH,
-			Getter: () => BuildDisplayLines(machine)));
+			Getter: () => BuildDisplayLines(machine),
+			Width: BodyW, Height: BodyH));
 		return layout;
 	}
 
@@ -44,12 +33,9 @@ public static class ResearchStationLayout
 		var lines = new List<string>();
 		var recipeLogic = machine.Recipe;
 
-		// Unformed: actionable matcher error (same TerrariaCompat first-line
-		// deviation generic_multi uses) so the player sees WHY it won't form.
 		if (!machine.IsFormed)
 			lines.Add(RecipeStatusText.StatusLineForMulti(machine, recipeLogic));
 
-		// Verbatim upstream ResearchStationMachine.addDisplayText.
 		Api.Machine.Multiblock.MultiblockDisplayText.Create(lines, machine.IsFormed)
 			.SetWorkingStatus(recipeLogic.IsWorkingEnabled(), machine.DisplayActive)
 			.SetWorkingStatusKeys(
@@ -61,11 +47,6 @@ public static class ResearchStationLayout
 			.AddWorkingStatusLine()
 			.AddProgressLineOnlyPercent(recipeLogic.GetProgressPercent());
 
-		// DEVIATION: upstream's addComputationUsage
-		// ExactLine is commented out (TODO). Surfaced + enhanced - capacity vs the
-		// active/blocked recipe's required CWU/t, red + an "insufficient" line when
-		// the HPCA chain can't meet it. Both values are read-only server snapshots
-		// (GetMaxCWUt + non-mutating item match) synced to MP clients.
 		int capacity = machine.DisplayCapacityCwu;
 		int req      = machine.DisplayRequiredCwu;
 		if (req > 0)

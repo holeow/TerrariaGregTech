@@ -14,25 +14,15 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.Api.Machine.Trait;
 
-// port of com.gregtechceu.gtceu.api.machine.trait.RecipeLogic.
-//
-// adaptations:
-//   - Component -> string
-//   - ChanceCacheMap -> flat Dictionary<string, int> keyed by ChanceKey(Ingredient)
-//   - @SaveField, @SyncToClient, ClientFieldChangeListener dropped - MachineStateSyncPacket carries the Save() blob
-//   - RecipeHelper.matchContents / handleRecipeIO / matchTickRecipe collapsed
-//     into IRecipeLogicMachine.TryMatchInputContents / TryConsumeInputContents
-//     / HasOutputRoomContents / DepositOutputContents. Items and fluids are
-//     passed as separate args. ActionResult preserved so EU brownout
-//     detection works precisely (gates on io == IN && capability == EU).
-//   - MultiblockControllerCover detection collapsed to IRecipeLogicMachine.PreventPowerFail
-//   - IFancyTooltip dropped
 public class RecipeLogic : MachineTrait, IWorkable
 {
 	public static readonly MachineTraitType<RecipeLogic> TYPE = new(allowMultipleInstances: false);
 	public override MachineTraitType TraitType => TYPE;
 
-	// === Mutable state ==================
+	public static Func<IRecipeLogicMachine, GTRecipe?, GTRecipe?>? AmbientRecipeModifier;
+
+	protected static GTRecipe? ApplyAmbient(IRecipeLogicMachine machine, GTRecipe? recipe) =>
+		AmbientRecipeModifier is null ? recipe : AmbientRecipeModifier(machine, recipe);
 
 	public List<GTRecipe>? lastFailedMatches;
 
@@ -77,7 +67,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 	public bool IsSuspendAfterFinish() => _suspendAfterFinish;
 	public void SetSuspendAfterFinish(bool v) => _suspendAfterFinish = v;
 
-	// Chance accumulator - flat Dictionary<string, int> keyed by ChanceKey(Ingredient)
 	protected readonly Dictionary<string, int> _chanceCaches = new();
 	public IReadOnlyDictionary<string, int> GetChanceCaches() => _chanceCaches;
 	private static readonly Random Rng = new();
@@ -85,8 +74,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 	protected TickableSubscription? _subscription;
 
 	protected object? _workingSound;
-
-	// === Construction / attachment ==========================================
 
 	public RecipeLogic() : base() { }
 
@@ -194,13 +181,11 @@ public class RecipeLogic : MachineTrait, IWorkable
 		bool unsubscribe = false;
 		if (IsSuspend())
 		{
-			// Machine is paused and can unsubscribe.
 			unsubscribe = true;
 		}
 		else if (_lastRecipe == null && IsIdle() && !machine.KeepSubscribing() && !_recipeDirty &&
 		         lastFailedMatches == null)
 		{
-			// No recipes available and the machine wants to unsubscribe until notified.
 			unsubscribe = true;
 		}
 		if (IsIdle())
@@ -255,13 +240,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 
 	public virtual bool CheckMatchedRecipeAvailable(GTRecipe match)
 	{
-		// Deviation from upstream: pre-screen the raw recipe against the
-		// machine's inputs BEFORE running FullModifyRecipe. Otherwise modifier-
-		// side cancellations (insufficient_voltage / coil_temperature_too_low
-		// / wrong_machine_type - see GTRecipeModifiers) record their reason
-		// for every too-high-V candidate while the input bus is empty, and an
-		// idle multi surfaces "Voltage Tier Too Low" on hover even though the
-		// player hasn't put anything in
 		var rawMatch = MatchRecipe(match);
 		if (!rawMatch.IsSuccess)
 		{
@@ -269,7 +247,7 @@ public class RecipeLogic : MachineTrait, IWorkable
 			return false;
 		}
 
-		var modified = GetRLMachine().FullModifyRecipe(match);
+		var modified = ApplyAmbient(GetRLMachine(), GetRLMachine().FullModifyRecipe(match));
 		if (modified != null)
 		{
 			var recipeMatch = CheckRecipe(modified);
@@ -441,10 +419,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 			SetStatus(Status.WORKING);
 			_progress = 0;
 			_duration = recipe.Duration;
-			// Adaptation: ActiveEut is a machine-side display value (the UI
-			// EU/t label). Upstream has no equivalent - per-tick EU is read
-			// from the recipe's tickInputs each tick. We cache the post-modifier
-			// real EU/t so the UI matches actual consumption.
 			GetRLMachine().ActiveEut = RecipeHelper.GetRealEUt(recipe).GetTotalEU();
 			_isActive = true;
 			GetRLMachine().LastRecipeId = recipe.Id;
@@ -507,6 +481,7 @@ public class RecipeLogic : MachineTrait, IWorkable
 			{
 				if (_lastRecipe != null && _duration > 0)
 				{
+					_runDelay = 0;
 					SetStatus(Status.WORKING);
 				}
 				else
@@ -548,7 +523,7 @@ public class RecipeLogic : MachineTrait, IWorkable
 			{
 				if (_lastOriginRecipe != null)
 				{
-					var modified = GetRLMachine().FullModifyRecipe(_lastOriginRecipe.Copy());
+					var modified = ApplyAmbient(GetRLMachine(), GetRLMachine().FullModifyRecipe(_lastOriginRecipe.Copy()));
 					if (modified == null)
 					{
 						MarkLastRecipeDirty();
@@ -591,18 +566,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 		}
 	}
 
-	// === Chance roll - mirror of upstream ChanceLogic.OR ====================
-	//
-	// Upstream ChanceLogic.OR (ChanceLogic.java:42-69):
-	//     cached  = previously stored "leftover chance" (random initial)
-	//     chance  = newChance + cached
-	//     while (chance >= maxChance) { produce one; chance -= maxChance;
-	//                                   newChance -= maxChance; }
-	//     cache[key] = newChance/2 + cached
-	//
-	// Makes probabilistic outputs deterministic over time. The flat key
-	// space (vs upstream's per-capability IdentityHashMap) is documented
-	// at the class level.
 	public bool RollChance(Api.Recipe.Content.Content content)
 	{
 		int max = content.MaxChance;
@@ -641,16 +604,6 @@ public class RecipeLogic : MachineTrait, IWorkable
 			PutFailureReason(rlm.GetRecipeLogic(), recipe, reason);
 	}
 
-	// Priority ranking for failure reasons - higher = more informative for
-	// the player. Used by `Save()` to pick which reason to ship when many
-	// recipes fail simultaneously. Ordering:
-	//   - `insufficient_out`: inputs DID match; output blocked.        Most actionable.
-	//   - `insufficient_eu` / `eu_too_high`: inputs+outputs OK; power. Actionable.
-	//   - `recipe_modifier.*`: specific modifier rejection (no rotor, ...). Actionable.
-	//   - `recipe.condition.*`: an environmental gate failed.          Actionable.
-	//   - `recipe_logic.no_capabilities` / `no_contents`: structural.  Less actionable.
-	//   - `recipe_logic.insufficient_in`: most-common noise.           Least actionable.
-	//   - everything else: mid-tier default.
 	private static int RankFailureReason(string r) => r switch
 	{
 		"gtceu.recipe_logic.insufficient_out" => 100,

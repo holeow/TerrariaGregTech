@@ -221,6 +221,8 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 	{
 		if (!MachineCellResolver.TryFindMachineAt(i, j, out var machine)) return;
 		if (!machine.TryConsumeWirePulse()) return;
+		if (machine is IWirePulseReceiver machineReceiver)
+			machineReceiver.OnWirePulse();
 		foreach (var cover in ((ICoverable)machine).GetCovers())
 			if (cover is IWirePulseReceiver receiver)
 				receiver.OnWirePulse();

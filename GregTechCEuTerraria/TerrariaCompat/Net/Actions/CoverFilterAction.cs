@@ -12,19 +12,6 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net.Actions;
 
-// Server-authoritative cover-filter edit - the matcher (phantom) slots, the
-// blacklist / ignore-NBT toggles, and the filter-item install slot.
-//
-// The matcher-slot logic is a verbatim port of upstream PhantomSlotWidget
-// .slotClickPhantom: a phantom slot holds a "ghost" item/fluid (type + count),
-// never a real one. LMB with a held item sets it (count = held count); RMB
-// sets count 1; empty-handed LMB/RMB steps the count -1/+1; Shift halves /
-// doubles; middle-click clears. The held item is read-only here - phantom
-// slots don't consume it (the one upstream divergence: no JEI ghost-drag, so
-// you click with a real held item / a fluid container instead).
-//
-// The filter-item slot IS a real cursor<->slot swap (the filter item is a real
-// inventory item) - server-confirmed cursor write-back, same as CoverAction.
 public sealed class CoverFilterAction : ICoverAction
 {
 	public enum Op : byte
@@ -33,13 +20,10 @@ public sealed class CoverFilterAction : ICoverAction
 		ToggleBlacklist = 1,
 		ToggleIgnoreNbt = 2,
 		FilterSlot      = 3,
-		SetTagExpr      = 4,   // tag-filter expression text (TagFilter.SetOreDict)
-		// Set the filter TYPE on a cover programmatically (no cursor item) -
-		// used by the pipe settings panel where filter installation has no
-		// item economy. _index carries the FilterType byte (0=none, 1=simple,
-		// 2=tag). Server resolves the matching filter ITEM and installs it
-		// via the cover's UiItemFilterHandler / UiFluidFilterHandler.
+		SetTagExpr      = 4,
 		SetFilterType   = 5,
+		MatcherSetFluid = 6,
+		MatcherSetAmount = 7,
 	}
 
 	public PacketType Type => PacketType.CoverFilter;
@@ -52,6 +36,7 @@ public sealed class CoverFilterAction : ICoverAction
 	private bool _shift;
 	private Item _held = new();
 	private string _text = "";
+	private long _amount;
 
 	public CoverFilterAction() { }
 
@@ -68,9 +53,14 @@ public sealed class CoverFilterAction : ICoverAction
 	public static CoverFilterAction TagExpr(CoverSide side, bool fluid, string expr) =>
 		new() { _side = side, _op = Op.SetTagExpr, _fluid = fluid, _text = expr ?? "" };
 
-	// `type` is the PipeFilterType byte (see PipeSettingsState).
 	public static CoverFilterAction SetType(CoverSide side, bool fluid, int type) =>
 		new() { _side = side, _op = Op.SetFilterType, _fluid = fluid, _index = type };
+
+	public static CoverFilterAction MatcherSetFluid(CoverSide side, int index, string fluidId) =>
+		new() { _side = side, _op = Op.MatcherSetFluid, _fluid = true, _index = index, _text = fluidId ?? "" };
+
+	public static CoverFilterAction MatcherSetAmount(CoverSide side, bool fluid, int index, long amount) =>
+		new() { _side = side, _op = Op.MatcherSetAmount, _fluid = fluid, _index = index, _amount = amount };
 
 	public void Write(BinaryWriter w)
 	{
@@ -82,6 +72,7 @@ public sealed class CoverFilterAction : ICoverAction
 		w.Write(_shift);
 		w.WriteItem(_held);
 		w.Write(_text);
+		w.Write(_amount);
 	}
 
 	public void Read(BinaryReader r)
@@ -94,14 +85,11 @@ public sealed class CoverFilterAction : ICoverAction
 		_shift = r.ReadBoolean();
 		_held = r.ReadItem();
 		_text = r.ReadString();
+		_amount = r.ReadInt64();
 	}
 
 	public void Apply(ICoverable target, int byWhoAmI)
 	{
-		// Op.SetFilterType is the one op that doesn't require a pre-existing
-		// cover - its whole purpose is to CREATE / REPLACE the cover at the
-		// side. Dispatch it before the existing-cover gate. Every other op
-		// reads from / mutates an existing cover, so the gate stands.
 		if (_op == Op.SetFilterType)
 		{
 			if (target is TerrariaCompat.Pipelike.PipeCoverable pipe)
@@ -118,6 +106,30 @@ public sealed class CoverFilterAction : ICoverAction
 
 		switch (_op)
 		{
+			case Op.MatcherSetFluid:
+				if (cover.UiFluidFilter is { } fset && _index >= 0 && _index < fset.Matches.Length)
+				{
+					var fluid = FluidRegistry.Get(_text);
+					if (fluid is not null) fset.Matches[_index] = new FluidStack(fluid, 1000);
+				}
+				break;
+
+			case Op.MatcherSetAmount:
+				if (_fluid)
+				{
+					if (cover.UiFluidFilter is { } fa && _index >= 0 && _index < fa.Matches.Length && !fa.Matches[_index].IsEmpty)
+					{
+						fa.Matches[_index] = fa.Matches[_index].WithAmount((int)Math.Clamp(_amount, 1, fa.MaxStackSize));
+						fa.OnUpdated();
+					}
+				}
+				else if (cover.UiItemFilter is { } ia && _index >= 0 && _index < ia.Matches.Length && !ia.Matches[_index].IsAir)
+				{
+					ia.Matches[_index].stack = (int)Math.Clamp(_amount, 1, ia.MaxStackSize);
+					ia.OnUpdated();
+				}
+				break;
+
 			case Op.MatcherClick:
 				if (_fluid)
 				{
@@ -146,27 +158,13 @@ public sealed class CoverFilterAction : ICoverAction
 
 			case Op.SetTagExpr:
 			{
-				// The installed filter is a tag filter - set its expression.
-				// Layer-agnostic via the UiTagItemFilter / UiTagFluidFilter
-				// accessors on CoverBehavior: default impls read via the
-				// handler (Conveyor / Pump / Detector / Ender), filter-cover
-				// overrides read off the cover's AttachItem-driven lazy filter.
 				TagFilter? tag = _fluid ? (TagFilter?)cover.UiTagFluidFilter
 				                        : (TagFilter?)cover.UiTagItemFilter;
 				tag?.SetOreDict(_text);
 				break;
 			}
-
-			// Op.SetFilterType handled above the existing-cover gate - it's the
-			// one op that creates / replaces a cover so it doesn't require a
-			// pre-existing one to read from.
 		}
 	}
-
-	// === Phantom matcher clicks - verbatim PhantomSlotWidget.slotClickPhantom ==
-	// The item variant lives in Api.Cover.Filter.ItemFilterEdit (shared with the
-	// item-magnet filter UI); the fluid variant stays here - covers are its only
-	// consumer.
 
 	private static void FluidMatcherClick(SimpleFluidFilter filter, int index, int button, bool shift, FluidStack held)
 	{
@@ -204,10 +202,6 @@ public sealed class CoverFilterAction : ICoverAction
 		return next <= 0 ? FluidStack.Empty : slot.WithAmount(next);
 	}
 
-	// === Filter-item install slot - a real cursor<->slot swap ===================
-	// Empty slot + held filter item -> install one (cursor loses one). Occupied
-	// slot + empty cursor -> remove it back to the cursor. (Occupied + held is a
-	// no-op - take the installed filter out first; matches the cover-slot rule.)
 	private void FilterSlotSwap(ItemFilterHandler? handler, int byWhoAmI) => FilterSlotSwapImpl(handler, byWhoAmI);
 	private void FilterSlotSwap(FluidFilterHandler? handler, int byWhoAmI) => FilterSlotSwapImpl(handler, byWhoAmI);
 
@@ -241,8 +235,6 @@ public sealed class CoverFilterAction : ICoverAction
 			Main.mouseItem = cursor;
 	}
 
-	// Resolve the fluid carried by a held container - vanilla bucket, GT
-	// per-fluid bucket, or any IFluidHandlerItem (fluid cell). Empty otherwise.
 	private static FluidStack HeldFluid(Item held)
 	{
 		if (held is null || held.IsAir) return FluidStack.Empty;

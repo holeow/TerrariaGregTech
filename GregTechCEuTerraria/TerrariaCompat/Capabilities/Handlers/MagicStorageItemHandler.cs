@@ -51,6 +51,12 @@ public sealed class MagicStorageItemHandler : IItemHandler
 	{
 		if (item is null || item.IsAir) return new Item();
 
+		if (MagicStorageNbtGuard.HoldsCustomData(item))
+		{
+			MagicStorageNbtGuard.Warn();
+			return item.Clone();
+		}
+
 		int canFit = ComputeCanFit(item);
 		if (canFit <= 0) return item.Clone();
 
@@ -83,6 +89,12 @@ public sealed class MagicStorageItemHandler : IItemHandler
 
 		Item stored = Snapshot[idx];
 		if (stored.IsAir) return new Item();
+
+		if (MagicStorageNbtGuard.HoldsCustomData(stored))
+		{
+			MagicStorageNbtGuard.Warn();
+			return new Item();
+		}
 
 		int take = Math.Min(stored.stack, maxAmount);
 		if (take <= 0) return new Item();

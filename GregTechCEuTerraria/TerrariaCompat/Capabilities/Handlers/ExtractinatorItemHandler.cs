@@ -10,8 +10,8 @@ namespace GregTechCEuTerraria.TerrariaCompat.Capabilities.Handlers;
 
 public sealed class ExtractinatorItemHandler : IItemHandler
 {
-	private const uint RegularCooldownTicks = 180;
-	private const uint ChlorophyteCooldownTicks = 30;
+	private const uint RegularCooldownTicks = 600;
+	private const uint ChlorophyteCooldownTicks = 60;
 
 	private static readonly Dictionary<Point16, uint> LastRoll = new();
 

@@ -28,8 +28,7 @@ public static class RecipeRowRenderer
 	public const int CellPad   = 2;
 	private const int ArrowSize = 24;
 	private const int LabelHeight = 10;
-	private const int TagCyclePeriod = 48;
-	private const int CircuitCellWidth = CellSize;
+	private const int TagMembersListed = 12;
 
 	private static readonly Item[] TempSlot = { new() };
 	private static Mod? _mod;
@@ -37,13 +36,22 @@ public static class RecipeRowRenderer
 	private const int StationIconSize = 22;
 	private const int CraftButtonWidth  = 52;
 	private const int CraftButtonHeight = 22;
-	private const int MaxCircuit = 32;
-	private static readonly Asset<Texture2D>?[] _circuitByValue = new Asset<Texture2D>?[MaxCircuit + 1];
 
-	private static Dictionary<int, int>?    _invSnapshot;
-	private static Dictionary<string, int>? _fluidSnapshot;
+	private static IReadOnlyDictionary<int, int>?    _invSnapshot;
+	private static IReadOnlyDictionary<string, int>? _fluidSnapshot;
+
+	private static readonly Dictionary<string, int> EmptyFluids = new();
+
+	public static IReadOnlyDictionary<int, int>? HaveCountsOverride;
+
 	private static void EnsureInventorySnapshot()
 	{
+		if (HaveCountsOverride != null)
+		{
+			_invSnapshot   = HaveCountsOverride;
+			_fluidSnapshot = EmptyFluids;
+			return;
+		}
 		_invSnapshot   = GlobalRecipeBrowserState.InventoryCountsSnapshot();
 		_fluidSnapshot = GlobalRecipeBrowserState.FluidCountsSnapshot();
 	}
@@ -51,35 +59,35 @@ public static class RecipeRowRenderer
 	private static readonly Color TintFull    = new(60, 230, 60);
 	private static readonly Color TintPartial = new(240, 200, 40);
 
+	public static HashSet<int>? CoveredStationTiles;
+
+	private static Color? StationOverlay(int tile, string ownStation)
+	{
+		var covered = CoveredStationTiles;
+		if (covered == null) return null;
+		if (tile > 0) return covered.Contains(tile) ? null : new Color(220, 55, 45) * 0.5f;
+		return VanillaCraftingBridge.IsHandStation(ownStation) ? null : new Color(220, 55, 45) * 0.5f;
+	}
+
 	public static int MeasureWidth(GTRecipe recipe)
 	{
 		var inputs  = AllInputs(recipe);
 		var outputs = AllOutputs(recipe);
-		int circuit = ExtractCircuit(recipe, out _);
-		int cells = inputs.Count + outputs.Count - (circuit >= 0 ? 1 : 0);
-		int w = cells * (CellSize + CellPad) + ArrowSize + 12;
-		if (circuit >= 0) w += CircuitCellWidth + CellPad;
-		return w;
+		int cells = inputs.Count + outputs.Count;
+		return cells * (CellSize + CellPad) + ArrowSize + 12;
 	}
 
-	public static void Draw(SpriteBatch sb, Rectangle bounds, GTRecipe recipe, Color lightColor)
+	public static void Draw(SpriteBatch sb, Rectangle bounds, GTRecipe recipe, Color lightColor, bool craftButton = true, long amountScale = 1)
 	{
 		EnsureInventorySnapshot();
+		if (amountScale < 1) amountScale = 1;
 		int x = bounds.X + 4;
 		int cy = bounds.Y + 2;
 		bool craftable = FindAvailableVanillaCraft(recipe) != null;
 
-		int circuit = ExtractCircuit(recipe, out var circuitContent);
-		if (circuit >= 0)
-		{
-			DrawCircuitCell(sb, new Rectangle(x, cy, CircuitCellWidth, CellSize), circuit, lightColor);
-			x += CircuitCellWidth + CellPad;
-		}
-
 		foreach (var c in AllInputs(recipe))
 		{
-			if (ReferenceEquals(c, circuitContent)) continue;
-			DrawIngredient(sb, new Rectangle(x, cy, CellSize, CellSize), c, lightColor, isOutput: false);
+			DrawIngredient(sb, new Rectangle(x, cy, CellSize, CellSize), c, lightColor, isOutput: false, amountScale);
 			x += CellSize + CellPad;
 		}
 
@@ -88,51 +96,66 @@ public static class RecipeRowRenderer
 
 		foreach (var c in AllOutputs(recipe))
 		{
-			DrawIngredient(sb, new Rectangle(x, cy, CellSize, CellSize), c, lightColor, isOutput: true);
+			DrawIngredient(sb, new Rectangle(x, cy, CellSize, CellSize), c, lightColor, isOutput: true, amountScale);
 			x += CellSize + CellPad;
 		}
 
 		float labelX = x + 6;
 		string ownStation = recipe.RecipeType.RegistryName ?? "";
-		var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
-		int firstStationItem = 0;
-		if (stationKeys.Count > 0)
+		int nativeTile = recipe.Data.GetInt("nativeTile");
+		int[] stationTiles = recipe.Data.GetIntArray("stationTiles");
+		if (stationTiles.Length > 0)
 		{
-			foreach (var key in stationKeys)
+			foreach (int tile in stationTiles)
 			{
-				int it = StationIcon.ItemTypeFor(key, GetMod());
+				int it = StationIcon.ItemTypeForTile(tile);
 				if (it <= 0) continue;
-				if (firstStationItem == 0) firstStationItem = it;
-				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), it, lightColor);
+				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), it, StationOverlay(tile, ownStation));
 				labelX += StationIconSize + 4;
 			}
 		}
 		else
 		{
-			firstStationItem = StationIcon.ItemTypeFor(ownStation, GetMod());
-			if (firstStationItem > 0)
+			var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
+			int firstStationItem = 0;
+			if (stationKeys.Count > 0)
 			{
-				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), firstStationItem, lightColor);
-				labelX += StationIconSize + 4;
+				foreach (var key in stationKeys)
+				{
+					int it = StationIcon.ItemTypeFor(key, GetMod());
+					if (it <= 0) continue;
+					if (firstStationItem == 0) firstStationItem = it;
+					int tile = CraftingStationRegistry.TryGetTile(key, out int kt) ? kt : -1;
+					DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), it, StationOverlay(tile, ownStation));
+					labelX += StationIconSize + 4;
+				}
 			}
 			else
 			{
-				string stationLabel = StationIcon.TryGetDisplayName(ownStation, out var dn) ? dn : Humanize(ownStation);
-				if (stationLabel.Length > 0)
-					Terraria.Utils.DrawBorderString(sb, stationLabel,
-						new Vector2(labelX, cy + 1), new Color(180, 220, 255), 0.7f);
+				firstStationItem = StationIcon.ItemTypeFor(ownStation, GetMod());
+				if (firstStationItem > 0)
+				{
+					DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), firstStationItem, StationOverlay(nativeTile > 0 ? nativeTile : -1, ownStation));
+					labelX += StationIconSize + 4;
+				}
+				else
+				{
+					string stationLabel = StationIcon.TryGetDisplayName(ownStation, out var dn) ? dn : Humanize(ownStation);
+					if (stationLabel.Length > 0)
+						Terraria.Utils.DrawBorderString(sb, stationLabel,
+							new Vector2(labelX, cy + 1), new Color(180, 220, 255), 0.7f);
+				}
 			}
-		}
 
-		int nativeTile = recipe.Data.GetInt("nativeTile");
-		if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(ownStation))
-		{
-			int nativeItemType = StationIcon.ItemTypeForTile(nativeTile);
-			if (nativeItemType > 0 && nativeItemType != firstStationItem)
+			if (nativeTile > 0 && !VanillaCraftingBridge.IsHandStation(ownStation))
 			{
-				var alsoRect = new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize);
-				DrawItemIconFit(sb, alsoRect, nativeItemType, lightColor);
-				labelX += StationIconSize + 4;
+				int nativeItemType = StationIcon.ItemTypeForTile(nativeTile);
+				if (nativeItemType > 0 && nativeItemType != firstStationItem)
+				{
+					var alsoRect = new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize);
+					DrawItemIconFit(sb, alsoRect, nativeItemType, StationOverlay(nativeTile, ownStation));
+					labelX += StationIconSize + 4;
+				}
 			}
 		}
 		long eut = recipe.InputEUt.Voltage > 0 ? recipe.InputEUt.Voltage : recipe.OutputEUt.Voltage;
@@ -152,7 +175,7 @@ public static class RecipeRowRenderer
 				durStr = $"{recipe.Duration / 20.0:0.##}s";
 			}
 			string meta = eut > 0
-				? $"{durStr} * {eut} EU/t ({VoltageTiers.ShortName(VoltageTiers.MinTierForVoltage(eut))})"
+				? $"{durStr}   {eut} EU/t ({VoltageTiers.ShortName(VoltageTiers.MinTierForVoltage(eut))})"
 				: durStr;
 			Terraria.Utils.DrawBorderString(sb, meta,
 				new Vector2(labelX, cy + 14),
@@ -168,7 +191,7 @@ public static class RecipeRowRenderer
 				new Color(255, 210, 110) * (lightColor.A / 255f), 0.62f);
 		}
 
-		if (craftable)
+		if (craftButton && craftable)
 			DrawCraftButton(sb, CraftButtonRect(bounds));
 	}
 
@@ -186,6 +209,32 @@ public static class RecipeRowRenderer
 		new(bounds.Right - 6 - CraftButtonWidth,
 			bounds.Y + (RowHeight - CraftButtonHeight) / 2,
 			CraftButtonWidth, CraftButtonHeight);
+
+	public const int SelectGutter = 44;
+	public const int SelectButtonSize = 36;
+
+	public static Rectangle SelectButtonRect(Rectangle rowBounds) =>
+		new(rowBounds.X + 4, rowBounds.Y + (rowBounds.Height - SelectButtonSize) / 2, SelectButtonSize, SelectButtonSize);
+
+	public static void DrawSelectButton(SpriteBatch sb, Rectangle rect, bool hot)
+	{
+		var px = TextureAssets.MagicPixel.Value;
+		float t = (float)(0.5 + 0.22 * System.Math.Sin(Main.GameUpdateCount * 0.035));
+		var bg = Color.Lerp(new Color(36, 130, 60), new Color(96, 232, 122), t);
+		if (hot) bg = Color.Lerp(bg, Color.White, 0.25f);
+		sb.Draw(px, rect, bg);
+		var border = hot ? new Color(200, 255, 215) : new Color(28, 90, 45);
+		sb.Draw(px, new Rectangle(rect.X, rect.Y, rect.Width, 1), border);
+		sb.Draw(px, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), border);
+		sb.Draw(px, new Rectangle(rect.X, rect.Y, 1, rect.Height), border);
+		sb.Draw(px, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), border);
+		var font = FontAssets.MouseText.Value;
+		const float scale = 1.9f;
+		var size = font.MeasureString("+") * scale;
+		Terraria.Utils.DrawBorderString(sb, "+",
+			new Vector2(rect.X + (rect.Width - size.X) / 2f, rect.Y + (rect.Height - size.Y) / 2f - 2),
+			Color.White, scale);
+	}
 
 	public static Terraria.Recipe? FindAvailableVanillaCraft(GTRecipe recipe)
 	{
@@ -207,7 +256,7 @@ public static class RecipeRowRenderer
 		var sb = new System.Text.StringBuilder();
 		foreach (var c in recipe.Conditions)
 		{
-			if (sb.Length > 0) sb.Append(" * ");
+			if (sb.Length > 0) sb.Append("   ");
 			sb.Append(ConditionText(c));
 		}
 		return sb.ToString();
@@ -225,12 +274,8 @@ public static class RecipeRowRenderer
 		int x = bounds.X + 4;
 		int cy = bounds.Y + 2;
 
-		int circuit = ExtractCircuit(recipe, out var circuitContent);
-		if (circuit >= 0) x += CircuitCellWidth + CellPad;
-
 		foreach (var c in AllInputs(recipe))
 		{
-			if (ReferenceEquals(c, circuitContent)) continue;
 			var r = new Rectangle(x, cy, CellSize, CellSize);
 			if (r.Contains(mouse)) return ResolveItemType(c);
 			x += CellSize + CellPad;
@@ -245,21 +290,32 @@ public static class RecipeRowRenderer
 		return 0;
 	}
 
-	private static int ResolveItemType(RecipeContent content)
+	private static int ResolveItemType(RecipeContent content) => ItemTypeOf((Ingredient)content.Payload);
+
+	public static int ItemTypeOf(Ingredient ing) => Inner(ing) switch
 	{
-		var ing = (Ingredient)content.Payload;
-		return Inner(ing) switch
-		{
-			ItemStackIngredient isi    => isi.ItemType,
-			NBTPredicateIngredient nbt => nbt.ItemType,
-			TagIngredient tag          => tag.GetItems().Count > 0 ? tag.GetItems()[0].type : 0,
-			_                          => 0,
-		};
+		ItemStackIngredient isi    => isi.ItemType,
+		NBTPredicateIngredient nbt => nbt.ItemType,
+		TagIngredient tag          => tag.GetItems().Count > 0 ? tag.GetItems()[0].type : 0,
+		IntCircuitIngredient       => CircuitItemType(),
+		_                          => 0,
+	};
+
+	private static int _circuitItemType = -1;
+
+	private static int CircuitItemType()
+	{
+		if (_circuitItemType == -1)
+			_circuitItemType = GetMod() is { } mod && mod.TryFind<ModItem>("programmed_circuit", out var mi) ? mi.Type : 0;
+		return _circuitItemType;
 	}
 
-	private static void DrawIngredient(SpriteBatch sb, Rectangle dest, RecipeContent content, Color lightColor, bool isOutput)
+	private static int ScaledCount(Ingredient ing, long amountScale) =>
+		(int)System.Math.Min(int.MaxValue, (long)CountOf(ing) * amountScale);
+
+	private static void DrawIngredient(SpriteBatch sb, Rectangle dest, RecipeContent content, Color lightColor, bool isOutput, long amountScale = 1)
 	{
-		if (!isOutput) DrawAvailabilityBackdrop(sb, dest, content, lightColor);
+		if (!isOutput) DrawAvailabilityBackdrop(sb, dest, content, lightColor, amountScale);
 
 		var ing = (Ingredient)content.Payload;
 		if (IsFluid(ing))
@@ -271,7 +327,7 @@ public static class RecipeRowRenderer
 
 		if (Inner(ing) is TagIngredient tag && tag.GetItems().Count > 0)
 		{
-			DrawItemSprite(sb, dest, CycleMember(tag), CountOf(ing), lightColor);
+			DrawItemSprite(sb, dest, CycleMember(tag), ScaledCount(ing, amountScale), lightColor);
 			DrawTagGlyph(sb, dest, lightColor);
 			DrawChanceOverlay(sb, dest, content, lightColor, isOutput);
 			return;
@@ -284,14 +340,16 @@ public static class RecipeRowRenderer
 			return;
 		}
 
-		DrawItemSprite(sb, dest, itemType, CountOf(ing), lightColor, Inner(ing));
+		DrawItemSprite(sb, dest, itemType, ScaledCount(ing, amountScale), lightColor, Inner(ing));
 		DrawChanceOverlay(sb, dest, content, lightColor, isOutput);
 	}
 
-	private static void StampResearchIfAny(Item item, Ingredient? ing)
+	private static void ApplyIngredientState(Item item, Ingredient? ing)
 	{
 		if (ing is NBTPredicateIngredient nbt)
 			Items.ResearchDataGlobalItem.StampFromSnbt(item, nbt.OutputNbt);
+		if (ing is IntCircuitIngredient circ && item.ModItem is Items.IntCircuitItem ic)
+			ic.Configuration = circ.Configuration;
 	}
 
 	public static Item BuildDisplayItem(Api.Recipe.Content.Content content, int itemType)
@@ -299,16 +357,16 @@ public static class RecipeRowRenderer
 		var item = new Item();
 		item.SetDefaults(itemType);
 		if (content?.Payload is Ingredient ing)
-			StampResearchIfAny(item, Inner(ing));
+			ApplyIngredientState(item, Inner(ing));
 		return item;
 	}
 
-	private static void DrawAvailabilityBackdrop(SpriteBatch sb, Rectangle dest, RecipeContent content, Color lightColor)
+	private static void DrawAvailabilityBackdrop(SpriteBatch sb, Rectangle dest, RecipeContent content, Color lightColor, long amountScale = 1)
 	{
 		if (_invSnapshot is null || _fluidSnapshot is null) return;
 		var state = IsFluid((Ingredient)content.Payload)
-			? GlobalRecipeBrowserState.GetFluidAvailability(content, _fluidSnapshot)
-			: GlobalRecipeBrowserState.GetItemAvailability(content, _invSnapshot);
+			? GlobalRecipeBrowserState.GetFluidAvailability(content, _fluidSnapshot, amountScale)
+			: GlobalRecipeBrowserState.GetItemAvailability(content, _invSnapshot, amountScale);
 		if (state == GlobalRecipeBrowserState.AvailabilityState.None) return;
 		var tint = state == GlobalRecipeBrowserState.AvailabilityState.Full ? TintFull : TintPartial;
 		sb.Draw(TextureAssets.MagicPixel.Value, dest, tint * (0.85f * lightColor.A / 255f));
@@ -323,7 +381,7 @@ public static class RecipeRowRenderer
 			TempSlot[0] = new Item();
 			TempSlot[0].SetDefaults(itemType);
 			TempSlot[0].stack = stack;
-			StampResearchIfAny(TempSlot[0], researchSrc);
+			ApplyIngredientState(TempSlot[0], researchSrc);
 			ItemSlot.Draw(sb, TempSlot, ItemSlot.Context.CraftingMaterial, 0,
 				new Vector2(dest.X, dest.Y), lightColor);
 		}
@@ -336,8 +394,7 @@ public static class RecipeRowRenderer
 	private static int CycleMember(TagIngredient tag)
 	{
 		var items = tag.GetItems();
-		int idx = (int)(Main.GameUpdateCount / TagCyclePeriod % (uint)items.Count);
-		return items[idx].type;
+		return items[TagCycle.Index(items.Count)].type;
 	}
 
 	private static void DrawTagGlyph(SpriteBatch sb, Rectangle dest, Color lightColor)
@@ -416,32 +473,6 @@ public static class RecipeRowRenderer
 			lightColor * 0.7f, 0.55f);
 	}
 
-	private static void DrawCircuitCell(SpriteBatch sb, Rectangle dest, int circuit, Color lightColor)
-	{
-		var sprite = CircuitSprite(circuit);
-		if (sprite is null) { DrawCircuitFallback(sb, dest, circuit, lightColor); return; }
-		PointClampDraw.Draw(sb, () =>
-			sb.Draw(sprite, dest, null, lightColor, 0f, Vector2.Zero, SpriteEffects.None, 0f));
-	}
-
-	private static Texture2D? CircuitSprite(int value)
-	{
-		if (value < 0 || value > MaxCircuit) return null;
-		int fileIndex = value + 1;
-		_circuitByValue[value] ??= ModContent.Request<Texture2D>(
-			$"GregTechCEuTerraria/Content/Textures/item/programmed_circuit/{fileIndex}");
-		return _circuitByValue[value]?.Value;
-	}
-
-	private static void DrawCircuitFallback(SpriteBatch sb, Rectangle dest, int circuit, Color lightColor)
-	{
-		var px = TextureAssets.MagicPixel.Value;
-		sb.Draw(px, dest, new Color(15, 50, 55) * (lightColor.A / 255f));
-		TankFrame.DrawBorder(sb, dest, TankFrame.BorderColor * (lightColor.A / 255f));
-		Terraria.Utils.DrawBorderString(sb, circuit.ToString(),
-			new Vector2(dest.X + 4, dest.Y + 4), lightColor, 1.0f);
-	}
-
 	private static void DrawArrow(SpriteBatch sb, Rectangle dest, Color lightColor, bool craftable)
 	{
 		if (TextureAssets.CraftToggle[craftable ? 3 : 2]?.Value is not { } tex) return;
@@ -453,19 +484,8 @@ public static class RecipeRowRenderer
 	{
 		int x = bounds.X + 4;
 		int cy = bounds.Y + 2;
-		int circuit = ExtractCircuit(recipe, out var circuitContent);
-		if (circuit >= 0)
-		{
-			if (new Rectangle(x, cy, CircuitCellWidth, CellSize).Contains(mouse))
-			{
-				Main.instance.MouseText($"Programmed Circuit\nValue: {circuit}");
-				return;
-			}
-			x += CircuitCellWidth + CellPad;
-		}
 		foreach (var c in AllInputs(recipe))
 		{
-			if (ReferenceEquals(c, circuitContent)) continue;
 			if (new Rectangle(x, cy, CellSize, CellSize).Contains(mouse)) { EmitIngTooltip(c, isOutput: false); return; }
 			x += CellSize + CellPad;
 		}
@@ -506,14 +526,7 @@ public static class RecipeRowRenderer
 					string label = VanillaCraftingBridge.IsHandStation(stationId)
 						? "By Hand"
 						: StationIcon.TryGetDisplayName(stationId, out var dn) ? dn : Humanize(stationId);
-					var text = new System.Text.StringBuilder(label);
-					if (recipe.Conditions.Count > 0)
-					{
-						text.Append("\nConditions:");
-						foreach (var c in recipe.Conditions)
-							text.Append("\n  ").Append(ConditionText(c));
-					}
-					Main.instance.MouseText(text.ToString());
+					Main.instance.MouseText(label);
 					return;
 				}
 				labelX += StationIconSize + 4;
@@ -536,25 +549,13 @@ public static class RecipeRowRenderer
 			}
 		}
 
-		if (recipe.Conditions.Count > 0)
-		{
-			var text = new System.Text.StringBuilder("Conditions:");
-			foreach (var c in recipe.Conditions)
-				text.Append("\n  ").Append(ConditionText(c));
-			Main.instance.MouseText(text.ToString());
-		}
 	}
 
 	private static int TrailingStartX(GTRecipe recipe, Rectangle bounds)
 	{
 		int x = bounds.X + 4;
-		int circuit = ExtractCircuit(recipe, out var circuitContent);
-		if (circuit >= 0) x += CircuitCellWidth + CellPad;
-		foreach (var c in AllInputs(recipe))
-		{
-			if (ReferenceEquals(c, circuitContent)) continue;
+		foreach (var _ in AllInputs(recipe))
 			x += CellSize + CellPad;
-		}
 		x += ArrowSize + 6 + 2;
 		foreach (var _ in AllOutputs(recipe))
 			x += CellSize + CellPad;
@@ -628,38 +629,37 @@ public static class RecipeRowRenderer
 		if (Inner(ing) is TagIngredient tag && tag.GetItems().Count > 0)
 		{
 			var members = tag.GetItems();
-			var text = new System.Text.StringBuilder();
-			text.Append('#').Append(StripNs(tag.TagName));
-			text.Append("\n").Append(CountOf(ing)).Append("x - accepts any of:");
-			const int maxListed = 14;
-			for (int i = 0; i < members.Count && i < maxListed; i++)
-				text.Append("\n  ").Append(members[i].Name);
-			if (members.Count > maxListed)
-				text.Append("\n  +").Append(members.Count - maxListed).Append(" more");
-			text.Append(chanceLine);
-			Main.instance.MouseText(text.ToString());
+			string header = FriendlyGroupName(tag.TagName) ?? ("#" + StripNs(tag.TagName));
+			string chanceInline = chanceLine.Length > 0 ? " (" + chanceLine.TrimStart('\n') + ")" : "";
+			BrowserTooltipGlobal.Begin();
+			BrowserTooltipGlobal.AfterName(header, BrowserTooltipGlobal.Header);
+			BrowserTooltipGlobal.AfterName($"Accepts any of {members.Count} items{chanceInline}", BrowserTooltipGlobal.Detail);
+			BrowserTooltipGlobal.Append("Accepts any of:", BrowserTooltipGlobal.Header);
+			int shown = members.Count < TagMembersListed ? members.Count : TagMembersListed;
+			for (int i = 0; i < shown; i++)
+				BrowserTooltipGlobal.Append("  " + members[i].Name, BrowserTooltipGlobal.Member);
+			if (members.Count > TagMembersListed)
+				BrowserTooltipGlobal.Append("  +" + (members.Count - TagMembersListed) + " more", BrowserTooltipGlobal.Member);
+			Main.HoverItem = new Item();
+			Main.HoverItem.SetDefaults(CycleMember(tag));
+			Main.HoverItem.stack = CountOf(ing);
+			Main.instance.MouseText("");
 			return;
 		}
 
 		int itemType = ResolveItemType(content);
 		if (itemType > 0)
 		{
-			int count = CountOf(ing);
-			if (chanceLine.Length == 0)
+			Main.HoverItem = new Item();
+			Main.HoverItem.SetDefaults(itemType);
+			Main.HoverItem.stack = CountOf(ing);
+			ApplyIngredientState(Main.HoverItem, Inner(ing));
+			if (chanceLine.Length > 0)
 			{
-				Main.HoverItem = new Item();
-				Main.HoverItem.SetDefaults(itemType);
-				Main.HoverItem.stack = count;
-				StampResearchIfAny(Main.HoverItem, Inner(ing));
-				Main.instance.MouseText("");
+				BrowserTooltipGlobal.Begin();
+				BrowserTooltipGlobal.AfterName(chanceLine.TrimStart('\n'), BrowserTooltipGlobal.Chance);
 			}
-			else
-			{
-				var probe = new Item();
-				probe.SetDefaults(itemType);
-				StampResearchIfAny(probe, Inner(ing));
-				Main.instance.MouseText($"{probe.Name}\n{count}x{chanceLine}");
-			}
+			Main.instance.MouseText("");
 			return;
 		}
 		Main.instance.MouseText($"{ShortLabel(ing)}\n(unresolved){chanceLine}");
@@ -669,11 +669,8 @@ public static class RecipeRowRenderer
 	{
 		int x = bounds.X + 4;
 		int cy = bounds.Y + 2;
-		int circuit = ExtractCircuit(recipe, out var circuitContent);
-		if (circuit >= 0) x += CircuitCellWidth + CellPad;
 		foreach (var c in AllInputs(recipe))
 		{
-			if (ReferenceEquals(c, circuitContent)) continue;
 			if (new Rectangle(x, cy, CellSize, CellSize).Contains(mouse)) return c;
 			x += CellSize + CellPad;
 		}
@@ -780,20 +777,6 @@ public static class RecipeRowRenderer
 		return list;
 	}
 
-	private static int ExtractCircuit(GTRecipe recipe, out RecipeContent? carrier)
-	{
-		foreach (var c in recipe.GetInputContents(ItemRecipeCapability.CAP))
-		{
-			if (Inner((Ingredient)c.Payload) is IntCircuitIngredient ic)
-			{
-				carrier = c;
-				return ic.Configuration;
-			}
-		}
-		carrier = null;
-		return -1;
-	}
-
 	private static Ingredient Inner(Ingredient ing) => ing switch
 	{
 		SizedIngredient sized      => Inner(sized.Inner),
@@ -821,7 +804,7 @@ public static class RecipeRowRenderer
 	private static string ShortLabel(Ingredient ing) => Inner(ing) switch
 	{
 		ItemStackIngredient isi      => string.IsNullOrEmpty(isi.UpstreamId) ? $"i{isi.ItemType}" : StripNs(isi.UpstreamId),
-		TagIngredient tag            => "#" + StripNs(tag.TagName),
+		TagIngredient tag            => FriendlyGroupName(tag.TagName) ?? ("#" + StripNs(tag.TagName)),
 		NBTPredicateIngredient nbt   => StripNs(nbt.UpstreamId),
 		FluidIngredient fi           => fi.ExactType?.Id ?? fi.TagName ?? fi.Attribute?.Id ?? "?",
 		FluidContainerIngredient fc  => fc.Fluid.ExactType?.Id ?? fc.Fluid.TagName ?? "?",
@@ -834,9 +817,117 @@ public static class RecipeRowRenderer
 		return colon >= 0 ? id.Substring(colon + 1) : id;
 	}
 
+	public static string? FriendlyGroupName(string? tagName)
+	{
+		if (tagName is null) return null;
+		const string prefix = "$terraria:group/";
+		if (tagName.StartsWith(prefix, System.StringComparison.Ordinal)
+		    && int.TryParse(tagName.Substring(prefix.Length), out int gid)
+		    && Terraria.RecipeGroup.recipeGroups.TryGetValue(gid, out var g))
+			return g.GetText();
+		if (VanillaItemMap.TryGetFungibleGroupName(tagName, out var name))
+			return name;
+		return null;
+	}
+
+	public static void ResolveCell(RecipeContent content,
+		out int itemType, out int itemAmount,
+		out FluidType? fluid, out int fluidAmountMb,
+		out string? tagLabel, out HashSet<int>? tagMembers)
+	{
+		itemType = 0; itemAmount = 1; fluid = null; fluidAmountMb = 0;
+		tagLabel = null; tagMembers = null;
+
+		var raw = (Ingredient)content.Payload;
+		itemAmount = raw switch
+		{
+			SizedIngredient s         => s.Amount,
+			IntProviderIngredient ipi => ipi.RollSampledCount(),
+			_                         => 1,
+		};
+		if (itemAmount <= 0) itemAmount = 1;
+		var inner = Inner(raw);
+		if (inner is TagIngredient tag && tag.GetItems().Count > 0)
+		{
+			var members = new HashSet<int>();
+			foreach (var m in tag.GetItems())
+				if (m.type > Terraria.ID.ItemID.None) members.Add(m.type);
+			if (members.Count >= 2)
+			{
+				tagLabel = FriendlyGroupName(tag.TagName) ?? StripNs(tag.TagName);
+				tagMembers = members;
+				return;
+			}
+			itemType = tag.GetItems()[0].type;
+			return;
+		}
+
+		switch (inner)
+		{
+			case FluidIngredient fi:
+				fluid = fi.ExactType ?? (fi.GetFluids().Count > 0 ? fi.GetFluids()[0] : null);
+				fluidAmountMb = fi.Amount;
+				return;
+			case ItemStackIngredient isi when isi.ItemType > 0:    itemType = isi.ItemType; return;
+			case NBTPredicateIngredient nbt when nbt.ItemType > 0: itemType = nbt.ItemType; return;
+			case FluidContainerIngredient fc:
+				fluid = fc.Fluid.ExactType ?? (fc.Fluid.GetFluids().Count > 0 ? fc.Fluid.GetFluids()[0] : null);
+				fluidAmountMb = fc.Fluid.Amount;
+				return;
+		}
+
+		if (Inner((Ingredient)content.Payload) is IntProviderFluidIngredient ipfi)
+			fluidAmountMb = ipfi.RollSampledCount();
+	}
+
+	private static void RecordHover(RecipeContent content)
+	{
+		ResolveCell(content, out int itemType, out _, out var fluid, out _,
+			out string? tagLabel, out var tagMembers);
+		if (tagLabel is not null && tagMembers is not null) BrowserHover.SetTag(tagLabel, tagMembers);
+		else if (itemType > 0) BrowserHover.SetItem(itemType);
+		else if (fluid is not null) BrowserHover.SetFluid(fluid.Id, fluid.DisplayName);
+	}
+
+	public static bool HandleQueryClick(GTRecipe recipe, Rectangle bounds, Point mouse,
+		bool dragging, bool stationClickAllowed, Action<string>? onStationFilter)
+	{
+		EmitTooltipFor(recipe, bounds, mouse);
+
+		string? chipStation = onStationFilter == null ? null : StationChipAt(recipe, bounds, mouse);
+		if (chipStation is not null)
+		{
+			if (stationClickAllowed && MouseClick.LeftPressed) onStationFilter!(chipStation);
+			return true;
+		}
+
+		var ing = IngredientAt(recipe, bounds, mouse);
+		if (ing is null) return false;
+		RecordHover(ing);
+		if (dragging) return true;
+
+		ResolveCell(ing, out int itemType, out int itemAmt, out var fluid, out int fluidAmt,
+			out string? tagLabel, out var tagMembers);
+		if (MouseClick.LeftPressed)
+		{
+			if (itemType > 0) ItemDrag.ArmItem(itemType);
+			else if (fluid is not null) ItemDrag.ArmFluid(fluid.Id, fluid.DisplayName);
+			else if (tagMembers is { Count: > 0 })
+				foreach (var m in tagMembers) { ItemDrag.ArmItem(m); break; }
+		}
+		var click = ItemDrag.Active ? default : BrowserSlotInteraction.PollReleased();
+		if (tagLabel is not null && tagMembers is not null)
+			BrowserSlotInteraction.HandleTag(click, tagLabel, tagMembers, recipeAmount: itemAmt);
+		else if (fluid is not null)
+			BrowserSlotInteraction.HandleFluid(click, fluid, fluidAmt > 0 ? fluidAmt : (int?)null, inFavoritesPane: false);
+		else if (itemType > 0)
+			BrowserSlotInteraction.HandleItem(click, BuildDisplayItem(ing, itemType), inFavoritesPane: false, recipeAmount: itemAmt);
+		return true;
+	}
+
 	private static readonly Item[] _stationSlotItem = { new() };
 	private const float VanillaNativeSlotPixels = 52f;
-	private static void DrawItemIconFit(SpriteBatch sb, Rectangle dest, int itemType, Color tint)
+	private static void DrawItemIconFit(SpriteBatch sb, Rectangle dest, int itemType, Color? overlay)
 	{
 		if (itemType <= 0 || itemType >= TextureAssets.Item.Length) return;
 		_stationSlotItem[0].SetDefaults(itemType);
@@ -851,6 +942,8 @@ public static class RecipeRowRenderer
 		{
 			Main.inventoryScale = oldScale;
 		}
+		if (overlay is { } o)
+			sb.Draw(TextureAssets.MagicPixel.Value, dest, o);
 	}
 
 	// "chemical_reactor" -> "Chemical Reactor".

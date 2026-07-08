@@ -6,8 +6,6 @@ using Terraria.DataStructures;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Resolves any cell of a multi-tile machine back to the entity at its origin.
-// TileFrameX/Y encode the sub-tile quadrant; entity lives at the top-left.
 public static class MachineCellResolver
 {
 	public static bool TryFindMachineAt(int i, int j, out MetaMachine machine)
@@ -17,11 +15,16 @@ public static class MachineCellResolver
 		Tile tile = Main.tile[i, j];
 		if (!tile.HasTile) return false;
 
-		// tML 18 px stride (16 content + 2 padding); 2x2 yields {0,18}.
 		int dx = (tile.TileFrameX / 18) % 8;
 		int dy = (tile.TileFrameY / 18) % 8;
 		int originX = i - dx;
 		int originY = j - dy;
+
+		if (originX < 0 || originX >= Main.maxTilesX || originY < 0 || originY >= Main.maxTilesY)
+			return false;
+		Tile origin = Main.tile[originX, originY];
+		if (!origin.HasTile || origin.TileType != tile.TileType)
+			return false;
 
 		if (!TileEntity.ByPosition.TryGetValue(new Point16(originX, originY), out var te))
 			return false;
@@ -33,8 +36,6 @@ public static class MachineCellResolver
 		return false;
 	}
 
-	// Per-cell cardinal walk; naive Position+Cardinal4 lands inside the
-	// footprint on a 2x2. Deduped - multi-cell neighbour yielded once.
 	public static IEnumerable<(IODirection side, MetaMachine neighbor)> PerimeterNeighbors(MetaMachine machine)
 	{
 		var own = new HashSet<(int, int)>(machine.Cells());

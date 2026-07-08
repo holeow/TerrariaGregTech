@@ -33,9 +33,9 @@ public sealed class UIToggleButton : UIElement
 		Height = StyleDimension.FromPixels(18);
 	}
 
-	public override void LeftClick(UIMouseEvent evt)
+	public override void LeftMouseDown(UIMouseEvent evt)
 	{
-		base.LeftClick(evt);
+		base.LeftMouseDown(evt);
 		_setter(!_getter());
 		SoundEngine.PlaySound(SoundID.MenuTick);
 	}

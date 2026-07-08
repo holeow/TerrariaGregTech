@@ -12,25 +12,15 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Steam;
 
-// Adapted port of SteamMinerMachine (+ SteamMinerLogic collapsed). Two variants
-// lp/hp_steam_miner keyed off IsHighPressure. 3D box -> 2D WxD band; vent feature
-// dropped; bespoke OnTick loop (no RecipeLogic) - same shape as electric Miner.
-public sealed class SteamMinerMachine : SteamMachine, IControllable
+public sealed class SteamMinerMachine : SteamMachine, IControllable, IItemHandler
 {
 	public SteamMinerMachine() : base() { }
 
 	protected override string Label => Definition?.Label ?? (IsHighPressure ? "HP Steam Miner" : "Steam Miner");
 
-	// Steam is INPUT here (filled by boiler/bucket); base ctors IO.OUT.
 	protected override NotifiableFluidTank CreateSteamTank() =>
 		new(1, SteamTankCapacity, Api.Capability.Recipe.IO.IN);
 
-	// LP/HP parameters - SSOT for any rebalance.
-	// Width: absolute tile count (machine-relative).
-	// Depth: world-height-scaled. Steam miner stops at deep-Cavern; never
-	// reaches Underworld even from worst-case surface placement (~0.21*H).
-	//   LP 0.30  - mid-Cavern (water + early ores)
-	//   HP 0.55  - deep-Cavern, ~100+ tiles short of Underworld top on every size
 	public int Width          => IsHighPressure ? 24  : 16;
 	public int Depth
 	{
@@ -42,17 +32,9 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		}
 	}
 
-	// 2x upstream's `speed` (320/240) - the 2D band-scanner is less productive
-	// per "useful" tick than upstream's 3D box, so the speed-up keeps the steam
-	// miner in the right throughput ballpark for the steam age.
 	public int TicksPerOre    => IsHighPressure ? 120 : 160;
 
-	// DEVIATION: rate dropped 8x from upstream (16/32 -> 2/4 mB/t)
-	// so per-ore cost lands on the same order as a steam-processing recipe.
-	// LP->HP x2 ratio still matches upstream's LP=1.0/HP=2.0 mB/EU split.
 	public int SteamPerTick   => IsHighPressure ? 4   : 2;
-
-	// === Cache (4 slots, fixed) =============================================
 
 	private const int InventorySize = 4;
 
@@ -63,7 +45,6 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 
 	public override AutoOutputTrait? AutoOutput { get { EnsureMinerTraits(); return _autoOutput; } }
 
-	// SteamTank must attach first (fixed persistence key).
 	private void EnsureMinerTraits()
 	{
 		if (_cache is not null) return;
@@ -73,7 +54,6 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		Traits.Attach(_cache);
 		Traits.RegisterPersistent("Cache", _cache);
 
-		// Handler-ref form = upstream `exportItems.exportToNearby(facing)`.
 		_autoOutput = AutoOutputTrait.OfItems(_cache);
 		Traits.Attach(_autoOutput);
 		Traits.RegisterPersistent("AutoOutput", _autoOutput);
@@ -91,6 +71,13 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		_                         => base.GetSlotGroup(group),
 	};
 
+	public int SlotCount                                        => Cache.SlotCount;
+	public Item GetSlot(int slot)                               => Cache.GetSlot(slot);
+	public Item Insert(int slot, Item item, bool simulate)      => Cache.Insert(slot, item, simulate);
+	public Item Extract(int slot, int maxAmount, bool simulate) => Cache.Extract(slot, maxAmount, simulate);
+	public int GetSlotLimit(int slot)                           => Cache.GetSlotLimit(slot);
+	public bool IsItemValid(int slot, Item item)               => Cache.IsItemValid(slot, item);
+
 	public override bool SupportsAutoOutputItems => true;
 
 	private bool _isWorkingEnabled = true;
@@ -104,7 +91,7 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 	private int  _targetX;
 	private int  _targetY;
 	private bool _hasTarget;
-	private int  _scanCursor; // walks W-band left->right across ticks
+	private int  _scanCursor;
 	private int  _lastDepth;
 
 	protected override void OnTick()
@@ -156,7 +143,6 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		return t.HasTile && TileID.Sets.Ore[t.TileType];
 	}
 
-	// Same band-scan as electric MinerMachine - see that file for cursor rationale.
 	private bool FindTarget(out int outX, out int outY)
 	{
 		int leftX  = Position.X + Size.Width / 2 - Width / 2;
@@ -183,7 +169,6 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		return false;
 	}
 
-	// Cache-first capture - see MinerMachine.BreakTarget for rationale.
 	private void BreakTarget()
 	{
 		if (_targetX < 0 || _targetX >= Main.maxTilesX || _targetY < 0 || _targetY >= Main.maxTilesY) return;
@@ -240,7 +225,6 @@ public sealed class SteamMinerMachine : SteamMachine, IControllable
 		}
 	}
 
-	// Verbatim port of upstream SteamMinerMachine.drainInput (vent gate not ported).
 	private bool DrainSteam(bool simulate)
 	{
 		var stack = SteamTank.GetFluidInTank(0);

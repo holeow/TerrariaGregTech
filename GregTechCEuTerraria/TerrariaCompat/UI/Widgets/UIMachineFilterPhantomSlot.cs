@@ -1,11 +1,12 @@
 #nullable enable
 using System;
+using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.Api.Cover.Filter;
 using GregTechCEuTerraria.TerrariaCompat.Machine;
 using GregTechCEuTerraria.TerrariaCompat.Net.Actions;
+using GregTechCEuTerraria.TerrariaCompat.UI.MeCraft;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
@@ -13,11 +14,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// One phantom matcher slot of a machine-owned SimpleItemFilter - the server-
-// authoritative analogue of UIMagnetPhantomSlot. Same verbatim
-// PhantomSlotWidget click semantics; differs only in dispatch - the magnet
-// edits client-side (private item), this routes through MachineFilterAction
-// (a server-authoritative machine state mutation).
 public sealed class UIMachineFilterPhantomSlot : UIElement
 {
 	public const int NativeUnscaledSize = 22;
@@ -28,7 +24,6 @@ public sealed class UIMachineFilterPhantomSlot : UIElement
 	private readonly int _index;
 	private readonly Item[] _render = { new() };
 
-	private bool _leftDown, _rightDown, _midDown;
 
 	public UIMachineFilterPhantomSlot(MetaMachine entity, Func<SimpleItemFilter?> filter, int index)
 	{
@@ -46,6 +41,16 @@ public sealed class UIMachineFilterPhantomSlot : UIElement
 			? filter.Matches[_index] : new Item();
 
 		var bounds = GetDimensions().ToRectangle();
+
+		if (ItemDrag.TryDropItem(bounds, out int dropped))
+		{
+			var it = new Item();
+			it.SetDefaults(dropped);
+			it.stack = 1;
+			MachineActions.Send(MachineFilterAction.Matcher(_index, 0, false, it), _entity);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+		}
+
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = bounds.Width / VanillaNativeSlotPixels;
 		try
@@ -53,12 +58,7 @@ public sealed class UIMachineFilterPhantomSlot : UIElement
 			if (IsMouseHovering)
 			{
 				Main.LocalPlayer.mouseInterface = true;
-				HandleClicks();
 				ItemSlot.MouseHover(_render, ItemSlot.Context.ChestItem, 0);
-			}
-			else
-			{
-				_leftDown = _rightDown = _midDown = false;
 			}
 			ItemSlot.Draw(spriteBatch, _render, ItemSlot.Context.ChestItem, 0, new Vector2(bounds.X, bounds.Y));
 		}
@@ -68,20 +68,41 @@ public sealed class UIMachineFilterPhantomSlot : UIElement
 		}
 	}
 
-	private void HandleClicks()
+	public override void LeftMouseDown(UIMouseEvent evt)  { base.LeftMouseDown(evt);  HandleLeft(); }
+	public override void RightMouseDown(UIMouseEvent evt) { base.RightMouseDown(evt); HandleClear(); }
+
+	private void HandleLeft()
 	{
-		bool shift = Main.keyState.IsKeyDown(Keys.LeftShift) || Main.keyState.IsKeyDown(Keys.RightShift);
-		bool leftPress  = Main.mouseLeft   && !_leftDown;
-		bool rightPress = Main.mouseRight  && !_rightDown;
-		bool midPress   = Main.mouseMiddle && !_midDown;
-		_leftDown  = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
-		_midDown   = Main.mouseMiddle;
+		var filter = _filter();
+		Item slot = filter is not null && _index < filter.Matches.Length ? filter.Matches[_index] : new Item();
 
-		int button = leftPress ? 0 : rightPress ? 1 : midPress ? 2 : -1;
-		if (button < 0) return;
+		if (!Main.mouseItem.IsAir)
+		{
+			MachineActions.Send(MachineFilterAction.Matcher(_index, 0, false, Main.mouseItem), _entity);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
 
-		MachineActions.Send(MachineFilterAction.Matcher(_index, button, shift, Main.mouseItem), _entity);
+		if (slot.IsAir)
+		{
+			ItemPickerSystem.OpenForItem(
+				it => MachineActions.Send(MachineFilterAction.Matcher(_index, 0, false, it), _entity));
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
+
+		if ((filter?.MaxStackSize ?? 1) <= 1) return;
+
+		MeCraftSystem.OpenForAmount(AEItemKey.Of(slot)!, slot.stack, 1, "Set Amount", "Set",
+			"Amount this slot matches",
+			amt => MachineActions.Send(MachineFilterAction.SetAmount(_index, amt), _entity),
+			parentLayer: UILayers.TopModal);
+		SoundEngine.PlaySound(SoundID.MenuTick);
+	}
+
+	private void HandleClear()
+	{
+		MachineActions.Send(MachineFilterAction.Matcher(_index, 2, false, new Item()), _entity);
 		SoundEngine.PlaySound(SoundID.MenuTick);
 	}
 }

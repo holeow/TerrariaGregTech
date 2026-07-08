@@ -116,6 +116,22 @@ public sealed class QuestbookWorldProgress : ModSystem
 		return -1;
 	}
 
+	internal void CompleteTask(string questId, int taskIndex, int contributor)
+	{
+		if (Completed.Contains(questId))
+			return;
+		if (!QuestbookSystem.IsFluidTask(questId, taskIndex))
+			return;
+
+		string key = QuestbookSystem.TaskKey(questId, taskIndex);
+		bool added = SatisfiedTasks.Add(key);
+
+		if (TryAdvance(questId, out int autoContributor))
+			CompleteQuest(questId, contributor >= 0 ? contributor : autoContributor);
+		else if (added)
+			QuestbookPackets.BroadcastSync();
+	}
+
 	internal void CompleteQuest(string questId, int contributor)
 	{
 		if (!QuestbookSystem.QuestsById.ContainsKey(questId))
@@ -127,10 +143,13 @@ public sealed class QuestbookWorldProgress : ModSystem
 		string who = p is { active: true } ? p.name : "Someone";
 		string title = QuestbookSystem.QuestsById.TryGetValue(questId, out QuestData? q) ? q.Title : questId;
 
-		if (p is { active: true })
+		bool reward = QuestbookSystem.GivesReward(questId);
+		if (reward && p is { active: true })
 			PlayerGive.Give(p, p.GetSource_GiftOrReward(), ItemID.GoldCoin, RewardGold);
 
-		Announce($"{who} finished \"{title}\" and received {RewardGold} gold coins!");
+		Announce(reward
+			? $"{who} finished \"{title}\" and received {RewardGold} gold coins!"
+			: $"{who} finished \"{title}\"!");
 
 		QuestbookPackets.BroadcastSync();
 

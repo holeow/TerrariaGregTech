@@ -14,6 +14,8 @@ public static class ToolItemLoader
 {
 	private const string ToolTexDir = "GregTechCEuTerraria/Content/Textures/item/tools/";
 
+	public static readonly HashSet<string> ExcludedMaterials = new() { "netherite" };
+
 	private static readonly Dictionary<string, int> _byUpstreamId = new();
 	public static IReadOnlyDictionary<string, int> ByUpstreamId => _byUpstreamId;
 
@@ -70,6 +72,7 @@ public static class ToolItemLoader
 		foreach (var (_, material) in MaterialRegistry.All)
 		{
 			if (!material.HasTool()) continue;
+			if (ExcludedMaterials.Contains(material.Id)) continue;
 
 			Color primary = RGB(material.Color);
 			Color secondary = material.SecondaryColor is { } sc ? RGB(sc) : primary;

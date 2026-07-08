@@ -8,16 +8,12 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Primitive;
 
-// Port of PrimitiveBlastFurnaceMachine (+ PrimitiveWorkableMachine collapsed
-// in). Iron + fuel + igniter -> steel + dust x 2, no EU, fluidless.
-// 3 in / 3 out handlers with HandlerIO (IO.IN, IO.NONE) / (IO.OUT, IO.NONE) -
-// upstream's blocked-adjacent-extraction override.
-// Dropped: EnvironmentalHazardEmitterTrait (CO), MultiblockFluidRendererTrait,
-// animateTick particles, hurtEntitiesAndBreakSnow.
 public class PrimitiveBlastFurnaceMachine : WorkableMultiblockMachine,
 	IItemHandler
 {
 	protected override string Label => "Primitive Blast Furnace";
+
+	public override bool SupportsCovers => false;
 
 	private const int InputSlots  = 3;
 	private const int OutputSlots = 3;
@@ -72,8 +68,6 @@ public class PrimitiveBlastFurnaceMachine : WorkableMultiblockMachine,
 			_                         => base.GetSlotGroup(group),
 		};
 	}
-
-	// IItemHandler - flat view: input [0..2], output [3..5].
 
 	public int  SlotCount                                  { get { EnsurePrimitiveTraits(); return InputSlots + OutputSlots; } }
 	public Item GetSlot(int slot)                          { EnsurePrimitiveTraits(); return slot < InputSlots ? _importItems!.GetSlot(slot) : _exportItems!.GetSlot(slot - InputSlots); }

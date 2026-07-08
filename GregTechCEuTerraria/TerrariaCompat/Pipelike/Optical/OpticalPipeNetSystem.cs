@@ -4,12 +4,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Optical;
 
-// Per-world LevelOpticalPipeNet owner. Mirrors LaserPipeNetSystem - rebuilds
-// the level pipenet from cells when the OpticalPipeLayer is dirty.
-//
-// DEVIATION (consistency-driven): upstream's LevelPipeNet persists
-// nets via Forge SavedData; we mirror the cable/item/fluid/laser pipe "derived
-// from cells, no separate save" model. The PipeNet hierarchy stays verbatim.
 public sealed class OpticalPipeNetSystem : ModSystem
 {
 	private static LevelOpticalPipeNet? _level;
@@ -18,7 +12,6 @@ public sealed class OpticalPipeNetSystem : ModSystem
 
 	public override void ClearWorld() => _level = new LevelOpticalPipeNet();
 
-	// PostUpdateEverything runs on MP clients too (PostUpdateWorld doesn't).
 	public override void PostUpdateEverything() => MaybeRebuild();
 
 	public override void PostUpdateWorld()
@@ -44,9 +37,6 @@ public sealed class OpticalPipeNetSystem : ModSystem
 	public static void OnPipeAdded(int x, int y)
 	{
 		if (Level.GetNetFromPos((x, y)) is not null) return;
-		// Open mask = the <=2 reciprocal connections computed at placement. The
-		// net's CanNodesConnect only merges two pipes that both opened the
-		// shared side -> non-branching paths (vs ALL_OPENED merging everything).
 		var cell = OpticalPipeLayerSystem.Pipes.CellAt(x, y);
 		int open = cell?.Open ?? Node<OpticalPipeProperties>.ALL_OPENED;
 		Level.AddNode((x, y), OpticalPipeProperties.INSTANCE,

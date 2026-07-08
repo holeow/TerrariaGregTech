@@ -89,12 +89,6 @@ public static class PipeNeighborProbe
 		return false;
 	}
 
-	private static IODirection ToIODirection(CoverSide side) => side switch
-	{
-		CoverSide.Up    => IODirection.Up,
-		CoverSide.Down  => IODirection.Down,
-		CoverSide.Left  => IODirection.Left,
-		CoverSide.Right => IODirection.Right,
-		_               => IODirection.None,
-	};
+	private static IODirection ToIODirection(CoverSide side)
+		=> Capabilities.WorldCapability.ToIODirection(side);
 }

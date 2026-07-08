@@ -14,12 +14,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// Phantom fluid slot for the Creative Tank source-fluid setter. Click with a
-// held container item (bucket / fluid cell) whose IFluidHandlerItem can be
-// read -> setter fires with the contained fluid type. Right-click clears.
-//
-// Drawing follows the UIFluidSlot convention: a 22x22 vanilla chest-slot
-// frame with the fluid-icon overlay centered inside.
 public sealed class UICreativeSourceFluidSlot : UIElement
 {
 	private const int Native = 22;
@@ -39,19 +33,26 @@ public sealed class UICreativeSourceFluidSlot : UIElement
 	{
 		base.LeftMouseDown(evt);
 		var cursor = Main.mouseItem;
-		FluidType? type = null;
-		if (cursor is not null && !cursor.IsAir)
+		if (cursor is null || cursor.IsAir)
 		{
-			if (cursor.ModItem is IFluidHandlerItem fhi)
-			{
-				var stack = fhi.GetTank(0);
-				if (!stack.IsEmpty) type = stack.Type;
-			}
-			else
-			{
-				var stack = VanillaFluidBridge.StackFor(cursor.type);
-				if (!stack.IsEmpty) type = stack.Type;
-			}
+			ItemPickerSystem.Open(
+				_ => { },
+				fluidId => _setter(FluidRegistry.Get(fluidId)),
+				allowedItems: System.Array.Empty<int>());
+			SoundEngine.PlaySound(SoundID.MenuTick);
+			return;
+		}
+
+		FluidType? type = null;
+		if (cursor.ModItem is IFluidHandlerItem fhi)
+		{
+			var stack = fhi.GetTank(0);
+			if (!stack.IsEmpty) type = stack.Type;
+		}
+		else
+		{
+			var stack = VanillaFluidBridge.StackFor(cursor.type);
+			if (!stack.IsEmpty) type = stack.Type;
 		}
 		_setter(type);
 		SoundEngine.PlaySound(SoundID.MenuTick);
@@ -66,14 +67,21 @@ public sealed class UICreativeSourceFluidSlot : UIElement
 
 	protected override void DrawSelf(SpriteBatch sb)
 	{
+		var bounds = GetDimensions().ToRectangle();
+
+		if (ItemDrag.TryDropFluid(bounds, out var droppedFluid, out _))
+		{
+			var f = FluidRegistry.Get(droppedFluid);
+			if (f is not null) _setter(f);
+			SoundEngine.PlaySound(SoundID.MenuTick);
+		}
+
 		if (IsMouseHovering)
 		{
 			Main.LocalPlayer.mouseInterface = true;
 			var t = _getter();
-			Main.instance.MouseText(t is null ? "Click with a bucket / fluid cell to set source" : t.DisplayName);
+			Main.instance.MouseText(t is null ? "Click to pick a fluid, or drag one here" : t.DisplayName);
 		}
-		var bounds = GetDimensions().ToRectangle();
-		// Vanilla chest-slot frame (Inventory_Back asset).
 		var slotTex = TextureAssets.InventoryBack.Value;
 		sb.Draw(slotTex, bounds, Color.White * 0.85f);
 		var fluid = _getter();

@@ -8,12 +8,11 @@ using GregTechCEuTerraria.TerrariaCompat.Net;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of TankValvePartMachine. The MultiblockTankMachine's hatch-shaped face -
-// owns a FluidTankProxyTrait rebound to the controller's tank on
-// AddedToController. Auto-outputs to neighbour on IoDirection every 5 ticks.
 public class TankValvePartMachine : MultiblockPartMachine
 {
 	protected override string Label => "Tank Valve";
+
+	public override bool SupportsCovers => false;
 
 	public FluidTankProxyTrait? TankProxy { get; protected set; }
 
@@ -56,8 +55,6 @@ public class TankValvePartMachine : MultiblockPartMachine
 	public override void AddedToController(MultiblockControllerMachine controller)
 	{
 		base.AddedToController(controller);
-		// Defensive - TileEntity.ByID iteration order isn't guaranteed; controller
-		// can form before our own OnTick has run.
 		EnsureProxy();
 		if (controller is IMultiblockTankController tankController)
 			TankProxy!.Proxy = tankController.GetTank();

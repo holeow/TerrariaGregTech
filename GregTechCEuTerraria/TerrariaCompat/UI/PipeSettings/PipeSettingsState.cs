@@ -33,7 +33,7 @@ public sealed class PipeSettingsState : UIModalWindow
 		public readonly PipeSideMode      Mode;
 		public readonly PipeCoverable.PipeFilterType FilterType;
 		public readonly System.Type?      CoverType;
-		public readonly int               TransferMode;   // -1 if no active cover
+		public readonly int               TransferMode;
 
 		public SideSignature(SideNeighbourKind kind, PipeSideMode mode,
 			PipeCoverable.PipeFilterType filterType, System.Type? coverType, int transferMode)
@@ -478,9 +478,9 @@ public sealed class PipeSettingsState : UIModalWindow
 
 	private const string TagExprHelp =
 		"Accepts complex expressions:\n"
-		+ "a & b = AND   *   a | b = OR   *   a ^ b = XOR\n"
-		+ "!a = NOT   *   (a) for grouping\n"
-		+ "* = wildcard   *   $ = untagged\n"
+		+ "a & b = AND   a | b = OR   a ^ b = XOR\n"
+		+ "!a = NOT   (a) for grouping\n"
+		+ "* = wildcard   $ = untagged\n"
 		+ "Tags are 'namespace:tag/subtype' (forge: assumed by default).\n"
 		+ "Type, then press Enter (or click away) to set.";
 
@@ -541,39 +541,14 @@ public sealed class PipeSettingsState : UIModalWindow
 		});
 
 		rowY += btnH + rowGap;
-		cell.Append(new UITextButton(
-			label: () => "-",
-			onLeft:  () => StepRate(side, pcv, -1, false),
-			onRight: () => StepRate(side, pcv, -1, true),
-			tooltip: "Decrease transfer rate (Shift = x16).",
-			width: 18, height: btnH)
+		cell.Append(new UINumericStepper("",
+			() => (pcv.GetCoverAtSide(side) as IIOCover)?.TransferRate ?? 0,
+			v => CoverActions.Send(new CoverConfigAction(side, 3, System.Math.Max(0, v)), pcv),
+			min: 0, max: int.MaxValue, step: 1, labelWidth: 0)
 		{
-			Left = StyleDimension.FromPixels(x),
-			Top  = StyleDimension.FromPixels(rowY),
-		});
-		cell.Append(new UITextField(
-			current: () => ((pcv.GetCoverAtSide(side) as IIOCover)?.TransferRate ?? 0).ToString(),
-			onConfirm: txt => { if (long.TryParse(txt, out long v))
-				CoverActions.Send(new CoverConfigAction(side, 3, System.Math.Max(0, v)), pcv); },
-			maxLength: 10,
-			filter: ch => ch >= '0' && ch <= '9',
-			placeholder: "rate /t",
-			tooltip: "Transfer rate per tick (typing replaces the value).")
-		{
-			Left   = StyleDimension.FromPixels(x + 21),
-			Top    = StyleDimension.FromPixels(rowY),
-			Width  = StyleDimension.FromPixels(w - 21 - 21),
-			Height = StyleDimension.FromPixels(btnH),
-		});
-		cell.Append(new UITextButton(
-			label: () => "+",
-			onLeft:  () => StepRate(side, pcv, +1, false),
-			onRight: () => StepRate(side, pcv, +1, true),
-			tooltip: "Increase transfer rate (Shift = x16).",
-			width: 18, height: btnH)
-		{
-			Left = StyleDimension.FromPixels(x + w - 18),
-			Top  = StyleDimension.FromPixels(rowY),
+			Left  = StyleDimension.FromPixels(x),
+			Top   = StyleDimension.FromPixels(rowY),
+			Width = StyleDimension.FromPixels(w),
 		});
 
 		rowY += btnH + rowGap;
@@ -608,14 +583,6 @@ public sealed class PipeSettingsState : UIModalWindow
 				Height = StyleDimension.FromPixels(btnH),
 			});
 		}
-	}
-
-	private static void StepRate(CoverSide side, PipeCoverable pcv, int dir, bool shift)
-	{
-		if (pcv.GetCoverAtSide(side) is not IIOCover c) return;
-		int step = (shift ? 16 : 1) * dir;
-		long next = System.Math.Max(0, (long)c.TransferRate + step);
-		CoverActions.Send(new CoverConfigAction(side, 3, next), pcv);
 	}
 
 	private void AppendTransferModeButton(UIElement cell, CoverSide side, PipeCoverable pcv,
@@ -706,31 +673,16 @@ public sealed class PipeSettingsState : UIModalWindow
 
 	private string ResolveNeighbourName(CoverSide side)
 	{
-		(int dx, int dy) = side switch
-		{
-			CoverSide.Up    => (0, -1),
-			CoverSide.Down  => (0, +1),
-			CoverSide.Left  => (-1, 0),
-			CoverSide.Right => (+1, 0),
-			_               => (0, 0),
-		};
+		var (dx, dy) = CoverSides.Offset(side);
 		int nx = _pipeX + dx, ny = _pipeY + dy;
 		if (nx < 0 || ny < 0 || nx >= Main.maxTilesX || ny >= Main.maxTilesY) return "Empty";
-
-		if (MachineCellResolver.TryFindMachineAt(nx, ny, out var mach))
-			return mach.Definition?.Label ?? mach.Name;
 
 		bool sameKindPipe = _layer == PipeKind.Fluid
 			? FluidPipeLayerSystem.Pipes.Has(nx, ny)
 			: ItemPipeLayerSystem .Pipes.Has(nx, ny);
 		if (sameKindPipe) return _layer == PipeKind.Fluid ? "Fluid Pipe" : "Item Pipe";
 
-		var tile = Main.tile[nx, ny];
-		if (!tile.HasTile) return "Empty";
-
-		var modTile = TileLoader.GetTile(tile.TileType);
-		if (modTile is not null) return modTile.Name;
-		return "Tile";
+		return Capabilities.WorldCapability.TileDisplayName(nx, ny);
 	}
 
 	private string ResolveMaterialLabel()

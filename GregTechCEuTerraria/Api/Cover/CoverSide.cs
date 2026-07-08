@@ -1,11 +1,6 @@
 #nullable enable
 namespace GregTechCEuTerraria.Api.Cover;
 
-// Adaptation of net.minecraft.core.Direction for cover attachment.
-//
-// Upstream attaches covers to all 6 world sides. Terraria is 2D - a machine
-// has exactly 4 tile-neighbours and no front-facing - so we keep the 4
-// cardinals. Used as the per-side index into ICoverable's cover array.
 public enum CoverSide
 {
 	Up    = 0,
@@ -28,5 +23,14 @@ public static class CoverSides
 		CoverSide.Left  => CoverSide.Right,
 		CoverSide.Right => CoverSide.Left,
 		_               => side,
+	};
+
+	public static (int dx, int dy) Offset(CoverSide side) => side switch
+	{
+		CoverSide.Up    => (0, -1),
+		CoverSide.Down  => (0, +1),
+		CoverSide.Left  => (-1, 0),
+		CoverSide.Right => (+1, 0),
+		_               => (0, 0),
 	};
 }

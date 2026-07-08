@@ -18,27 +18,52 @@ public static class UILayers
 {
 	private static readonly Dictionary<string, Func<bool>> _modalIsOpen = new();
 	private static readonly Dictionary<string, Func<bool>> _modalCursorOver = new();
+	private static readonly Dictionary<string, Func<IEnumerable<Rectangle>>> _modalBounds = new();
 	private static readonly List<string> _modalStack = new();
 	private static uint _stackSyncTick = uint.MaxValue;
+
+	private static uint _lastPushTick = uint.MaxValue;
+	public static bool PushedThisFrame => _lastPushTick == Main.GameUpdateCount;
 
 	public static void Push(string name)
 	{
 		_modalStack.Remove(name);
 		_modalStack.Add(name);
+		_lastPushTick = Main.GameUpdateCount;
 	}
 
 	private static void SyncModalStack()
 	{
 		if (_stackSyncTick == Main.GameUpdateCount) return;
 		_stackSyncTick = Main.GameUpdateCount;
+		int before = _modalStack.Count;
 		_modalStack.RemoveAll(n => !_modalIsOpen.TryGetValue(n, out var f) || !f());
+		if (Main.mouseLeft && _modalStack.Count < before) _pressSpent = true;
 	}
 
 	public static void RegisterModal(string name, Func<bool> isOpen)
 		=> _modalIsOpen[name] = isOpen;
 
+	public static bool IsModalOpen(string name)
+		=> _modalIsOpen.TryGetValue(name, out var f) && f();
+
 	public static void RegisterModalCursorProbe(string name, Func<bool> cursorOver)
 		=> _modalCursorOver[name] = cursorOver;
+
+	public static void RegisterModalBoundsProbe(string name, Func<IEnumerable<Rectangle>> bounds)
+		=> _modalBounds[name] = bounds;
+
+	public static IEnumerable<Rectangle> OpenModalBounds(string? excludeName = null)
+	{
+		SyncModalStack();
+		foreach (var name in _modalStack)
+		{
+			if (name == excludeName) continue;
+			if (!_modalBounds.TryGetValue(name, out var f)) continue;
+			foreach (var r in f())
+				if (r.Width > 0 && r.Height > 0) yield return r;
+		}
+	}
 
 	public static bool IsCursorOverAnyModal()
 	{
@@ -67,6 +92,41 @@ public static class UILayers
 			if (_modalCursorOver.TryGetValue(_modalStack[j], out var f) && f())
 				return true;
 		return false;
+	}
+
+	private static uint _claimTick = uint.MaxValue;
+	private static string? _pressOwner;
+	private static bool _pressSpent;
+
+	private static void SyncClaim()
+	{
+		if (_claimTick == Main.GameUpdateCount) return;
+		_claimTick = Main.GameUpdateCount;
+		SyncModalStack();
+		int count = _modalStack.Count;
+		if (count == 0 || !Main.mouseLeft)
+		{
+			_pressOwner = null;
+			_pressSpent = false;
+		}
+		else
+		{
+			if (MouseClick.LeftPressed)
+			{
+				_pressOwner = TopmostModalAtCursor();
+				_pressSpent = false;
+			}
+			foreach (var n in _modalStack)
+				if (!(_modalIsOpen.TryGetValue(n, out var f) && f())) { _pressSpent = true; break; }
+		}
+	}
+
+	public static bool PressBelongsToAnotherModal(string myName)
+	{
+		SyncClaim();
+		if (!Main.mouseLeft) return false;
+		if (_pressSpent) return true;
+		return _pressOwner != null && _pressOwner != myName;
 	}
 
 	public static string? TopModal
@@ -120,43 +180,26 @@ public static class UILayers
 		}
 	}
 
-	private static readonly Color TooltipTitleColor = new(120, 180, 255);
-	private static readonly Color TooltipHotkeyColor = new(255, 90, 90);
-
 	private static void DrawHotkeyTooltip(string title, ModKeybind? keybind)
 	{
-		string keyStr = "NOT SET";
+		string text = title;
+		if (keybind != null)
+			text += $"\nHotkey: {HotkeyLabel(keybind)}";
+		Main.instance.MouseText(text);
+	}
+
+	public static string HotkeyLabel(ModKeybind? keybind)
+	{
 		if (keybind != null)
 		{
 			try
 			{
 				var keys = keybind.GetAssignedKeys();
-				if (keys.Count > 0) keyStr = string.Join(", ", keys);
+				if (keys.Count > 0) return string.Join(", ", keys);
 			}
 			catch { /* key not yet registered */ }
 		}
-		string hotkey = $"Hotkey: {keyStr} (Set in controls settings)";
-
-		var font = FontAssets.MouseText.Value;
-		Vector2 titleSize = font.MeasureString(title);
-		Vector2 hotkeySize = font.MeasureString(hotkey);
-		float w = System.Math.Max(titleSize.X, hotkeySize.X);
-		float h = titleSize.Y + hotkeySize.Y + 4f;
-
-		float x = Main.mouseX + 14f;
-		float y = Main.mouseY + 14f;
-		if (x + w + 16f > Main.screenWidth) x = Main.screenWidth - w - 16f;
-		if (y + h + 16f > Main.screenHeight) y = Main.screenHeight - h - 16f;
-
-		var sb = Main.spriteBatch;
-		var px = TextureAssets.MagicPixel.Value;
-		var bg = new Rectangle((int)x - 7, (int)y - 5, (int)w + 14, (int)h + 10);
-		sb.Draw(px, bg, new Color(20, 22, 38) * 0.92f);
-
-		ChatManager.DrawColorCodedStringWithShadow(sb, font, title,
-			new Vector2(x, y), TooltipTitleColor, 0f, Vector2.Zero, Vector2.One);
-		ChatManager.DrawColorCodedStringWithShadow(sb, font, hotkey,
-			new Vector2(x, y + titleSize.Y + 4f), TooltipHotkeyColor, 0f, Vector2.Zero, Vector2.One);
+		return "ASSIGN IN SETTINGS";
 	}
 
 	public static void InsertModal(

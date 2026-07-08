@@ -4,15 +4,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.Laser;
 
-// Per-world LevelLaserPipeNet owner. Mirrors ItemPipeNetSystem - rebuilds
-// the level pipenet from cells when the LaserPipeLayer is dirty, and runs
-// any per-tick maintenance (none today - laser pipes have no per-cell
-// counters / per-side covers).
-//
-// DEVIATION (consistency-driven): upstream's LevelPipeNet
-// persists nets via Forge SavedData; we mirror the cable+item+fluid pipe
-// "derived from cells, no separate save" model. The PipeNet hierarchy
-// itself stays verbatim.
 public sealed class LaserPipeNetSystem : ModSystem
 {
 	private static LevelLaserPipeNet? _level;
@@ -21,8 +12,6 @@ public sealed class LaserPipeNetSystem : ModSystem
 
 	public override void ClearWorld() => _level = new LevelLaserPipeNet();
 
-	// PostUpdateEverything runs on MP clients too (PostUpdateWorld doesn't) -
-	// matches ItemPipeNetSystem.
 	public override void PostUpdateEverything() => MaybeRebuild();
 
 	public override void PostUpdateWorld()
@@ -47,12 +36,8 @@ public sealed class LaserPipeNetSystem : ModSystem
 
 	public static void OnPipeAdded(int x, int y)
 	{
-		// Idempotent - lets world-load callers replay safely.
 		if (Level.GetNetFromPos((x, y)) is not null) return;
 
-		// Open mask = the straight-only reciprocal connections from placement.
-		// CanNodesConnect only merges pipes that both opened the shared side, so
-		// crossing laser lines stay separate nets (no blob / cross).
 		var cell = LaserPipeLayerSystem.Pipes.CellAt(x, y);
 		int open = cell?.Open ?? Node<LaserPipeProperties>.ALL_OPENED;
 		Level.AddNode((x, y), LaserPipeProperties.INSTANCE,

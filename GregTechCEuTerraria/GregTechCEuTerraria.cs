@@ -48,7 +48,14 @@ public sealed class GregTechCEuTerraria : Mod
 
 	public override void Load()
 	{
+		Terraria.ModLoader.Logging.IgnoreExceptionContents(
+			"GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting.CraftingTreeNode.Request");
+		Terraria.ModLoader.Logging.IgnoreExceptionContents(
+			"GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting.CraftingCalculation.HandlePausing");
+
 		Api.TickScale.SimulationSpeedProvider = () => Config.GTConfig.Instance?.SimulationSpeed ?? 1.0f;
+
+		TerrariaCompat.UI.GTShaders.Load(this);
 
 		Stage("Loading materials");
 		TerrariaCompat.Materials.MaterialJsonLoader.Load(this);
@@ -69,6 +76,7 @@ public sealed class GregTechCEuTerraria : Mod
 		Stage("Registering wires & cables");
 		WireItemRegistry.Register(this);
 		TerrariaCompat.Items.Cables.SuperconductorWireLoader.Register(this);
+		TerrariaCompat.Items.MeCables.MeCableItemRegistry.Register(this);
 		Stage("Registering pipes");
 		TerrariaCompat.Items.Pipes.PipeItemRegistry.Register(this);
 		TerrariaCompat.Items.Pipes.SimplePipeRegistry.Register(this);
@@ -78,6 +86,8 @@ public sealed class GregTechCEuTerraria : Mod
 		TerrariaCompat.Items.Magnets.MagnetItemLoader.Register(this);
 		Stage("Registering ore scanners");
 		TerrariaCompat.Items.Prospectors.ProspectorItemLoader.Register(this);
+		Stage("Registering ME terminal upgrade cards");
+		TerrariaCompat.Items.Terminal.MeTerminalUpgradeLoader.Register(this);
 		Stage("Registering GregTech tools");
 		TerrariaCompat.Items.Tools.ToolItemLoader.Register(this);
 		Stage("Registering Gregith weapons");
@@ -100,6 +110,8 @@ public sealed class GregTechCEuTerraria : Mod
 		MachineDefinitions.RegisterAll();
 		TerrariaCompat.Pipelike.LongDistance.LongDistanceLocale.RegisterAll();
 		TerrariaCompat.Machine.Multiblock.MultiblockLocale.RegisterAll();
+		AppliedEnergistics.Api.Stacks.AEKeyTypes.RegisterBuiltins();
+		AppliedEnergistics.Core.AELocale.RegisterAll();
 		Stage("Registering machine tiles & items");
 		TieredMachineFactory.RegisterAll(this);
 		Stage("Registering wood-form items");
@@ -115,6 +127,7 @@ public sealed class GregTechCEuTerraria : Mod
 		var resolver = TerrariaCompat.Recipes.IngredientResolverImpl.Instance;
 		IIngredientResolver.Default = resolver;
 		Api.Recipe.Lookup.RecipeDB.Warn = msg => Logger.Warn(msg);
+		Api.Machine.Trait.RecipeLogic.AmbientRecipeModifier = TerrariaCompat.Machine.GregtechToiletAura.PostModify;
 
 		Stage("Loading recipes (~32k)");
 		RecipeJsonLoader.Load(this, resolver);
@@ -135,6 +148,9 @@ public sealed class GregTechCEuTerraria : Mod
 	public override void PostSetupContent()
 	{
 		TerrariaCompat.Machine.Multiblock.MultiblockStructureRecipeSynth.Register(this);
+
+		if (TryFind<Terraria.ModLoader.ModItem>("lv_rock_crusher", out var rockCrusher))
+			TerrariaCompat.UI.Widgets.StationIcon.RegisterExplicit("rock_breaker", rockCrusher.Type);
 	}
 
 	public override void HandlePacket(BinaryReader reader, int whoAmI)
@@ -145,10 +161,12 @@ public sealed class GregTechCEuTerraria : Mod
 	public override void Unload()
 	{
 		RuntimeTextureRegistry.DisposeAll();
+		TerrariaCompat.UI.GTShaders.Unload();
 
 		TerrariaCompat.Pipelike.PipeIntersection.UninstallHook();
 		IIngredientResolver.Default = null;
 		Api.Recipe.Lookup.RecipeDB.Warn = null;
+		Api.Machine.Trait.RecipeLogic.AmbientRecipeModifier = null;
 
 		TerrariaCompat.BossDrops.BossDropRegistry.Unload();
 		TerrariaCompat.BossDrops.MultiblockBag.MultiblockBagLoader.Unload();
@@ -165,6 +183,7 @@ public sealed class GregTechCEuTerraria : Mod
 		Api.Cover.CoverRegistry.Clear();
 		TerrariaCompat.Items.Registry.RegistryDump.Unload();
 		WireItemRegistry.Unload();
+		TerrariaCompat.Items.MeCables.MeCableItemRegistry.Unload();
 		TerrariaCompat.Items.Pipes.PipeItemRegistry.Unload();
 		VeinRegistry.Clear();
 		OreTileRegistry.Unload();

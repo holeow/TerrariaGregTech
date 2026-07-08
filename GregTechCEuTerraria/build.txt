@@ -1,9 +1,9 @@
 author = caxapexac
 displayName = GregTechCEuUp (Terraria)
 homepage = https://github.com/caxapexac/TerrariaGregTech
-version = 0.0.6
+version = 0.0.7
 hideCode = false
 hideResources = false
 weakReferences = MagicStorage
 includeSource = true
-buildIgnore = *.csproj, *.user, *.md, obj\*, bin\*, .vs\*, lib\*
+buildIgnore = *.csproj, *.user, *.md, obj\*, bin\*, .vs\*, lib\*, Effects\Compiler\*, Effects\*.fx

@@ -697,6 +697,7 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 	public override void AppendTooltip(System.Collections.Generic.List<string> lines)
 	{
 		base.AppendTooltip(lines);
+		if (!IsFormed) return;
 		lines.Add(RecipeStatusText.StatusLineForMulti(this, _recipeLogic));
 		AppendEnergyLine(lines);
 		if (_recipeLogic is { } rl && rl.IsWorking())
@@ -714,8 +715,6 @@ public abstract class WorkableMultiblockMachine : MultiblockControllerMachine, I
 		if (ActiveEut > 0)
 			lines.Add($"Drawing: {ActiveEut:N0} EU/t");
 	}
-
-	protected override void AppendUnformedStatusIfNeeded(List<string> lines) { }
 
 	protected virtual void AppendEnergyLine(List<string> lines) { }
 

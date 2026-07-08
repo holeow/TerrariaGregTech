@@ -11,12 +11,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// The filter-item install slot of a handler-based cover (detector / voiding /
-// ender / conveyor / pump). Unlike the phantom matcher slots this IS a real
-// cursor<->slot swap - the filter item is a real inventory item. Left-click:
-// empty slot + held filter -> install one; occupied slot + empty cursor ->
-// remove it back to the cursor. Server-authoritative via CoverFilterAction;
-// the server confirms the cursor write-back (CursorUpdatePacket in MP).
 public sealed class UIFilterItemSlot : UIElement
 {
 	public const int NativeUnscaledSize = 22;
@@ -27,7 +21,6 @@ public sealed class UIFilterItemSlot : UIElement
 	private readonly bool _fluid;
 	private readonly Item[] _render = { new() };
 
-	private bool _leftDown;
 
 	public UIFilterItemSlot(ICoverable entity, CoverSide side, bool fluid)
 	{
@@ -58,12 +51,7 @@ public sealed class UIFilterItemSlot : UIElement
 			{
 				Main.LocalPlayer.mouseInterface = true;
 				ItemSlot.OverrideHover(_render, ItemSlot.Context.ChestItem, 0);
-				HandleClicks();
 				ItemSlot.MouseHover(_render, ItemSlot.Context.ChestItem, 0);
-			}
-			else
-			{
-				_leftDown = false;
 			}
 			ItemSlot.Draw(spriteBatch, _render, ItemSlot.Context.ChestItem, 0, new Vector2(bounds.X, bounds.Y));
 		}
@@ -73,15 +61,10 @@ public sealed class UIFilterItemSlot : UIElement
 		}
 	}
 
-	private void HandleClicks()
+	public override void LeftMouseDown(UIMouseEvent evt)
 	{
-		bool leftPress = Main.mouseLeft && !_leftDown;
-		_leftDown = Main.mouseLeft;
-		if (!leftPress) return;
-
-		// Empty slot + empty cursor - nothing to do (no chirp).
+		base.LeftMouseDown(evt);
 		if (_render[0].IsAir && Main.mouseItem.IsAir) return;
-
 		CoverActions.Send(CoverFilterAction.FilterItem(_side, _fluid, Main.mouseItem), _entity);
 		SoundEngine.PlaySound(SoundID.Grab);
 	}

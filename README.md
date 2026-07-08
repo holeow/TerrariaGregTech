@@ -168,6 +168,10 @@ Credits: GregTech Modern Community Pack (questbook content)
 Source: https://github.com/GregTechCEu/GregTech-Modern-Community-Pack
 License: LGPL-2.1
 
+Credits: Applied Energistics 2 (internal storage and autocrafting logic port)
+Source: https://github.com/AppliedEnergistics/Applied-Energistics-2
+License: LGPL-3.0-only
+
 Credits: EBF-chan sprite by Qiuqiu, used with their permission
 
-Credits: Armor sprites by Flareguy, used with their permission
+Credits: Armor sprites, upgrade cards by Flareguy, used with their permission

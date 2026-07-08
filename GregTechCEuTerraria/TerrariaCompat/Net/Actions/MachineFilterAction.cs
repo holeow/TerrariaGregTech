@@ -6,18 +6,6 @@ using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net.Actions;
 
-// Server-authoritative edit of a machine's own filter - the matcher slots
-// (phantom 3x3 grid), the blacklist / ignore-NBT toggles, the filter-type
-// cycle (items <-> tags), and the tag-expression text field.
-//
-// The on-machine analogue of CoverFilterAction. Operates on any entity that
-// implements IFilterableMachine (today: ItemCollectorMachine). The matcher-
-// click math itself is shared with the cover path + the magnet's client-side
-// editor via Api.Cover.Filter.ItemFilterEdit.
-//
-// Mirrors upstream ItemCollectorMachine's filter-slot UX, but with the filter
-// living on the machine instead of on an installed filter item (Terraria items
-// have no per-instance NBT).
 public sealed class MachineFilterAction : IMachineAction
 {
 	public enum Op : byte
@@ -27,6 +15,7 @@ public sealed class MachineFilterAction : IMachineAction
 		ToggleIgnoreNbt = 2,
 		CycleFilterType = 3,
 		SetTagExpr      = 4,
+		SetAmount       = 5,
 	}
 
 	public PacketType Type => PacketType.MachineFilter;
@@ -37,11 +26,15 @@ public sealed class MachineFilterAction : IMachineAction
 	private bool _shift;
 	private Item _held = new();
 	private string _text = "";
+	private long _amount;
 
 	public MachineFilterAction() { }
 
 	public static MachineFilterAction Matcher(int index, int button, bool shift, Item held) =>
 		new() { _op = Op.MatcherClick, _index = index, _button = (byte)button, _shift = shift, _held = held.Clone() };
+
+	public static MachineFilterAction SetAmount(int index, long amount) =>
+		new() { _op = Op.SetAmount, _index = index, _amount = amount };
 
 	public static MachineFilterAction Toggle(Op toggleOp) =>
 		new() { _op = toggleOp };
@@ -59,6 +52,7 @@ public sealed class MachineFilterAction : IMachineAction
 		w.Write(_shift);
 		w.WriteItem(_held);
 		w.Write(_text);
+		w.Write(_amount);
 	}
 
 	public void Read(BinaryReader r)
@@ -69,6 +63,7 @@ public sealed class MachineFilterAction : IMachineAction
 		_shift = r.ReadBoolean();
 		_held = r.ReadItem();
 		_text = r.ReadString();
+		_amount = r.ReadInt64();
 	}
 
 	public void Apply(MetaMachine entity, int byWhoAmI)
@@ -95,6 +90,15 @@ public sealed class MachineFilterAction : IMachineAction
 
 			case Op.SetTagExpr:
 				fm.TagFilter.SetOreDict(TagItemFilter.NormalizeExpression(_text));
+				break;
+
+			case Op.SetAmount:
+				if (_index >= 0 && _index < fm.SimpleFilter.Matches.Length && !fm.SimpleFilter.Matches[_index].IsAir)
+				{
+					fm.SimpleFilter.Matches[_index].stack =
+						(int)System.Math.Clamp(_amount, 1, fm.SimpleFilter.MaxStackSize);
+					fm.SimpleFilter.OnUpdated();
+				}
 				break;
 		}
 	}

@@ -12,21 +12,11 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Port of ActiveTransformerMachine. Power converter - bound input hatches feed
-// bound output hatches each tick (no recipes). Structure invalid without both
-// sides. Weakest-link routing emerges from EnergyContainerList.ChangeEnergy.
-//
-// ConditionalSubscriptionHandler collapsed (OnTick ticks every tick anyway).
-// ioMap per-block override dropped (no caller). harmlessActiveTransformers
-// config dropped - always explodes on structural failure while running (upstream
-// default). GUI lives on AppendTooltip until a panel ships.
 public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 {
 	private EnergyContainerList _powerInput  = new(new List<IEnergyContainer>());
 	private EnergyContainerList _powerOutput = new(new List<IEnergyContainer>());
 
-	// Display snapshot - the part walk is server-only, so MP clients receive
-	// these via SaveData/MachineStateSyncPacket.
 	private long _dispInputV, _dispInputA, _dispInputPerSec;
 	private long _dispOutputV, _dispOutputA, _dispOutputPerSec;
 
@@ -36,7 +26,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 	{
 		base.OnStructureFormed();
 
-		// Verbatim upstream order: BOTH-direction handlers fall into INPUT first.
 		var input  = new List<IEnergyContainer>();
 		var output = new List<IEnergyContainer>();
 
@@ -44,7 +33,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		{
 			foreach (var rhl in part.GetRecipeHandlers())
 			{
-				// = upstream ioMap default (no per-block override).
 				if (!rhl.IsValid(IO.BOTH)) continue;
 
 				List<IEnergyContainer>? containers = null;
@@ -64,18 +52,13 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 			}
 		}
 
-		// Defensive - pattern factory already rejects hatchless structures.
 		if (input.Count == 0 || output.Count == 0)
 		{
 			string which = input.Count == 0
 				? (output.Count == 0 ? "no input AND no output hatches bound"
 				                     : "no input energy hatches bound")
 				: "no output energy hatches bound";
-			SetUnformedReason(which, new[]
-			{
-				"Active Transformer needs at least one INPUT energy hatch + one OUTPUT energy hatch.",
-				"(Substation Energy Hatches and Laser Hatches also satisfy these slots.)",
-			});
+			SetUnformedReason(which);
 			OnStructureInvalid();
 			return;
 		}
@@ -86,7 +69,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 
 	public override void OnStructureInvalid()
 	{
-		// Verbatim: explode at 6+tier if running when broken.
 		if (Recipe.IsWorkingEnabled() && Recipe.IsWorking())
 		{
 			EnvironmentalExplosionTrait.DoExplosionAt(this, 6f + GetTier());
@@ -104,7 +86,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		if (!IsServer) return;
 		if (IsFormed) ConvertEnergyTick();
 
-		// Aligned to MachineStateSyncPacket's 6-tick BroadcastNearby cadence.
 		if (IsFormed && (Terraria.Main.GameUpdateCount & 0x7) == 0)
 			RefreshDisplaySnapshot();
 	}
@@ -119,12 +100,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		_dispOutputPerSec = _powerOutput.GetOutputPerSec();
 	}
 
-	// DEVIATION: upstream flips to SUSPEND on
-	// input-dry / output-full, AND gates SetStatus on isWorkingEnabled() -
-	// which flips false once SUSPEND lands, locking the multi until manual
-	// power-toggle. We use IDLE for transient "nothing to transfer" instead
-	// (doesn't lock; transitions back to WORKING when conditions allow).
-	// SUSPEND reserved for the player's manual pause path.
 	private void ConvertEnergyTick()
 	{
 		bool active = IsSubscriptionActive();
@@ -150,7 +125,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		return true;
 	}
 
-	// Cheap output hatches before substation/laser buffers.
 	private List<IMultiPart> GetPrioritySortedParts()
 	{
 		var parts = GetParts().ToList();
@@ -170,8 +144,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 
 	public override int GetTier() => (int)Tier;
 
-	// Skip WMM.AppendTooltip's "Running 0/0t" (DUMMY recipe). Inline DisplayName
-	// + fancy info + unformed-reason; custom Paused/Running/Idle status.
 	public override void AppendTooltip(List<string> lines)
 	{
 		lines.Add(DisplayName);
@@ -190,7 +162,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		else
 			lines.Add("Idle");
 
-		// Per-sec sums are 20-tick rolling - divide for /tick.
 		long maxIn  = System.Math.Abs(_dispInputV  * _dispInputA);
 		long maxOut = System.Math.Abs(_dispOutputV * _dispOutputA);
 		long avgIn  = System.Math.Abs(_dispInputPerSec  / 20);
@@ -199,8 +170,6 @@ public class ActiveTransformerMachine : WorkableElectricMultiblockMachine
 		lines.Add($"Max output: {maxOut:N0} EU/t");
 		lines.Add($"Avg in: {avgIn:N0} EU/t");
 		lines.Add($"Avg out: {avgOut:N0} EU/t");
-		// TEMP DBG (2026-05-29) - laser target -> dynamo investigation, transient.
-		// Remove once root-cause confirmed (likely stale _handlerList cache).
 		lines.Add($"[c/AAAAFF:DBG in: {_powerInput.EnergyStored:N0}/{_powerInput.EnergyCapacity:N0} EU]");
 		lines.Add($"[c/AAAAFF:DBG out: {_powerOutput.EnergyStored:N0}/{_powerOutput.EnergyCapacity:N0} EU]");
 		lines.Add($"[c/AAAAFF:DBG status: {Recipe.GetStatus()} subActive: {IsSubscriptionActive()}]");

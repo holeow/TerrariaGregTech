@@ -7,7 +7,6 @@ using GregTechCEuTerraria.TerrariaCompat.Tiles.Machines;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Layout dispatch keyed on MachineDefinition.LayoutKey. "none" = no GUI.
 public static class MachineLayoutRegistry
 {
 	public static MachineUILayout? Build(MetaMachine machine)
@@ -18,6 +17,10 @@ public static class MachineLayoutRegistry
 		return def.LayoutKey switch
 		{
 			"none"           => null,
+			"me_storage"     => MeStorageLayout.Build((TerrariaCompat.AppliedEnergistics.MeStorageMachine)machine),
+			"me_modular_terminal" => MeModularTerminalLayout.Build((TerrariaCompat.AppliedEnergistics.MeModularTerminalMachine)machine),
+			"me_pattern_provider" => MePatternProviderLayout.Build((TerrariaCompat.AppliedEnergistics.PatternProviderMachine)machine),
+			"me_interface"   => MeInterfaceLayout.Build((TerrariaCompat.AppliedEnergistics.MeInterfaceMachine)machine),
 			"steam_turbine"  => SteamTurbineLayout.Build((SimpleGeneratorMachine)machine),
 			"coal_boiler"    => CoalBoilerLayout.Build((SteamSolidBoilerMachine)machine),
 			"solar_boiler"   => SolarBoilerLayout.Build((SteamSolarBoiler)machine),
@@ -54,10 +57,7 @@ public static class MachineLayoutRegistry
 			"maintenance"    => MaintenanceHatchLayout.Build((MaintenanceHatchPartMachine)machine),
 			"cleanroom"      => CleanroomLayout.Build((TerrariaCompat.Machine.Multiblock.Electric.CleanroomMachine)machine),
 			"power_substation" => PowerSubstationLayout.Build((TerrariaCompat.Machine.Multiblock.Electric.PowerSubstationMachine)machine),
-			// HPCA / DataBank / NetworkSwitch - passive providers (no recipe,
-			// two-state Idling/Providing display).
 			"research_provider" => ResearchProviderLayout.Build((TerrariaCompat.Machine.Multiblock.WorkableElectricMultiblockMachine)machine),
-			// Research Station - custom addDisplayText (research keys + CWU line).
 			"research_station" => ResearchStationLayout.Build((TerrariaCompat.Machine.Multiblock.Electric.Research.ResearchStationMachine)machine),
 			"generic_multi"  => GenericMultiblockLayout.Build((TerrariaCompat.Machine.Multiblock.WorkableElectricMultiblockMachine)machine),
 			"steam_parallel_multi" => SteamParallelMultiblockLayout.Build((TerrariaCompat.Machine.Multiblock.Steam.SteamParallelMultiblockMachine)machine),

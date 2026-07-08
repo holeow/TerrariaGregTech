@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using GregTechCEuTerraria.TerrariaCompat.Items.Fluids;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
 using Terraria;
 using Terraria.ModLoader;
@@ -74,6 +75,7 @@ public sealed class QuestbookSystem : ModSystem
 				resolved.Tasks.Add(new ResolvedTask
 				{
 					IsItem = true,
+					IsFluid = AllFluidBuckets(accept),
 					AcceptTypes = accept,
 					Count = Math.Max(1, task.Count),
 					Label = task.Label,
@@ -99,6 +101,35 @@ public sealed class QuestbookSystem : ModSystem
 				}
 
 		return resolved;
+	}
+
+	private static bool AllFluidBuckets(int[] types)
+	{
+		if (types.Length == 0)
+			return false;
+		foreach (int t in types)
+			if (ModContent.GetModItem(t) is not FluidBucketItem)
+				return false;
+		return true;
+	}
+
+	public static bool IsFluidTask(string questId, int taskIndex)
+		=> Resolved.TryGetValue(questId, out ResolvedQuest? r)
+			&& taskIndex >= 0 && taskIndex < r.Tasks.Count && r.Tasks[taskIndex].IsFluid;
+
+	public static bool GivesReward(string questId)
+	{
+		if (!Resolved.TryGetValue(questId, out ResolvedQuest? r))
+			return false;
+		bool hasCollectible = false;
+		foreach (ResolvedTask t in r.Tasks)
+		{
+			if (!t.IsItem)
+				return false;
+			if (!t.IsFluid && t.AcceptTypes.Length > 0)
+				hasCollectible = true;
+		}
+		return hasCollectible;
 	}
 
 	internal static void ReResolve(QuestData quest)
@@ -166,6 +197,7 @@ internal sealed class ResolvedQuest
 internal sealed class ResolvedTask
 {
 	public bool IsItem;
+	public bool IsFluid;
 	public int[] AcceptTypes = [];
 	public int Count = 1;
 	public string Label = "";

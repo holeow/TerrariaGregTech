@@ -7,10 +7,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Part;
 
-// Port of LaserHatchPartMachine. Tier + amperage laser energy hatch -
-// EnergyHatchPartMachine shape with a NotifiableLaserContainer. Capacity
-// V[tier] * 64 * amperage (both emitter/receiver, vs EnergyHatch's 16x/64x).
-// Buffer rejects on wrong side internally.
 public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 {
 	protected override string Label => "Laser Hatch";
@@ -45,9 +41,6 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		Configure(def.PartIo.Value, (int)((MetaMachine)this).Tier, def.PartAmperage);
 	}
 
-	// Verbatim port of NotifiableLaserContainer.serverTick, replicated at the
-	// part level because the trait's TYPE is allowMultipleInstances and the
-	// base NEC's TYPE-keyed walk would miss laser hatches.
 	protected override void OnTick()
 	{
 		base.OnTick();
@@ -62,15 +55,11 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		if (outputAmperes == 0) return;
 
 		long amperesUsed = 0;
-		// PerimeterCells: whole-footprint walk; 4-cardinal from top-left would
-		// self-match a 2x2 hatch's interior cells.
 		foreach (var (side, nx, ny) in PerimeterCells(this))
 		{
 			if (!buf.OutputsEnergy(side)) continue;
 			var oppositeSide = side.Opposite();
 
-			// (a) adjacent laser pipe -> LaserNetHandler walks the net;
-			// (b) direct adjacent ILaserContainer -> push without hop.
 			ILaserContainer? dest;
 			if (TerrariaCompat.Pipelike.Laser.LaserPipeLayerSystem.Pipes.Has(nx, ny))
 			{
@@ -109,15 +98,12 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		Buffer = Io == IO.OUT
 			? NotifiableLaserContainer.EmitterContainer (capacity, voltage, Amperage)
 			: NotifiableLaserContainer.ReceiverContainer(capacity, voltage, Amperage);
-		// No side gate - EnergyHatchPartMachine convention (sideless wires).
 		Traits.Attach(Buffer);
 		Traits.RegisterPersistent("Buffer", Buffer);
 	}
 
 	public bool CanShared() => false;
 
-	// Diagnostic tooltip - controller binding + buffer fill + per-side
-	// pipe/endpoint resolution.
 	public override void AppendTooltip(System.Collections.Generic.List<string> lines)
 	{
 		base.AppendTooltip(lines);
@@ -130,7 +116,7 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 
 		string role = Io == IO.OUT ? "[c/55AAFF:Source]" : "[c/FFAA55:Target]";
 		string tierName = Common.Energy.VoltageTiers.ShortName(((MetaMachine)this).Tier);
-		lines.Add($"{role} * {Amperage:N0}A * {tierName} ({Common.Energy.VoltageTiers.V(Tier):N0} EU/t)");
+		lines.Add($"{role}   {Amperage:N0}A   {tierName} ({Common.Energy.VoltageTiers.V(Tier):N0} EU/t)");
 		lines.Add($"Buffer: {buf.EnergyStored:N0} / {buf.EnergyCapacity:N0} EU");
 
 		var controllers = GetControllers();
@@ -139,7 +125,6 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		else
 			lines.Add($"[c/55FF55:Bound to {controllers.Count} controller{(controllers.Count == 1 ? "" : "s")}]");
 
-		// Same 4-side walk OnTick does (push targets for Source / inputs for Target).
 		AppendAdjacencyLines(lines);
 	}
 
@@ -157,7 +142,6 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 				}
 				else
 				{
-					// Walk from the pipe-side that faces back at this hatch.
 					var route = net.GetNetData((nx, ny), side.Opposite());
 					if (route is null)
 						lines.Add($"  {SideName(side)}: [c/FFAA44:pipe -> no endpoint]");
@@ -194,8 +178,6 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		_                  => "?    ",
 	};
 
-	// Raw-cell variant of MachineCellResolver.PerimeterNeighbors - yields
-	// (side, x, y) since laser pipes aren't MetaMachines. Dedupes neighbor cells.
 	private static System.Collections.Generic.IEnumerable<(IODirection side, int x, int y)>
 		PerimeterCells(MetaMachine machine)
 	{
@@ -222,6 +204,6 @@ public class LaserHatchPartMachine : TieredIOPartMachine, ILaserContainer
 		base.LoadData(tag);
 		Amperage = tag.GetInt("amperage");
 		EnsureBuffer();
-		Traits.Load(tag);   // re-load after late registration; ItemBus pattern.
+		Traits.Load(tag);
 	}
 }

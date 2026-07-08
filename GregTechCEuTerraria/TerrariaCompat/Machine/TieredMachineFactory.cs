@@ -7,10 +7,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
-// Registers Tile + Item per (MachineDefinition x tier).
-// Behavioral entity classes autoload separately (~8, well under tML's 256
-// byte-truncated network ceiling). Tile/item ids are ushort/int = no 256 cap.
-// MachineDefinitions.RegisterAll MUST run first.
 public static class TieredMachineFactory
 {
 	public static void RegisterAll(Mod mod)
@@ -25,6 +21,8 @@ public static class TieredMachineFactory
 					MachineFamily.SolarPanel  => new SolarPanelTile(tier, def),
 					MachineFamily.SuperTank   => new SuperTankTile(tier, def),
 					MachineFamily.SuperChest  => new SuperChestTile(tier, def),
+					MachineFamily.QuantumComputer => new QuantumComputerTile(tier, def),
+					MachineFamily.PatternProvider => new PatternProviderTile(tier, def),
 					MachineFamily.Drum        => new DrumTile(tier, def),
 					MachineFamily.Crate       => new CrateTile(tier, def),
 					_                         => new TieredMachineTile(tier, def),
@@ -42,8 +40,6 @@ public static class TieredMachineFactory
 				};
 				mod.AddContent(item);
 
-				// Multi patterns resolve via Predicates.Abilities(PartAbility.X);
-				// no per-multi hand-collection of tile lists needed.
 				if (def.PartAbilities.Length > 0)
 				{
 					ushort tileType = (ushort)tile.Type;

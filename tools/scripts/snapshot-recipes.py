@@ -171,6 +171,8 @@ REMOVED_TOKENS = (
     "duct_pipe",
     "passthrough_hatch",
     "reservoir_hatch",
+    "basic_tape",
+    "duct_tape",
 )
 
 REMOVED_EXACT_IDS = (
@@ -208,6 +210,27 @@ REMOVED_RECIPE_IDS = frozenset((
     "macerator/macerate_lv_buffer", "macerator/macerate_mv_buffer", "macerator/macerate_hv_buffer",
     "assembler/repeater",
     "macerator/macerate_calcite",
+    "shaped/lv_diode", "shaped/mv_diode", "shaped/hv_diode", "shaped/ev_diode",
+    "shaped/iv_diode", "shaped/luv_diode", "shaped/zpm_diode", "shaped/uv_diode",
+    "shaped/uhv_diode", "shaped/uev_diode", "shaped/uiv_diode", "shaped/uxv_diode",
+    "shaped/opv_diode",
+    "arc_furnace/arc_lv_diode", "arc_furnace/arc_mv_diode", "arc_furnace/arc_hv_diode",
+    "arc_furnace/arc_ev_diode", "arc_furnace/arc_iv_diode", "arc_furnace/arc_luv_diode",
+    "arc_furnace/arc_zpm_diode", "arc_furnace/arc_uv_diode", "arc_furnace/arc_uhv_diode",
+    "arc_furnace/arc_uev_diode", "arc_furnace/arc_uiv_diode", "arc_furnace/arc_uxv_diode",
+    "arc_furnace/arc_opv_diode",
+    "macerator/macerate_lv_diode", "macerator/macerate_mv_diode", "macerator/macerate_hv_diode",
+    "macerator/macerate_ev_diode", "macerator/macerate_iv_diode", "macerator/macerate_luv_diode",
+    "macerator/macerate_zpm_diode", "macerator/macerate_uv_diode", "macerator/macerate_uhv_diode",
+    "macerator/macerate_uev_diode", "macerator/macerate_uiv_diode", "macerator/macerate_uxv_diode",
+    "macerator/macerate_opv_diode",
+    "assembler/tool_lighter_invar", "assembler/tool_lighter_platinum",
+    "assembler/tool_matches_0", "assembler/tool_matches_1",
+    "assembler/tool_matches_2", "assembler/tool_matches_3",
+    "packer/matchbox",
+    "assembler/text_module", "assembler/image_module",
+    "arc_furnace/arc_text_module", "arc_furnace/arc_image_module",
+    "macerator/macerate_text_module", "macerator/macerate_image_module",
 ))
 
 

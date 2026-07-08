@@ -10,17 +10,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Pipelike.LongDistance;
 
-// Port of com.gregtechceu.gtceu.common.machine.storage.LongDistanceEndpointMachine.
-//
-// A GUI-less machine that caps an LD pipe network. The INPUT endpoint exposes an
-// insert-only handler on its TargetSide; an insert there is forwarded straight to
-// the OUTPUT endpoint's TargetSide inventory (the wormhole). Extraction is always
-// disabled - exactly upstream's ItemHandlerWrapper / FluidHandlerWrapper shape.
-//
-// IO model deviation: upstream derives IN/OUT from front-vs-back
-// facing. We have no facing, so PipeSide is auto-detected (the single footprint
-// side touching an LD pipe of this type) and the IN/OUT role is set by the player
-// via a screwdriver flip. TargetSide = opposite of PipeSide.
 public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 {
 	protected LongDistanceEndpointMachine() { }
@@ -38,9 +27,6 @@ public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 	private bool _removed;
 	public bool IsRemoved => _removed;
 
-	// The single footprint side adjacent to an LD pipe cell of this PipeType, or
-	// IODirection.None when 0 or >1 distinct sides qualify (invalid - upstream's
-	// "two neighbouring networks => IO.NONE").
 	public IODirection PipeSide
 	{
 		get
@@ -90,19 +76,6 @@ public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 		_linkResolved = false;
 	}
 
-	// === Wormhole capability ============================================
-	// DEVIATION: upstream gates on the single front
-	// face. We're facing-less, so the wormhole is exposed on EVERY side of the
-	// Input endpoint, and the far Output endpoint dumps into an inventory on ANY
-	// of its sides - whichever has one. (The pipe side is harmless: nothing
-	// queries an Input endpoint from its pipe side, and an Output dest lookup
-	// there resolves to nothing - an LD pipe cell is not an inventory.) The
-	// endpoint still only works when attached to a pipe net, since GetLink()
-	// returns null without one.
-
-	// Every perimeter cell of `link` - candidate inventories the far Output
-	// endpoint dumps into. arrival = the dest's own-frame side facing the link
-	// (opposite of the link's outward side at that cell).
 	private static System.Collections.Generic.IEnumerable<(int x, int y, IODirection arrival)>
 		LinkDestCells(ILDEndpoint link)
 	{
@@ -142,7 +115,6 @@ public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 		return null;
 	}
 
-	// === Lifecycle / registry ===========================================
 	protected override void OnMachineLoaded() => LongDistanceEndpointRegistry.Register(this);
 
 	public override void OnKill()
@@ -152,7 +124,6 @@ public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 		base.OnKill();
 	}
 
-	// === IO role tooltip + persistence ==================================
 	public override void AppendTooltip(List<string> lines)
 	{
 		base.AppendTooltip(lines);
@@ -163,10 +134,6 @@ public abstract class LongDistanceEndpointMachine : MetaMachine, ILDEndpoint
 			_      => "[c/FFAA44:Unset - screwdriver to set Input/Output]",
 		};
 		lines.Add(role);
-		// PipeSide is computed from the (synced) pipe layer, so it's valid on
-		// clients. The link comes from the endpoint registry, which is populated
-		// server-side only - gate the partner line on IsServer to avoid a false
-		// "no partner" on MP clients.
 		if (PipeSide == IODirection.None)
 			lines.Add("[c/FF6666:Not touching a single long-distance pipe]");
 		else if (IsServer && IoType is IO.IN or IO.OUT && GetLink() is null)

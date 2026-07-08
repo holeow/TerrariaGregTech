@@ -6,17 +6,11 @@ namespace GregTechCEuTerraria.TerrariaCompat.Items.Pipes;
 
 public static class SimplePipeRegistry
 {
-	private static readonly PipeSize[] ItemSizes =
-		{ PipeSize.Small, PipeSize.Normal, PipeSize.Large, PipeSize.Huge };
-
-	private static readonly PipeSize[] FluidSizes =
-		{ PipeSize.Tiny, PipeSize.Small, PipeSize.Normal, PipeSize.Large, PipeSize.Huge };
-
 	public static void Register(Mod mod)
 	{
-		foreach (var s in ItemSizes)
+		foreach (var s in SimpleItemPipeItem.Sizes)
 			mod.AddContent(new SimpleItemPipeItem(s));
-		foreach (var s in FluidSizes)
+		foreach (var s in SimpleFluidPipeItem.Sizes)
 			mod.AddContent(new SimpleFluidPipeItem(s));
 	}
 }

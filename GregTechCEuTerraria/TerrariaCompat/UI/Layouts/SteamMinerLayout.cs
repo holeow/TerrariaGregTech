@@ -6,13 +6,12 @@ using GregTechCEuTerraria.TerrariaCompat.Machine.Steam;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Layouts;
 
-// Steam Miner GUI - steam tank | status readout | 2x2 output cache
 public static class SteamMinerLayout
 {
 	public static MachineUILayout Build(SteamMinerMachine miner)
 	{
 		const int InventorySize = 4;
-		const int RowSize       = 2;  // sqrt(4) - matches upstream's 2x2 grid
+		const int RowSize       = 2;
 
 		const int SlotSize = 22;
 		const int SlotGap  = 2;
@@ -22,7 +21,7 @@ public static class SteamMinerLayout
 
 		int cacheW = RowSize * SlotSize + (RowSize - 1) * SlotGap;
 		int cacheH = cacheW;
-		const int StatusW = 160;
+		const int StatusW = 112;
 		int statusH = cacheH;
 
 		int contentH = Math.Max(cacheH, statusH);
@@ -37,13 +36,11 @@ public static class SteamMinerLayout
 			Title  = miner.DisplayName,
 		};
 
-		// Steam tank.
 		int leftX = Padding;
 		layout.Widgets.Add(new FluidSlotWidgetSpec(
 			X: leftX, Y: contentTop, Width: TankW, Height: cacheH,
 			Direction: IO.OUT, TankIndex: 0, FillBar: true));
 
-		// Status readout.
 		int statusX = leftX + TankW + 8;
 		int statusY = contentTop;
 		layout.Widgets.Add(new LabelWidgetSpec(
@@ -62,7 +59,6 @@ public static class SteamMinerLayout
 				: (miner.IsWorkingEnabled() ? "Idle" : "Disabled"),
 			Scale: 0.7f));
 
-		// Output cache (2x2 grid).
 		int cacheX = statusX + StatusW + 8;
 		for (int r = 0; r < RowSize; r++)
 		{

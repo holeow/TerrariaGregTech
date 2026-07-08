@@ -7,13 +7,12 @@ public static class MultiblockLocale
 {
 	public static void RegisterAll()
 	{
-		// Plug TerrariaCompat resolver into the Api builder so AddRecipeFailReasonLine
-		// maps raw gtceu.recipe_logic.* ids to the same RecipeStatus strings the
-		// world-hover tooltip uses (single source of truth).
 		Api.Machine.Multiblock.MultiblockDisplayText.FailReasonResolver =
 			RecipeStatusText.Resolve;
 
-		// Map the raw upstream gtceu.* keys
+		Api.Machine.Multiblock.MultiblockDisplayText.UnformedHint =
+			"[c/88BBFF:Tip: Click Terminal item onto controller to instantly build multiblock from blocks in your inventory]";
+
 		Api.Machine.Multiblock.MultiblockDisplayText.KeyResolver = raw =>
 		{
 			if (!raw.StartsWith("gtceu.")) return raw;
@@ -38,9 +37,7 @@ public static class MultiblockLocale
 		Register("gtceu.multiblock.idling",                    "[c/FFFF55:Idling]");
 		Register("gtceu.multiblock.work_paused",               "[c/FFFF55:Work Paused]");
 		Register("gtceu.multiblock.running",                   "[c/55FF55:Running Perfectly]");
-		// Passive-provider "working" key (HPCA / Data Bank / Network Switch).
 		Register("gtceu.multiblock.data_bank.providing",       "[c/55FF55:Providing]");
-		// Research Station "working" key (verbatim upstream addDisplayText key).
 		Register("gtceu.multiblock.research_station.researching", "[c/55FF55:Researching]");
 
 		Register("gtceu.multiblock.progress",                  "Progress: [c/FFAA00:{0} s] / [c/FFAA00:{1} s] [c/55FF55:({2}%)]");
@@ -81,35 +78,26 @@ public static class MultiblockLocale
 
 		Register("gtceu.gui.content.range",                       "{0}-{1}");
 
-		// Coil-multi additionalDisplay keys (verbatim upstream en_us.json).
-		// blast_furnace.max_temperature has no color - upstream colors at call site.
 		Register("gtceu.multiblock.blast_furnace.max_temperature",      "Heat Capacity: {0}");
 		Register("gtceu.multiblock.pyrolyse_oven.speed",                "Speed: [c/55FF55:{0}]%");
 		Register("gtceu.multiblock.multi_furnace.heating_coil_level",   "Heating Coil Level: [c/55FF55:{0}]");
 		Register("gtceu.multiblock.multi_furnace.heating_coil_discount","Energy Discount: [c/55FF55:{0}]x");
 		Register("gtceu.multiblock.cracking_unit.energy",               "Energy: [c/55FF55:{0}]%");
 
-		// SteamParallel (SteamParallelMultiblockMachine.java:132-162).
 		Register("gtceu.multiblock.steam.steam_stored",                 "Stored Steam: [c/55FF55:{0}] / [c/55FF55:{1}] L");
 		Register("gtceu.multiblock.steam.low_steam",                    "[c/FF5555:Not Enough Steam!]");
 
-		// LargeBoiler (LargeBoilerMachine.java:199-220). Temperature args are
-		// currentTemperature + 274 and maxTemperature + 274 (degC delta -> K).
 		Register("gtceu.multiblock.large_boiler.temperature",           "Temperature: [c/55FF55:{0}] K / [c/55FF55:{1}] K");
 		Register("gtceu.multiblock.large_boiler.steam_output",          "Steam Output: [c/55FF55:{0}] L/t");
-		// Throttle arg arrives pre-wrapped in a color tag - nesting would render literal.
 		Register("gtceu.multiblock.large_boiler.throttle",              "Throttle: {0}");
 		Register("gtceu.multiblock.large_boiler.throttle_modify",       "Adjust Throttle:");
 
-		// Cleanroom (CleanroomMachine.java:451-500).
 		Register("gtceu.recipe.cleanroom.display_name",                 "Cleanroom");
 		Register("gtceu.recipe.cleanroom_sterile.display_name",         "Sterile Cleanroom");
 		Register("gtceu.multiblock.waiting",                            "[c/FF5555:Waiting]");
 		Register("gtceu.multiblock.cleanroom.clean_state",              "[c/55FF55:Clean]");
 		Register("gtceu.multiblock.cleanroom.dirty_state",              "[c/FF5555:Dirty]");
 		Register("gtceu.multiblock.cleanroom.clean_amount",             "Cleanliness: [c/55FF55:{0}]%");
-		// DEVIATION: upstream's dimensions.1 is
-		// LxHxF (3D); our .2d variant carries LxH only.
 		Register("gtceu.multiblock.dimensions.0",                       "Dimensions:");
 		Register("gtceu.multiblock.dimensions.1.2d",                    "[c/55FF55:{0}]x[c/55FF55:{1}]");
 	}

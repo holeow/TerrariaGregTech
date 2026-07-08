@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using GregTechCEuTerraria.Api.Fluids;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using ReLogic.Content;
@@ -17,7 +18,7 @@ public sealed class UIItemGrid : UIElement
 	private const int CellSize = 36;
 	private const int CellPad  = 2;
 	private const int Margin   = 6;
-	private const int ScrollbarWidth = VanillaScrollbar.Width;
+	private const int ScrollbarWidth = Scrollbar.Width;
 	private const int MinThumbHeight = 28;
 	private const float VanillaNativeSlotPixels = 52f;
 
@@ -38,38 +39,34 @@ public sealed class UIItemGrid : UIElement
 		}
 	}
 
+	private static readonly IReadOnlyList<string> _noFluids = Array.Empty<string>();
+
 	private readonly Func<IReadOnlyList<int>> _source;
+	private readonly Func<IReadOnlyList<string>>? _fluidSource;
 	private readonly string _emptyHint;
 	private readonly Action<int>? _onPick;
+	private readonly Action<string>? _onPickFluid;
 	private int _scroll;
-	private bool _leftDown, _rightDown;
-	private bool _pickArmed;
-	private bool _dragging;
-	private int _dragAnchorOffsetPx;
+	private readonly Scrollbar _bar = new();
 
 	public int ScrollBottomInset;
 
 	public UIItemGrid(Func<IReadOnlyList<int>> source, string emptyHint = "No items match this search",
-		Action<int>? onPick = null)
+		Action<int>? onPick = null, Func<IReadOnlyList<string>>? fluidSource = null,
+		Action<string>? onPickFluid = null)
 	{
 		_source = source;
 		_emptyHint = emptyHint;
 		_onPick = onPick;
-	}
-
-	public void ResetPickArming()
-	{
-		_pickArmed = false;
-		_leftDown = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
+		_fluidSource = fluidSource;
+		_onPickFluid = onPickFluid;
 	}
 
 	public override void ScrollWheel(UIScrollWheelEvent evt)
 	{
 		base.ScrollWheel(evt);
 		if (!IsMouseHovering) return;
-		_scroll -= evt.ScrollWheelValue;
-		if (_scroll < 0) _scroll = 0;
+		Scrollbar.Wheel(evt, ref _scroll);
 	}
 
 	protected override void DrawSelf(SpriteBatch sb)
@@ -92,64 +89,35 @@ public sealed class UIItemGrid : UIElement
 			outer.Height - Margin * 2);
 
 		var src = _source();
-		if (src.Count == 0)
+		var fluids = _fluidSource?.Invoke() ?? _noFluids;
+		int total = src.Count + fluids.Count;
+		if (total == 0)
 		{
 			Terraria.Utils.DrawBorderString(sb, _emptyHint,
 				new Vector2(content.X + 8, content.Y + 8),
 				Color.LightGray, 0.85f);
-			_leftDown  = Main.mouseLeft;
-			_rightDown = Main.mouseRight;
 			return;
 		}
 
 		int step = CellSize + CellPad;
 		int cols = Math.Max(1, (content.Width + CellPad) / step);
-		int rows = (src.Count + cols - 1) / cols;
+		int rows = (total + cols - 1) / cols;
 		int totalH = rows * step;
 		int viewH = content.Height;
 		int maxScroll = Math.Max(0, totalH - viewH);
 		if (_scroll > maxScroll) _scroll = maxScroll;
 
-		var mouse = GlobalRecipeBrowserState.BrowserCursor();
+		var mouse = ModalEscape.PollCursor();
 
-		bool draggingThisFrame = false;
 		Rectangle trackRect = Rectangle.Empty, thumbRect = Rectangle.Empty;
 		if (totalH > viewH)
 		{
 			int barX = outer.Right - Margin - ScrollbarWidth;
 			int barH = Math.Max(MinThumbHeight, content.Height - ScrollBottomInset);
 			trackRect = new Rectangle(barX, content.Y, ScrollbarWidth, barH);
-			float frac = (float)viewH / totalH;
-			int thumbH = Math.Max(MinThumbHeight, (int)(barH * frac));
-			int travel = barH - thumbH;
-			int thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
-			thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-
-			if (Main.mouseLeft && !_leftDown && trackRect.Contains(mouse))
-			{
-				_dragging = true;
-				_dragAnchorOffsetPx = thumbRect.Contains(mouse)
-					? mouse.Y - thumbY
-					: thumbH / 2;
-			}
-			if (_dragging && Main.mouseLeft)
-			{
-				int newThumbTop = mouse.Y - _dragAnchorOffsetPx;
-				int travelMax = Math.Max(1, barH - thumbH);
-				int clampedTop = Math.Clamp(newThumbTop - content.Y, 0, travelMax);
-				_scroll = (int)((float)clampedTop / travelMax * maxScroll);
-				draggingThisFrame = true;
-			}
-			else if (!Main.mouseLeft)
-			{
-				_dragging = false;
-			}
-			if (draggingThisFrame)
-			{
-				thumbY = content.Y + (travel > 0 ? (int)(travel * ((float)_scroll / maxScroll)) : 0);
-				thumbRect = new Rectangle(barX, thumbY, ScrollbarWidth, thumbH);
-			}
+			thumbRect = _bar.Update(trackRect, maxScroll, (float)viewH / totalH, ref _scroll, mouse);
 		}
+		bool draggingThisFrame = _bar.Dragging;
 
 		bool inside = content.Contains(mouse);
 
@@ -157,7 +125,7 @@ public sealed class UIItemGrid : UIElement
 		int lastRow  = Math.Min(rows - 1, (_scroll + viewH - 1) / step);
 
 		int hoveredType = 0;
-		Rectangle hoveredRect = Rectangle.Empty;
+		string? hoveredFluid = null;
 
 		float oldScale = Main.inventoryScale;
 		Main.inventoryScale = CellSize / VanillaNativeSlotPixels;
@@ -171,31 +139,38 @@ public sealed class UIItemGrid : UIElement
 				for (int c = 0; c < cols; c++)
 				{
 					int idx = r * cols + c;
-					if (idx >= src.Count) break;
+					if (idx >= total) break;
 					int xLeft = content.X + c * step;
 					var rect = new Rectangle(xLeft, yTop, CellSize, CellSize);
 					if (rect.Bottom < content.Y || rect.Y > content.Bottom) continue;
 
-					int itemType = src[idx];
-					if (!_itemCache.TryGetValue(itemType, out var cached))
-					{
-						cached = new Item();
-						cached.SetDefaults(itemType);
-						_itemCache[itemType] = cached;
-					}
-					_drawSlot[0] = cached;
-
 					bool isHover = !draggingThisFrame && inside && rect.Contains(mouse);
-					if (isHover)
-					{
-						hoveredType = itemType;
-						hoveredRect = rect;
-						ItemSlot.OverrideHover(_drawSlot, ItemSlot.Context.CraftingMaterial, 0);
-						ItemSlot.MouseHover(_drawSlot, ItemSlot.Context.CraftingMaterial, 0);
-					}
 
-					ItemSlot.Draw(sb, _drawSlot, ItemSlot.Context.CraftingMaterial, 0,
-						new Vector2(rect.X, rect.Y));
+					if (idx < src.Count)
+					{
+						int itemType = src[idx];
+						if (!_itemCache.TryGetValue(itemType, out var cached))
+						{
+							cached = new Item();
+							cached.SetDefaults(itemType);
+							_itemCache[itemType] = cached;
+						}
+						_drawSlot[0] = cached;
+						if (isHover)
+						{
+							hoveredType = itemType;
+							ItemSlot.OverrideHover(_drawSlot, ItemSlot.Context.CraftingMaterial, 0);
+							ItemSlot.MouseHover(_drawSlot, ItemSlot.Context.CraftingMaterial, 0);
+						}
+						ItemSlot.Draw(sb, _drawSlot, ItemSlot.Context.CraftingMaterial, 0,
+							new Vector2(rect.X, rect.Y));
+					}
+					else
+					{
+						string fluidId = fluids[idx - src.Count];
+						BrowserFluidSlot.Draw(sb, rect, FluidRegistry.Get(fluidId));
+						if (isHover) hoveredFluid = fluidId;
+					}
 				}
 			}
 			});
@@ -212,26 +187,38 @@ public sealed class UIItemGrid : UIElement
 
 			if (_onPick != null)
 			{
-				if (!Main.mouseLeft) _pickArmed = true;
-				if (_pickArmed && Main.mouseLeft && !_leftDown)
+				if (MouseClick.LeftPressed)
 					_onPick(hoveredType);
 			}
 			else
 			{
-				var click = BrowserSlotInteraction.Poll(_leftDown, _rightDown);
+				ItemDrag.ArmFromHover(hoveredType, null, null);
+				var click = ItemDrag.Active ? default : BrowserSlotInteraction.PollReleased();
 				BrowserSlotInteraction.HandleItem(click, hoveredType, inFavoritesPane: false);
 			}
 		}
+		else if (hoveredFluid != null)
+		{
+			Main.LocalPlayer.mouseInterface = true;
+			var fluid = FluidRegistry.Get(hoveredFluid);
+			BrowserHover.SetFluid(hoveredFluid, fluid?.DisplayName ?? hoveredFluid);
+			BrowserFluidSlot.EmitTooltip(fluid, 0, hoveredFluid);
 
-		_leftDown = Main.mouseLeft;
-		_rightDown = Main.mouseRight;
+			if (_onPickFluid != null)
+			{
+				if (MouseClick.LeftPressed)
+					_onPickFluid(hoveredFluid);
+			}
+			else if (fluid != null)
+			{
+				ItemDrag.ArmFromHover(0, hoveredFluid, fluid.DisplayName);
+				var click = ItemDrag.Active ? default : BrowserSlotInteraction.PollReleased();
+				BrowserSlotInteraction.HandleFluid(click, fluid, null, inFavoritesPane: false);
+			}
+		}
 
 		if (totalH > viewH)
-		{
-			bool thumbHot = _dragging || thumbRect.Contains(mouse);
-			VanillaScrollbar.Draw(sb, trackRect, thumbRect, thumbHot);
-			if (thumbHot) Main.LocalPlayer.mouseInterface = true;
-		}
+			_bar.Draw(sb, trackRect, thumbRect, mouse);
 	}
 
 }

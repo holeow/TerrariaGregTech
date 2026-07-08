@@ -12,9 +12,6 @@ using Terraria.UI;
 
 namespace GregTechCEuTerraria.TerrariaCompat.UI.Widgets;
 
-// 5-button plus-layout direction selector (Up/Left/Center/Right/Down). Center
-// = Off (IODirection.None). Clicking the active direction toggles auto-output
-// (upstream's plain-screwdriver behaviour). 54x54 logical, scaled by layout.
 public sealed class UIDirectionSelector : UIElement
 {
 	public enum Mode { Items, Fluids }
@@ -27,8 +24,9 @@ public sealed class UIDirectionSelector : UIElement
 	private readonly Action<IODirection> _setSide;
 	private readonly Func<bool> _getAutoOutput;
 	private readonly Action<bool> _setAutoOutput;
+	private readonly string? _label;
+	private readonly bool _autoOutputToggleable;
 
-	private bool _leftDown;
 	private static Asset<Texture2D>? _btnFrame;
 	private static Asset<Texture2D>? _arrow;
 	private static Asset<Texture2D>? _itemCenter;
@@ -38,19 +36,20 @@ public sealed class UIDirectionSelector : UIElement
 
 	public UIDirectionSelector(Mode mode,
 		Func<IODirection> getSide, Action<IODirection> setSide,
-		Func<bool> getAutoOutput, Action<bool> setAutoOutput)
+		Func<bool> getAutoOutput, Action<bool> setAutoOutput,
+		string? label = null, bool autoOutputToggleable = true)
 	{
 		_mode = mode;
 		_getSide = getSide;
 		_setSide = setSide;
 		_getAutoOutput = getAutoOutput;
 		_setAutoOutput = setAutoOutput;
+		_label = label;
+		_autoOutputToggleable = autoOutputToggleable;
 		Width = StyleDimension.FromPixels(ClusterSize);
 		Height = StyleDimension.FromPixels(ClusterSize);
 	}
 
-	// Plus pattern: (1,0)=Up, (0,1)=Left, (1,1)=center/Off, (2,1)=Right, (1,2)=Down.
-	// Corners return null (= not a cell).
 	private static IODirection? CellFor(int col, int row)
 	{
 		return (col, row) switch
@@ -73,7 +72,7 @@ public sealed class UIDirectionSelector : UIElement
 
 		var currentSide = _getSide();
 		bool autoOn = _getAutoOutput();
-		var mouse = new Point((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		var mouse = ModalEscape.PollCursor();
 		IODirection? hoveredDir = null;
 
 		TerrariaCompat.UI.PointClampDraw.Draw(spriteBatch, () =>
@@ -100,41 +99,41 @@ public sealed class UIDirectionSelector : UIElement
 		if (hoveredDir is not null)
 		{
 			Main.LocalPlayer.mouseInterface = true;
-			string label = _mode == Mode.Items ? "Item output" : "Fluid output";
+			string label = _label ?? (_mode == Mode.Items ? "Item output" : "Fluid output");
+			string activeHint = _autoOutputToggleable
+				? $"(active - click again to {(autoOn ? "disable" : "enable")} auto-output)"
+				: "(active - click to clear)";
 			string tip = hoveredDir.Value switch
 			{
 				IODirection.None  => $"{label}: OFF",
 				_                 => $"{label}: {hoveredDir.Value}\n"
-					+ (hoveredDir.Value == currentSide
-						? $"(active - click again to {(autoOn ? "disable" : "enable")} auto-output)"
-						: "(click to select)"),
+					+ (hoveredDir.Value == currentSide ? activeHint : "(click to select)"),
 			};
 			Main.instance.MouseText(tip);
 			HandleClick(hoveredDir.Value, currentSide, autoOn);
 		}
-		_leftDown = Main.mouseLeft;
 	}
 
 	private void HandleClick(IODirection clickedDir, IODirection currentSide, bool autoOn)
 	{
-		if (!(Main.mouseLeft && !_leftDown)) return;
+		if (!MouseClick.LeftPressed) return;
 
 		if (clickedDir == IODirection.None)
 		{
 			_setSide(IODirection.None);
-			_setAutoOutput(false);
+			if (_autoOutputToggleable) _setAutoOutput(false);
 			Terraria.Audio.SoundEngine.PlaySound(Terraria.ID.SoundID.MenuTick);
 			return;
 		}
 		if (clickedDir == currentSide)
 		{
-			_setAutoOutput(!autoOn);   // click active -> toggle auto-output
+			if (_autoOutputToggleable) _setAutoOutput(!autoOn);
+			else                       _setSide(IODirection.None);
 			Terraria.Audio.SoundEngine.PlaySound(Terraria.ID.SoundID.MenuTick);
 			return;
 		}
-		// New direction - don't auto-enable, user clicks again to start pushing.
 		_setSide(clickedDir);
-		_setAutoOutput(false);
+		if (_autoOutputToggleable) _setAutoOutput(false);
 		Terraria.Audio.SoundEngine.PlaySound(Terraria.ID.SoundID.MenuTick);
 	}
 
@@ -143,7 +142,6 @@ public sealed class UIDirectionSelector : UIElement
 		if (_btnFrame?.Value is { } frame)
 			sb.Draw(frame, dest, isHover ? Color.LightGoldenrodYellow : Color.White);
 
-		// Centre = mode icon; arms = rotated arrow.
 		if (dir == IODirection.None)
 		{
 			var center = _mode == Mode.Items ? _itemCenter : _fluidCenter;
@@ -156,7 +154,6 @@ public sealed class UIDirectionSelector : UIElement
 		}
 		else if (_arrow?.Value is { } arrowTex)
 		{
-			// left.png points left; rotate to face each direction.
 			float rot = dir switch
 			{
 				IODirection.Left  => 0f,
@@ -171,7 +168,6 @@ public sealed class UIDirectionSelector : UIElement
 			sb.Draw(arrowTex, center, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
 		}
 
-		// Top-right corner overlay on the active direction cell.
 		if (isActive && dir != IODirection.None)
 		{
 			var overlay = autoOn ? _activeOn : _activeOff;

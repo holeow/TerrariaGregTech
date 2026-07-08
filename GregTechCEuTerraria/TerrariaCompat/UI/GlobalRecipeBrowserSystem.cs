@@ -13,7 +13,7 @@ public sealed class GlobalRecipeBrowserSystem : ModalUISystem
 	private static GlobalRecipeBrowserSystem? _instance;
 	private GlobalRecipeBrowserState? _state;
 
-	private const string LayerNameStr = "GregTechCEuTerraria: GlobalRecipeBrowser";
+	public const string LayerNameStr = "GregTechCEuTerraria: GlobalRecipeBrowser";
 	protected override string LayerName => LayerNameStr;
 	public override bool PinSupported => true;
 
@@ -36,16 +36,28 @@ public sealed class GlobalRecipeBrowserSystem : ModalUISystem
 		base.Unload();
 	}
 
+	private bool _dockedWanted;
+
 	public override void OnWorldLoad()
 	{
-		// Pre-bake search-text cache + loot registry
 		if (!Main.dedServ)
 		{
 			GlobalRecipeBrowserState.SyncLocaleCaches();
 			RecipeSearch.WarmCache();
 			_state?.Warm();
 			Loot.LootRegistry.Warm();
+			_dockedWanted = Config.GTClientConfig.Instance.OpenDockedBrowserOnLaunch;
 		}
+	}
+
+	public override void UpdateUI(GameTime gameTime)
+	{
+		if (_dockedWanted && !Main.dedServ && Main.playerInventory && !IsOpenInternal)
+		{
+			_dockedWanted = false;
+			EnterDocked();
+		}
+		base.UpdateUI(gameTime);
 	}
 
 	protected override void OnClose()
@@ -57,35 +69,79 @@ public sealed class GlobalRecipeBrowserSystem : ModalUISystem
 	protected override void AddExtraLayers(List<GameInterfaceLayer> layers)
 		=> UILayers.InsertButton(layers,
 			"GregTechCEuTerraria: TooManyItems Button",
-			() => { DrawInventoryButton(); return true; });
+			() => { DrawInventoryButton(); DrawDockedButton(); return true; });
 
 	public static void Open()
 	{
 		var s = _instance;
 		if (s?.Ui is null || s._state is null) return;
-		if (s.Ui.CurrentState == s._state) return;
-		s._state.RebuildFromScratch();
-		s.Ui.SetState(s._state);
-		s.PushModal();
+		s.Pinned = false;
 		Main.playerInventory = true;
+		if (s.Ui.CurrentState != s._state)
+		{
+			s._state.RebuildFromScratch();
+			s.Ui.SetState(s._state);
+		}
+		s.PushModal();
+		s._state.RelayoutNow(false);
 	}
 
-	// R/U hover hotkeys
+	public static bool DockedActive
+		=> _instance is { } s && s.Pinned && (s._state?.Docked ?? false);
+
+	public static void ToggleDocked()
+	{
+		if (DockedActive) ExitDocked();
+		else EnterDocked();
+	}
+
+	private static void EnterDocked()
+	{
+		var s = _instance;
+		if (s?.Ui is null || s._state is null) return;
+		Main.playerInventory = true;
+		if (s.Ui.CurrentState != s._state)
+		{
+			s._state.RebuildFromScratch();
+			s.Ui.SetState(s._state);
+		}
+		s.Pinned = true;
+		s.PushModal();
+		s._state.RelayoutNow(true);
+	}
+
+	private static void ExitDocked()
+	{
+		var s = _instance;
+		if (s is null) return;
+		s.Pinned = false;
+		s._state?.SetDocked(false);
+		s.CloseInternal();
+	}
+
 	public static void OpenFiltered(int itemType, GlobalRecipeBrowserState.BrowseFilter filter)
 	{
+		FavoritesPlayer.Local.RecordItem(itemType);
 		if (Show() is { } s) s._state!.ApplyItemFilter(itemType, filter);
 	}
 
 	public static void OpenFilteredFluid(string fluidId, string label,
 		GlobalRecipeBrowserState.BrowseFilter filter)
 	{
+		FavoritesPlayer.Local.RecordFluid(fluidId, label);
 		if (Show() is { } s) s._state!.ApplyFluidFilter(fluidId, label, filter);
 	}
 
 	public static void OpenFilteredTag(string tagLabel, HashSet<int> items,
 		GlobalRecipeBrowserState.BrowseFilter filter)
 	{
+		FavoritesPlayer.Local.RecordTag(tagLabel, items);
 		if (Show() is { } s) s._state!.ApplyTagFilter(tagLabel, items, filter);
+	}
+
+	public static void OpenStation(string station)
+	{
+		if (Show() is { } s) s._state!.ApplyStationFilter(station);
 	}
 
 	private static GlobalRecipeBrowserSystem? Show()
@@ -110,7 +166,6 @@ public sealed class GlobalRecipeBrowserSystem : ModalUISystem
 
 	public static bool IsOpen => _instance?.IsOpenInternal ?? false;
 
-	public static bool CursorOverHigherModal => UILayers.IsCursorOverHigherModal(LayerNameStr);
 
 	private static void DrawInventoryButton()
 		=> UILayers.DrawStackedButton(
@@ -124,4 +179,18 @@ public sealed class GlobalRecipeBrowserSystem : ModalUISystem
 			tooltip: "Open Too Many Items",
 			onClick: Open,
 			keybind: ModalToggleKeybinds.OpenRecipeBrowser);
+
+	private static void DrawDockedButton()
+		=> UILayers.DrawStackedButton(
+			slot: 1,
+			background: DockedActive ? new Color(52, 92, 60) : new Color(38, 42, 70),
+			drawIcon: (sb, r) =>
+			{
+				var plate = TooManyItemsArt.PlateTexture;
+				if (plate != null)
+					sb.Draw(plate, r, DockedActive ? Color.White : new Color(150, 170, 210));
+			},
+			tooltip: DockedActive ? "Close Too Many Items docked" : "Open Too Many Items docked",
+			onClick: ToggleDocked,
+			keybind: ModalToggleKeybinds.ToggleDockedBrowser);
 }

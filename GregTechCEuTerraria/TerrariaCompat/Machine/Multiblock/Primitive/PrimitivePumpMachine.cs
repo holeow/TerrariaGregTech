@@ -13,6 +13,8 @@ public class PrimitivePumpMachine : MultiblockControllerMachine
 {
 	protected override string Label => "Primitive Water Pump";
 
+	public override bool SupportsCovers => false;
+
 	private int _biomeModifier;
 	private int _hatchModifier;
 	private NotifiableFluidTank? _fluidTank;

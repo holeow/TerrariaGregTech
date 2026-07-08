@@ -91,14 +91,14 @@ public sealed class UITextField : UIElement, ITextInput
 	{
 		base.Update(gameTime);
 		var bounds = GetDimensions().ToRectangle();
-		bool over = bounds.Contains((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		bool over = bounds.Contains(ModalEscape.PollCursor());
 
 		if (_mouseSelecting)
 		{
 			if (Main.mouseLeft) _caret = CaretFromMouse();
 			else { _mouseSelecting = false; if (_selAnchor == _caret) _selAnchor = -1; }
 		}
-		else if (IsFocused && Main.mouseLeft && !over)
+		else if (IsFocused && MouseClick.LeftPressed && !over)
 		{
 			Commit();
 		}
@@ -138,7 +138,7 @@ public sealed class UITextField : UIElement, ITextInput
 
 		switch (fired)
 		{
-			case Keys.Enter: Commit(); return;
+			case Keys.Enter: Main.chatRelease = false; Commit(); return;
 			case Keys.Escape: Discard(); return;
 			case Keys.Left: Move(_caret - 1, shift); return;
 			case Keys.Right: Move(_caret + 1, shift); return;
@@ -217,7 +217,7 @@ public sealed class UITextField : UIElement, ITextInput
 	private int CaretFromMouse()
 	{
 		var b = GetDimensions().ToRectangle();
-		float mx = Main.MouseScreen.X - (b.X + TextPadX);
+		float mx = ModalEscape.PollCursorScreen().X - (b.X + TextPadX);
 		var font = FontAssets.MouseText.Value;
 		string s = Flat(_buffer);
 		int best = 0;

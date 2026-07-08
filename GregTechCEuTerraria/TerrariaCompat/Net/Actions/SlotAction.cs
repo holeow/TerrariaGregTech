@@ -91,7 +91,10 @@ public sealed class SlotAction : IMachineAction
 
 	private void ApplyDeposit(Item[] slots, MetaMachine entity, int byWhoAmI)
 	{
-		if (_group != SlotGroup.InventoryOutput && !_cursor.IsAir)
+		bool depositOk = !_cursor.IsAir && (_group == SlotGroup.InventoryOutput
+			? entity.AcceptsOutputDeposit(_index, _cursor)
+			: entity.IsItemValidForSlot(_group, _index, _cursor));
+		if (depositOk)
 		{
 			ref Item slot = ref slots[_index];
 			int before = _cursor.stack;
@@ -147,7 +150,7 @@ public sealed class SlotAction : IMachineAction
 	private void ApplyShiftIn(MetaMachine entity, int byWhoAmI)
 	{
 		var (slots, group) = ResolveShiftInSlots(entity);
-		if (slots is not null)
+		if (slots is not null && entity.IsItemValidForSlot(group, 0, _cursor))
 		{
 			DepositInto(slots, _cursor);
 			entity.NotifySlotGroupChanged(group);

@@ -9,21 +9,10 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Port of PowerSubstationMachine. Bulk EU storage multi. OnStructureFormed
-// aggregates input/output hatch EnergyContainerLists + scans footprint for
-// battery blocks (PssBatteryData) into a PowerStationEnergyBank (BigInteger
-// total). Every 20 ticks: input hatches -> bank -> output hatches, passive
-// drain off the top.
-//
-// Adaptations: maintenance multiplier no-op (subsystem not ported); ioMap
-// per-block override dropped (parts default to declared Io via trait walk);
-// battery scan walks the formed footprint instead of upstream's match-context
-// PMC_BATTERY_HEADER buckets.
 public class PowerSubstationMachine : WorkableMultiblockMachine
 {
 	public const int  MaxBatteryLayers = 18;
 	public const int  MinCasings        = 14;
-	// 1 % capacity per 24 hours (20 Hz).
 	public const long PassiveDrainDivisor = 20L * 60 * 60 * 24 * 100;
 	public const long PassiveDrainMaxPerStorage = 100_000L;
 
@@ -32,7 +21,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 	private EnergyContainerList?    _outputHatches;
 	private long _passiveDrain;
 
-	// 20-tick rolling stats - upstream inputPerSec/outputPerSec.
 	private long _netInLastSec;
 	private long _netOutLastSec;
 	private long _inputPerSec;
@@ -66,8 +54,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		base.OnStructureFormed();
 		_energyBank ??= EnsureEnergyBank();
 
-		// Aggregate hatches (verbatim ActiveTransformer.OnStructureFormed shape,
-		// upstream lines 93-126). BOTH falls into INPUT first.
 		var inputs  = new List<IEnergyContainer>();
 		var outputs = new List<IEnergyContainer>();
 		foreach (var part in GetParts())
@@ -96,22 +82,13 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 			    Tiles.Casings.CasingTile casingTile) continue;
 			var data = PssBatteryData.Get(casingTile.Name);
 			if (data is null) continue;
-			if (data.Tier == -1 || data.Capacity <= 0) continue;  // empty filler
+			if (data.Tier == -1 || data.Capacity <= 0) continue;
 			batteries.Add(data);
 		}
 
-		// Upstream verbatim (line 136). Persist a reason since the cell-level
-		// matcher accepts empty filler variants.
 		if (batteries.Count == 0)
 		{
-			SetUnformedReason(
-				"No filled battery blocks installed",
-				new[]
-				{
-					"At least one of the inner B cells must hold a real battery block:",
-					"  EV / IV / LuV / ZPM / UV Lapotronic battery, or UHV Ultimate Battery.",
-					"Empty Tier I / II / III blocks are filler only and don't contribute capacity.",
-				});
+			SetUnformedReason("No filled battery blocks installed");
 			OnStructureInvalid();
 			return;
 		}
@@ -122,7 +99,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 
 	public override void OnStructureInvalid()
 	{
-		// Keep _energyBank - stored energy must survive rebuilds (upstream 147-149).
 		_inputHatches  = null;
 		_outputHatches = null;
 		_passiveDrain  = 0;
@@ -133,19 +109,13 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		base.OnStructureInvalid();
 	}
 
-	// Walks every cell the last match visited (MultiblockState.Cache), not just
-	// IMultiPart instances - batteries are CasingTiles and would be missed by
-	// PartPositions.
 	private IEnumerable<(int X, int Y)> EnumerateFootprintCells() =>
 		GetMultiblockState().GetCache();
 
-	// Verbatim transferEnergyTick (lines 160-189).
 	private void TransferEnergyTick()
 	{
-		// Stats rollover every 20 MC ticks (= 1 sec at SimSpeed=1.0).
 		if (Terraria.Main.GameUpdateCount % (uint)global::GregTechCEuTerraria.Api.TickScale.FromMcTicks(20) == 0)
 		{
-			// Status flip drives the active overlay only - real work below.
 			Recipe.SetStatus(_energyBank!.HasEnergy()
 				? Api.Machine.Feature.RecipeLogicStatus.WORKING
 				: Api.Machine.Feature.RecipeLogicStatus.IDLE);
@@ -169,12 +139,8 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		_netOutLastSec += debanked;
 	}
 
-	// Maintenance multiplier no-op (subsystem not ported).
 	public long GetPassiveDrain() => _passiveDrain;
 
-	// Custom tooltip skips WMM's recipe-shaped status line (would print
-	// "Running 0/0t" for a DUMMY recipe). Inline MetaMachine.AppendTooltip
-	// + the unformed-reason path manually. Same shape as ActiveTransformer.
 	public override void AppendTooltip(List<string> lines)
 	{
 		lines.Add(DisplayName);
@@ -190,9 +156,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		AppendLiveStats(lines);
 	}
 
-	// Port of upstream addDisplayText formed-state block (lines 194-259).
-	// Shared by world hover + PowerSubstationLayout display panel. Three-state
-	// Paused/Running/Idle (no progress - DUMMY recipe); duration in seconds.
 	private void AppendLiveStats(List<string> lines)
 	{
 		var bank = _energyBank!;
@@ -211,7 +174,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		lines.Add($"Avg in: [c/55FF55:{_inputPerSec / 20:N0} EU/t]");
 		lines.Add($"Avg out: [c/FF8888:{System.Math.Abs(_outputPerSec) / 20:N0} EU/t]");
 
-		// Time-to-fill/drain in seconds (upstream uses translatable keys).
 		long net = _inputPerSec - _outputPerSec;
 		if (net > 0)
 		{
@@ -225,9 +187,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		}
 	}
 
-	// Port of upstream createUIWidget's ComponentPanelWidget(addDisplayText).
-	// PowerSubstation extends WMM (not WEMM), so can't reuse generic_multi's
-	// layout (its getter casts to WEMM).
 	public IReadOnlyList<string> BuildPanelLines()
 	{
 		var lines = new List<string>();
@@ -251,7 +210,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 		return $"{s / (86400L * 365)} yr";
 	}
 
-	// Bank rides Traits.Save; avg stats need explicit save for MP visibility.
 	public override void SaveData(TagCompound tag)
 	{
 		base.SaveData(tag);
@@ -262,8 +220,6 @@ public class PowerSubstationMachine : WorkableMultiblockMachine
 
 	public override void LoadData(TagCompound tag)
 	{
-		// Ensure bank BEFORE base.LoadData runs Traits.Load - else the bank's
-		// persisted long[] storage is skipped and stored EU is lost on reload.
 		_energyBank ??= EnsureEnergyBank();
 		base.LoadData(tag);
 		if (tag.ContainsKey("pss_inPerSec"))  _inputPerSec  = tag.GetLong("pss_inPerSec");

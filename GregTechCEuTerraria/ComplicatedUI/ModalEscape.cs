@@ -13,10 +13,24 @@ public static class ModalEscape
 	private static readonly InputMode[] KeyboardModes = { InputMode.Keyboard, InputMode.KeyboardUI };
 	private static readonly string[] EscapeKey = { "Escape" };
 
+	private static bool _cursorParked;
+
+	public static Vector2 UiCursor
+	{
+		get
+		{
+			if (_cursorParked) return new Vector2(-10000f, -10000f);
+			float s = Main.UIScale <= 0f ? 1f : Main.UIScale;
+			return new Vector2(PlayerInput.MouseX / s, PlayerInput.MouseY / s);
+		}
+	}
+
+	public static Point UiCursorPoint { get { var v = UiCursor; return new Point((int)v.X, (int)v.Y); } }
+
 	public static void SuppressItemUse(UIState state)
 	{
 		if (state is null) return;
-		var mouse = Main.MouseScreen / Main.UIScale;
+		var mouse = UiCursor;
 		foreach (var child in state.Children)
 		{
 			if (child.ContainsPoint(mouse))
@@ -33,7 +47,7 @@ public static class ModalEscape
 	public static void SuppressVanillaUIClicks(UIState state)
 	{
 		if (state is null) return;
-		var mouse = Main.MouseScreen;
+		var mouse = UiCursor;
 		foreach (var child in state.Children)
 		{
 			if (child.ContainsPoint(mouse))
@@ -61,10 +75,21 @@ public static class ModalEscape
 
 	public static void WithCursorParked(System.Action action)
 	{
+		bool prev = _cursorParked;
+		_cursorParked = true;
 		int mx = Main.mouseX, my = Main.mouseY;
 		Main.mouseX = Main.mouseY = -10000;
 		try { action(); }
-		finally { Main.mouseX = mx; Main.mouseY = my; }
+		finally { Main.mouseX = mx; Main.mouseY = my; _cursorParked = prev; }
+	}
+
+	public static Vector2 PollCursorScreen()
+		=> FreeModalWindow.DragActive ? new Vector2(-10000, -10000) : UiCursor;
+
+	public static Point PollCursor()
+	{
+		var v = PollCursorScreen();
+		return new Point((int)v.X, (int)v.Y);
 	}
 
 	public static void ConsumePhysicalKeys(ICollection<string> physicalKeys, InputMode mode)

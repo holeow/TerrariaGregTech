@@ -40,6 +40,8 @@ public sealed class CasingItem : ModItem, ITextureWarmUp
 	{
 		if (_id is null) return;
 		Item.DefaultToPlaceableTile(Mod.Find<ModTile>(Name).Type);
+		Item.useTime = Players.CenteredPlacementPlayer.PlaceUseTime;
+		Item.useAnimation = Players.CenteredPlacementPlayer.PlaceUseAnimation;
 		Item.width = 32;
 		Item.height = 32;
 		Item.maxStack = 9999;

@@ -37,10 +37,7 @@ public sealed class SteamParallelMultiblockMachine : WorkableMultiblockMachine
 				return;
 			}
 		}
-		SetUnformedReason("No steam input hatch bound", new[]
-		{
-			"Steam multis need exactly one Steam Input Hatch installed on a wall cell.",
-		});
+		SetUnformedReason("No steam input hatch bound");
 		OnStructureInvalid();
 	}
 

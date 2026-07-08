@@ -42,14 +42,12 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 		}
 		if (ObjectHolder == null)
 		{
-			SetUnformedReason("No Object Holder",
-				new[] { "Place an Object Holder at the pedestal cell (H)." });
+			SetUnformedReason("No Object Holder");
 			OnStructureInvalid();
 		}
 		else if (ComputationProvider == null)
 		{
-			SetUnformedReason("No Computation Receiver Hatch",
-				new[] { "Install a Computation Data Reception Hatch on a casing cell." });
+			SetUnformedReason("No Computation Receiver Hatch");
 			OnStructureInvalid();
 		}
 	}
@@ -131,7 +129,7 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 
 		public override bool CheckMatchedRecipeAvailable(GTRecipe match)
 		{
-			var modified = GetRLMachine().FullModifyRecipe(match);
+			var modified = ApplyAmbient(GetRLMachine(), GetRLMachine().FullModifyRecipe(match));
 			if (modified != null)
 			{
 				if (modified.GetInputContents(CWURecipeCapability.CAP).Count == 0 &&

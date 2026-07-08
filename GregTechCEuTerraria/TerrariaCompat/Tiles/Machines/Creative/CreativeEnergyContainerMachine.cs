@@ -72,6 +72,19 @@ public sealed class CreativeEnergyContainerMachine : MetaMachine, IEnergyContain
 			_energyIOPerSec = 0;
 		}
 		_ampsReceived = 0;
+		if (!_active || !_source || _voltage <= 0 || _amps <= 0) return;
+		long ampsUsed = 0;
+		foreach (var (side, neighbor) in MachineCellResolver.PerimeterNeighbors(this))
+		{
+			if (neighbor is not IEnergyContainer container) continue;
+			var opposite = side.Opposite();
+			if (container.InputsEnergy(opposite) && container.GetEnergyCanBeInserted() > 0)
+			{
+				ampsUsed += container.AcceptEnergyFromNetwork(opposite, _voltage, _amps - ampsUsed);
+				if (ampsUsed >= _amps) break;
+			}
+		}
+		_energyIOPerSec += ampsUsed * _voltage;
 	}
 
 	public long AcceptEnergyFromNetwork(IODirection side, long voltage, long amperage)

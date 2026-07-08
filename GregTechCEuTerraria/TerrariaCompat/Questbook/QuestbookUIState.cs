@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using GregTechCEuTerraria.Config;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
 using GregTechCEuTerraria.TerrariaCompat.UI;
@@ -32,7 +33,6 @@ public sealed class QuestbookUIState : FreeModalWindow
 
 	private bool _questOpen;
 	private bool _questAttached;
-	private bool _prevLeft;
 
 	private int _chapterIndex = -1;
 	private string? _selectedQuest;
@@ -49,7 +49,7 @@ public sealed class QuestbookUIState : FreeModalWindow
 	protected override void RebuildWindow()
 	{
 		var root = RootSize();
-		ResolveSize(root.X, root.Y);
+		ResolveSize(root.X, root.Y, 1200f, 720f, MinModalW, MinModalH);
 		float w = CurW, h = CurH;
 
 		if (!_built) BuildStructure();
@@ -109,7 +109,7 @@ public sealed class QuestbookUIState : FreeModalWindow
 		};
 		_panel.Append(_title);
 
-		var warning = new UIText("WIP - new questbook ETA v0.0.7", 1.0f)
+		var warning = new UIText("WIP - new questbook ETA v0.0.8", 1.0f)
 		{
 			HAlign = 0.5f,
 			Top = StyleDimension.FromPixels(Pad),
@@ -257,14 +257,13 @@ public sealed class QuestbookUIState : FreeModalWindow
 			_questAttached = false;
 		}
 
-		if (_questAttached && !QuestItemPickerSystem.IsOpen
-			&& Main.mouseLeft && !_prevLeft)
+		if (_questAttached && !ItemPickerSystem.IsOpen
+			&& MouseClick.LeftPressed)
 		{
 			var r = _questPanel.GetDimensions().ToRectangle();
-			if (!r.Contains((int)Main.MouseScreen.X, (int)Main.MouseScreen.Y))
+			if (!r.Contains(ModalEscape.PollCursor()))
 				CloseQuestPanel();
 		}
-		_prevLeft = Main.mouseLeft;
 	}
 
 	private void LayoutQuestPanel()
@@ -304,8 +303,7 @@ public sealed class QuestbookUIState : FreeModalWindow
 
 	internal bool IsPointerOverQuestPanel()
 		=> _questAttached
-		&& _questPanel.GetDimensions().ToRectangle().Contains(
-			(int)Main.MouseScreen.X, (int)Main.MouseScreen.Y);
+		&& _questPanel.GetDimensions().ToRectangle().Contains(ModalEscape.PollCursor());
 
 	internal void OnChapterDeleted()
 	{
@@ -512,7 +510,7 @@ public sealed class QuestbookUIState : FreeModalWindow
 			Height = StyleDimension.FromPixels(22);
 			_pick = new UITextButton(
 				() => { string id = _get(); return string.IsNullOrEmpty(id) ? "(pick item)" : id; },
-				() => QuestItemPickerSystem.Open(onPick),
+				() => ItemPickerSystem.Open(onPick),
 				tooltip: "Search for an item");
 			Append(_pick);
 		}
@@ -674,6 +672,61 @@ public sealed class QuestbookUIState : FreeModalWindow
 			_task = task;
 			Width = StyleDimension.Fill;
 			Height = StyleDimension.FromPixels(26);
+			OnLeftClick += (evt, _) =>
+			{
+				if (!_task.IsFluid
+					|| QuestbookProgress.IsComplete(_questId)
+					|| QuestbookProgress.IsTaskSatisfied(_questId, _index))
+					return;
+				if (SkipBox().Contains(evt.MousePosition.ToPoint()))
+					QuestbookProgress.MarkTask(_questId, _index);
+			};
+		}
+
+		private int IconType => _task.AcceptTypes.Length > 0 ? _task.AcceptTypes[0] : 0;
+
+		private Rectangle SkipBox()
+		{
+			CalculatedStyle d = GetDimensions();
+			return new Rectangle((int)d.X + (int)d.Width - 78, (int)d.Y + 4, 74, 18);
+		}
+
+		private Rectangle IconBox()
+		{
+			CalculatedStyle d = GetDimensions();
+			return new Rectangle((int)d.X + 4, (int)d.Y + 3, 20, 20);
+		}
+
+		private string ItemLabel()
+			=> !string.IsNullOrEmpty(_task.Label)
+				? _task.Label
+				: (IconType > 0 ? Lang.GetItemNameValue(IconType) : "");
+
+		private HashSet<int> TagMembers()
+		{
+			var set = new HashSet<int>();
+			foreach (int t in _task.AcceptTypes)
+				if (t > 0) set.Add(t);
+			return set;
+		}
+
+		private void IconHovered()
+		{
+			Main.LocalPlayer.mouseInterface = true;
+			var click = BrowserSlotInteraction.Poll();
+
+			if (_task.AcceptTypes.Length > 1)
+			{
+				string label = ItemLabel();
+				var members = TagMembers();
+				BrowserHover.SetTag(label, members);
+				BrowserSlotInteraction.HandleTag(click, label, members);
+			}
+			else
+			{
+				BrowserHover.SetItem(IconType);
+				BrowserSlotInteraction.HandleItem(click, IconType, inFavoritesPane: false);
+			}
 		}
 
 		protected override void DrawSelf(SpriteBatch sb)
@@ -687,16 +740,30 @@ public sealed class QuestbookUIState : FreeModalWindow
 				return;
 			}
 
-			int iconType = _task.AcceptTypes.Length > 0 ? _task.AcceptTypes[0] : 0;
+			int iconType = IconType;
 			if (iconType > 0)
 			{
-				var box = new Rectangle((int)d.X + 4, (int)d.Y + 3, 20, 20);
+				Rectangle box = IconBox();
+				bool hover = box.Contains(ModalEscape.PollCursor());
+				var px = TextureAssets.MagicPixel.Value;
+				if (hover)
+					sb.Draw(px, box, new Color(120, 140, 220) * 0.4f);
 				QuestbookIcon.Draw(sb, iconType, box.Center.ToVector2(), 20f);
+				if (hover)
+				{
+					var bc = new Color(255, 224, 130);
+					sb.Draw(px, new Rectangle(box.X - 1, box.Y - 1, box.Width + 2, 1), bc);
+					sb.Draw(px, new Rectangle(box.X - 1, box.Bottom, box.Width + 2, 1), bc);
+					sb.Draw(px, new Rectangle(box.X - 1, box.Y - 1, 1, box.Height + 2), bc);
+					sb.Draw(px, new Rectangle(box.Right, box.Y - 1, 1, box.Height + 2), bc);
+					Main.instance.MouseText(
+						$"{ItemLabel()}\n[c/AAAAAA:LMB] how to obtain   [c/AAAAAA:RMB] used as");
+					IconHovered();
+				}
 			}
 
-			string name = !string.IsNullOrEmpty(_task.Label)
-				? _task.Label
-				: (iconType > 0 ? Lang.GetItemNameValue(iconType) : "(unresolved)");
+			string name = ItemLabel();
+			if (string.IsNullOrEmpty(name)) name = "(unresolved)";
 
 			bool latched = QuestbookProgress.IsTaskSatisfied(_questId, _index);
 			int have = 0;
@@ -710,6 +777,21 @@ public sealed class QuestbookUIState : FreeModalWindow
 
 			Terraria.Utils.DrawBorderString(sb, $"{_task.Count}x {name}{progress}",
 				new Vector2(d.X + 30, d.Y + 5), ok ? new Color(120, 230, 120) : Color.White, 0.78f);
+
+			if (_task.IsFluid && !ok)
+			{
+				Rectangle skip = SkipBox();
+				bool sh = skip.Contains(ModalEscape.PollCursor());
+				sb.Draw(TextureAssets.MagicPixel.Value, skip,
+					sh ? new Color(80, 90, 150) : new Color(55, 60, 95));
+				const string label = "I made it";
+				Vector2 sz = FontAssets.MouseText.Value.MeasureString(label) * 0.7f;
+				Terraria.Utils.DrawBorderString(sb, label,
+					new Vector2(skip.Center.X - sz.X * 0.5f, skip.Center.Y - sz.Y * 0.5f),
+					Color.White, 0.7f);
+				if (sh)
+					Main.LocalPlayer.mouseInterface = true;
+			}
 		}
 	}
 
@@ -773,7 +855,7 @@ public sealed class QuestbookUIState : FreeModalWindow
 
 			_pickBtn = new UITextButton(
 				() => task.Items.Count > 0 ? task.Items[0] : "(pick item)",
-				() => QuestItemPickerSystem.Open(type =>
+				() => ItemPickerSystem.Open(type =>
 				{
 					string id = IngredientResolverImpl.StableItemId(type);
 					QuestbookEditor.SetField(quest, _ =>

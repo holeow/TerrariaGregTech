@@ -45,13 +45,19 @@ public sealed class GTConfig : ModConfig
 
 	[Range(0, 1000)]
 	[Increment(10)]
-	[DefaultValue(50)]
-	public int LdItemPipeMinDistance { get; set; } = 50;
+	[DefaultValue(10)]
+	public int LdItemPipeMinDistance { get; set; } = 10;
 
 	[Range(0, 1000)]
 	[Increment(10)]
-	[DefaultValue(50)]
-	public int LdFluidPipeMinDistance { get; set; } = 50;
+	[DefaultValue(10)]
+	public int LdFluidPipeMinDistance { get; set; } = 10;
+
+	[DefaultValue(false)]
+	public bool CraftingSimulatedExtraction { get; set; } = false;
+
+	[DefaultValue(true)]
+	public bool FreeMePatterns { get; set; } = true;
 
 	[DefaultValue(true)]
 	public bool OrderedAssemblyLineItems { get; set; } = true;
