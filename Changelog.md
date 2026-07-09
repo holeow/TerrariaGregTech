@@ -1,4 +1,20 @@
-## 0.0.7 (todo)
+## 0.0.8
+
+Hotfix update, thanks to you all for early playtesting, we found potentially very critical compat bug
+
+Important:
+- Added chinese, japanese and all other IME languages typing support to input fields (thanks Aeolian)
+- Fixed other mods compatibility when they broke autocraft with their tags (thanks holeow)
+
+Qol:
+- Fixed composite crafting stations compatibility with terminal (thanks Bup Supreme)
+- Fixed ae components recipes to require any circuit (thanks Bup Supreme)
+
+Visuals:
+- Fixed ambiguity on some gt recipes getting into vanilla category in TMI (thanks Bup Supreme)
+- Fixed demon altar, water and other conditions not shown in recipe browser
+
+## 0.0.7
 
 Logistics update! Meet barebones AE2 port for proper gregtech automation. Barebones means you can't use it as a storage solution by itself, Magic Storage heart, crates, super tanks can be connected with storage bus to use them in ME network. Let me know if there are other mods that you think should be supported by storage buses.
 

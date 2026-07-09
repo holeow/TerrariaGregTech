@@ -31,6 +31,7 @@ public sealed class UISearchBar : UIElement
 	private bool _subscribed;
 	private KeyboardState _prevKb;
 	private int _backHeld;
+	private bool _wasComposing;
 
 	public string Text => _text;
 	public bool IsFocused => _focusedInstance == this;
@@ -75,7 +76,7 @@ public sealed class UISearchBar : UIElement
 
 	private void OnTextInput(char c)
 	{
-		if (IsFocused && c >= ' ' && c != (char)127)
+		if (IsFocused && c >= ' ' && c < (char)127)
 			SetText(_text + c);
 	}
 
@@ -98,25 +99,34 @@ public sealed class UISearchBar : UIElement
 		if (IsFocused)
 		{
 			PlayerInput.WritingText = true;
+			Main.chatRelease = false;
 
 			var kb = Keyboard.GetState();
-			if (Edge(kb, Keys.Enter) || Edge(kb, Keys.Escape))
+			bool composing = ImeText.Composing;
+			bool suppress = composing || _wasComposing;
+			_wasComposing = composing;
+			if (!suppress)
 			{
-				Main.chatRelease = false;
-				Unfocus();
-			}
-			else if (kb.IsKeyDown(Keys.Back))
-			{
-				_backHeld++;
-				bool fire = _backHeld == 1 ||
-					(_backHeld >= BackRepeatDelay && (_backHeld - BackRepeatDelay) % BackRepeatInterval == 0);
-				if (fire && _text.Length > 0) SetText(_text.Substring(0, _text.Length - 1));
-			}
-			else
-			{
-				_backHeld = 0;
+				if (Edge(kb, Keys.Enter) || Edge(kb, Keys.Escape))
+				{
+					Unfocus();
+				}
+				else if (kb.IsKeyDown(Keys.Back))
+				{
+					_backHeld++;
+					bool fire = _backHeld == 1 ||
+						(_backHeld >= BackRepeatDelay && (_backHeld - BackRepeatDelay) % BackRepeatInterval == 0);
+					if (fire && _text.Length > 0) SetText(_text.Substring(0, _text.Length - 1));
+				}
+				else
+				{
+					_backHeld = 0;
+				}
 			}
 			_prevKb = kb;
+
+			var composed = ImeText.ConsumeComposed();
+			if (composed.Length > 0) SetText(_text + composed);
 		}
 
 		if (over) Main.LocalPlayer.mouseInterface = true;
@@ -135,21 +145,30 @@ public sealed class UISearchBar : UIElement
 		var font = FontAssets.MouseText.Value;
 		const float scale = 0.85f;
 		float textY = bounds.Y + (bounds.Height - font.LineSpacing * scale) / 2f - 1;
-		bool empty = _text.Length == 0;
+		string comp = IsFocused ? ImeText.Composition : "";
+		bool empty = _text.Length == 0 && comp.Length == 0;
 
-		Terraria.Utils.DrawBorderString(spriteBatch,
-			empty ? _placeholder : _text,
-			new Vector2(bounds.X + 6, textY),
-			empty ? new Color(140, 140, 160) : Color.White,
-			scale);
+		float x = bounds.X + 6;
+		if (empty)
+		{
+			Terraria.Utils.DrawBorderString(spriteBatch, _placeholder,
+				new Vector2(x, textY), new Color(140, 140, 160), scale);
+		}
+		else
+		{
+			Terraria.Utils.DrawBorderString(spriteBatch, _text, new Vector2(x, textY), Color.White, scale);
+			x += font.MeasureString(_text).X * scale;
+			if (comp.Length > 0)
+			{
+				Terraria.Utils.DrawBorderString(spriteBatch, comp, new Vector2(x, textY), ImeText.CompositionColor, scale);
+				x += font.MeasureString(comp).X * scale;
+			}
+		}
 
 		if (IsFocused && (Main.GameUpdateCount % 30) < 15)
-		{
-			float w = empty ? 0f : font.MeasureString(_text).X * scale;
-			Terraria.Utils.DrawBorderString(spriteBatch, "|",
-				new Vector2(bounds.X + 6 + w, textY),
-				Color.LightYellow, scale);
-		}
+			Terraria.Utils.DrawBorderString(spriteBatch, "|", new Vector2(x, textY), Color.LightYellow, scale);
+
+		if (IsFocused) ImeText.DrawPanel(spriteBatch, bounds);
 	}
 
 	private static void DrawBorder(SpriteBatch sb, Texture2D px, Rectangle b, Color c)

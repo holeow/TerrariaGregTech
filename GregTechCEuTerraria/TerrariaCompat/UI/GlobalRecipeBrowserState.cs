@@ -1038,24 +1038,9 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 
 	private static string ClassifyRecipeMod(GTRecipe r)
 	{
-		if (PreferModded(Widgets.RecipeRowRenderer.OutputItemTypesInRecipe(r), out string outMod))
-			return outMod;
-		if (PreferModded(Widgets.RecipeRowRenderer.InputItemTypesInRecipe(r), out string inMod))
-			return inMod;
+		if (VanillaCraftingBridge.GTToVanilla.TryGetValue(r, out var native))
+			return native.Mod?.Name ?? VanillaMod;
 		return GregTechMod;
-	}
-
-	private static bool PreferModded(HashSet<int> types, out string mod)
-	{
-		bool sawVanilla = false;
-		foreach (int t in types)
-		{
-			string m = ItemModName(t);
-			if (m != VanillaMod) { mod = m; return true; }
-			sawVanilla = true;
-		}
-		mod = VanillaMod;
-		return sawVanilla;
 	}
 
 	private static string ItemModName(int type)

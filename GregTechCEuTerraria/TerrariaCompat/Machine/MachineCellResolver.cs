@@ -8,6 +8,21 @@ namespace GregTechCEuTerraria.TerrariaCompat.Machine;
 
 public static class MachineCellResolver
 {
+	public static bool TryFindMachineEntityCovering(int i, int j, out MetaMachine machine)
+	{
+		machine = null!;
+		const int max = 4;
+		for (int dy = 0; dy < max; dy++)
+			for (int dx = 0; dx < max; dx++)
+			{
+				if (!TileEntity.ByPosition.TryGetValue(new Point16(i - dx, j - dy), out var te)
+				    || te is not MetaMachine m) continue;
+				var (w, h) = m.Size;
+				if (dx < w && dy < h) { machine = m; return true; }
+			}
+		return false;
+	}
+
 	public static bool TryFindMachineAt(int i, int j, out MetaMachine machine)
 	{
 		machine = null!;

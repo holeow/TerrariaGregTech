@@ -156,7 +156,19 @@ public static class RecipeRowRenderer
 					DrawItemIconFit(sb, alsoRect, nativeItemType, StationOverlay(nativeTile, ownStation));
 					labelX += StationIconSize + 4;
 				}
+				else if (nativeItemType == 0)
+				{
+					string tileName = StationIcon.TileDisplayName(nativeTile);
+					if (tileName.Length > 0)
+					{
+						var font = Terraria.GameContent.FontAssets.MouseText.Value;
+						Terraria.Utils.DrawBorderString(sb, tileName,
+							new Vector2(labelX, cy + 4), new Color(180, 220, 255), 0.7f);
+						labelX += font.MeasureString(tileName).X * 0.7f + 6;
+					}
+				}
 			}
+
 		}
 		long eut = recipe.InputEUt.Voltage > 0 ? recipe.InputEUt.Voltage : recipe.OutputEUt.Voltage;
 		bool totalCwu = Api.Recipe.RecipeDataUtil.GetBool(recipe.Data, "duration_is_total_cwu");

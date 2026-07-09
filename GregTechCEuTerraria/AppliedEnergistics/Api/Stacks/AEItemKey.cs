@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Terraria;
+using Terraria.ModLoader;
 using Terraria.ModLoader.IO;
 using GregTechCEuTerraria.Api.Cover.Filter;
 using GregTechCEuTerraria.Api.Recipe.Ingredient;
@@ -29,7 +30,7 @@ public sealed class AEItemKey : AEKey
 	{
 		_item = item;
 		_tag = tag;
-		_hashCode = HashCode.Combine(item, CanonicalTag.Hash(tag));
+		_hashCode = item;
 	}
 
 	public static AEItemKey? Of(Item stack)
@@ -82,14 +83,14 @@ public sealed class AEItemKey : AEKey
 			return true;
 		if (o is not AEItemKey k)
 			return false;
-		return _item == k._item && CanonicalTag.Equal(_tag, k._tag);
+		return _item == k._item && ItemLoader.CanStack(GetReadOnlyStack(), k.GetReadOnlyStack());
 	}
 
 	public override int GetHashCode() => _hashCode;
 
 	public bool Matches(Item stack) =>
 		stack is not null && !stack.IsAir && stack.type == _item
-		&& CanonicalTag.Equal(ExtractIdentityTag(stack), _tag);
+		&& ItemLoader.CanStack(GetReadOnlyStack(), stack);
 
 	public bool Matches(Ingredient ingredient) => ingredient.Test(GetReadOnlyStack());
 

@@ -495,7 +495,7 @@ public static class CompatRecipes
 	  { "id": "crafting_shapeless/compat_me_crafting_terminal", "type": "minecraft:crafting_shapeless",
 	    "inputs":  { "item": [
 	      { "content": { "item": "GregTechCEuTerraria/bronze_crate" } },
-	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/lv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "outputs": { "item": [ { "content": { "item": "GregTechCEuTerraria/me_crafting_card" } } ] } },
@@ -510,7 +510,7 @@ public static class CompatRecipes
 	  { "id": "assembler/compat_me_pattern_encoding_terminal", "type": "gtceu:assembler", "duration": 200,
 	    "inputs":  { "item": [
 	      { "content": { "item": "GregTechCEuTerraria/steel_crate" } },
-	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/lv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "tickInputs": { "eu": [ { "content": 32 } ] },
@@ -519,7 +519,7 @@ public static class CompatRecipes
 	  { "id": "assembler/compat_me_crafting_status_card", "type": "gtceu:assembler", "duration": 200,
 	    "inputs":  { "item": [
 	      { "content": { "item": "GregTechCEuTerraria/steel_drum" } },
-	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/lv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "tickInputs": { "eu": [ { "content": 32 } ] },
@@ -528,7 +528,7 @@ public static class CompatRecipes
 	  { "id": "assembler/compat_me_pattern_access_terminal", "type": "gtceu:assembler", "duration": 200,
 	    "inputs":  { "item": [
 	      { "content": { "item": "GregTechCEuTerraria/aluminium_crate" } },
-	      { "content": { "item": "gtceu:good_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/mv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "tickInputs": { "eu": [ { "content": 128 } ] },
@@ -537,7 +537,7 @@ public static class CompatRecipes
 	  { "id": "assembler/compat_quantum_computer", "type": "gtceu:assembler", "duration": 200,
 	    "inputs":  { "item": [
 	      { "content": { "item": "gtceu:solid_machine_casing" } },
-	      { "content": { "type": "gtceu:sized", "count": 4, "ingredient": { "item": "gtceu:basic_electronic_circuit" } } },
+	      { "content": { "type": "gtceu:sized", "count": 4, "ingredient": { "tag": "gtceu:circuits/lv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 20, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "tickInputs": { "eu": [ { "content": 32 } ] },
@@ -554,7 +554,7 @@ public static class CompatRecipes
 	  { "id": "assembler/compat_me_pattern_provider", "type": "gtceu:assembler", "duration": 200,
 	    "inputs":  { "item": [
 	      { "content": { "item": "GregTechCEuTerraria/me_interface" } },
-	      { "content": { "item": "gtceu:basic_electronic_circuit" } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/lv" } } },
 	      { "content": { "type": "gtceu:sized", "count": 10, "ingredient": { "item": "GregTechCEuTerraria/me_cable_fluix" } } }
 	    ] },
 	    "tickInputs": { "eu": [ { "content": 32 } ] },

@@ -36,6 +36,7 @@ public sealed class UITextField : UIElement, ITextInput
 	private KeyboardState _prevKb;
 	private Keys _heldKey = Keys.None;
 	private int _heldTicks;
+	private bool _wasComposing;
 
 	public bool IsFocused => TextInputFocus.Current == (ITextInput)this;
 
@@ -106,7 +107,10 @@ public sealed class UITextField : UIElement, ITextInput
 		if (IsFocused)
 		{
 			PlayerInput.WritingText = true;
+			Main.chatRelease = false;
 			ProcessKeystrokes();
+			var composed = ImeText.ConsumeComposed();
+			if (composed.Length > 0) InsertText(composed);
 		}
 		if (over)
 		{
@@ -120,6 +124,10 @@ public sealed class UITextField : UIElement, ITextInput
 		var kb = Keyboard.GetState();
 		Keys fired = FindFiringKey(kb);
 		_prevKb = kb;
+		bool composing = ImeText.Composing;
+		bool suppress = composing || _wasComposing;
+		_wasComposing = composing;
+		if (suppress) return;
 		if (fired == Keys.None) return;
 
 		bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
@@ -264,7 +272,8 @@ public sealed class UITextField : UIElement, ITextInput
 		sb.Draw(px, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), border);
 
 		string shown = Flat(IsFocused ? _buffer : (_current() ?? ""));
-		bool empty = shown.Length == 0;
+		string comp = IsFocused ? ImeText.Composition : "";
+		bool empty = shown.Length == 0 && comp.Length == 0;
 		var font = FontAssets.MouseText.Value;
 		float tx = bounds.X + TextPadX;
 		float ty = bounds.Y + (bounds.Height - font.LineSpacing * TextScale) / 2f - 1;
@@ -277,14 +286,29 @@ public sealed class UITextField : UIElement, ITextInput
 				(int)(x2 - x1), (int)(font.LineSpacing * TextScale)), new Color(70, 110, 200) * 0.6f);
 		}
 
-		Terraria.Utils.DrawBorderString(sb, empty ? _placeholder : shown,
-			new Vector2(tx, ty), empty ? new Color(140, 140, 160) : Color.White, TextScale);
-
-		if (IsFocused && Main.GameUpdateCount % 30 < 15)
+		if (empty)
 		{
-			float w = font.MeasureString(shown.Substring(0, Math.Min(_caret, shown.Length))).X * TextScale;
-			Terraria.Utils.DrawBorderString(sb, "|", new Vector2(tx + w, ty),
-				Color.LightYellow, TextScale);
+			Terraria.Utils.DrawBorderString(sb, _placeholder, new Vector2(tx, ty), new Color(140, 140, 160), TextScale);
 		}
+		else
+		{
+			int caret = Math.Min(_caret, shown.Length);
+			string left = shown.Substring(0, caret);
+			string right = shown.Substring(caret);
+			float x = tx;
+			Terraria.Utils.DrawBorderString(sb, left, new Vector2(x, ty), Color.White, TextScale);
+			x += font.MeasureString(left).X * TextScale;
+			if (comp.Length > 0)
+			{
+				Terraria.Utils.DrawBorderString(sb, comp, new Vector2(x, ty), ImeText.CompositionColor, TextScale);
+				x += font.MeasureString(comp).X * TextScale;
+			}
+			if (right.Length > 0)
+				Terraria.Utils.DrawBorderString(sb, right, new Vector2(x, ty), Color.White, TextScale);
+			if (IsFocused && Main.GameUpdateCount % 30 < 15)
+				Terraria.Utils.DrawBorderString(sb, "|", new Vector2(x, ty), Color.LightYellow, TextScale);
+		}
+
+		if (IsFocused) ImeText.DrawPanel(sb, bounds);
 	}
 }

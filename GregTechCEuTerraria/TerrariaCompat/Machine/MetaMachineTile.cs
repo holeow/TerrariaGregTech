@@ -95,7 +95,7 @@ public abstract class MetaMachineTile : ModTile, IMachineTextureSpec, IMetaMachi
 		var drop = new Item();
 		drop.SetDefaults(modItem.Type);
 
-		if (MachineCellResolver.TryFindMachineAt(i, j, out var machine)
+		if (MachineCellResolver.TryFindMachineEntityCovering(i, j, out var machine)
 		    && drop.TryGetGlobalItem<MachinePortableData>(out var carrier))
 		{
 			var tag = new TagCompound();

@@ -34,6 +34,7 @@ public sealed class UITextArea : UIElement, ITextInput
 	private KeyboardState _prevKb;
 	private Keys _heldKey = Keys.None;
 	private int _heldTicks;
+	private bool _wasComposing;
 
 	private readonly List<(int Start, int Len)> _lines = new();
 	private bool _layoutDirty = true;
@@ -121,8 +122,11 @@ public sealed class UITextArea : UIElement, ITextInput
 		if (IsFocused)
 		{
 			PlayerInput.WritingText = true;
+			Main.chatRelease = false;
 			EnsureLayout();
 			ProcessKeystrokes();
+			var composed = ImeText.ConsumeComposed();
+			if (composed.Length > 0) InsertText(composed);
 			EnsureCaretVisible();
 		}
 		if (over)
@@ -134,6 +138,10 @@ public sealed class UITextArea : UIElement, ITextInput
 		var kb = Keyboard.GetState();
 		Keys fired = FindFiringKey(kb);
 		_prevKb = kb;
+		bool composing = ImeText.Composing;
+		bool suppress = composing || _wasComposing;
+		_wasComposing = composing;
+		if (suppress) return;
 		if (fired == Keys.None) return;
 
 		bool shift = kb.IsKeyDown(Keys.LeftShift) || kb.IsKeyDown(Keys.RightShift);
@@ -368,6 +376,18 @@ public sealed class UITextArea : UIElement, ITextInput
 		sb.Draw(px, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), border);
 		sb.Draw(px, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), border);
 
+		string comp = IsFocused ? ImeText.Composition : "";
+		string savedBuffer = _buffer;
+		int savedCaret = _caret, savedSel = _selAnchor;
+		if (comp.Length > 0)
+		{
+			int at = Math.Min(_caret, _buffer.Length);
+			_buffer = _buffer.Insert(at, comp);
+			_caret = at + comp.Length;
+			_selAnchor = -1;
+			_layoutDirty = true;
+		}
+
 		if (!IsFocused) { _buffer = _current() ?? ""; _layoutDirty = true; }
 		EnsureLayout();
 
@@ -419,6 +439,16 @@ public sealed class UITextArea : UIElement, ITextInput
 				float cy = textY + (cl - _scrollLine) * lineH;
 				Terraria.Utils.DrawBorderString(sb, "|", new Vector2(cx - 1, cy), Color.LightYellow, TextScale);
 			}
+		}
+
+		if (IsFocused) ImeText.DrawPanel(sb, bounds);
+
+		if (comp.Length > 0)
+		{
+			_buffer = savedBuffer;
+			_caret = savedCaret;
+			_selAnchor = savedSel;
+			_layoutDirty = true;
 		}
 	}
 }

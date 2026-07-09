@@ -16,26 +16,10 @@ using TRecipe        = Terraria.Recipe;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// Two passes that fold "smelting-shaped" recipes into GT machine recipes:
-//
-// Pass A - every minecraft:smelting recipe re-emitted as an electric_furnace
-// recipe at ULV (EUt = V[ULV]/2 = 4). Verbatim with GTRecipeTypes:82
-// register("electric_furnace", ELECTRIC, RecipeType.SMELTING) (which uses a
-// proxy-recipe mechanism in RecipeManagerHandler). Without it, the
-// electric_furnace station has 0 recipes and the coverage check flags it.
-//
-// Pass B - every Terraria-tile recipe whose tile is in TileToStation is
-// re-emitted as a GT recipe at the corresponding tier. EUt = V[tier]/2 sits
-// inside the tier's range and locks lower-tier machines out. Bridge-tracked
-// recipes are skipped so JSON-sourced recipes aren't mirrored back as natives.
-// Duration: 50 ticks (~0.83s, project balance).
 public static class NativeRecipeProxy
 {
 	private const int SynthDuration = 50;
 
-	// tier >= 0: minimum machine-tier gate (EUt = V[tier]/2).
-	// tier == -1 (CraftingTier): no EU, instant-craft sentinel for vanilla
-	// crafting tiles - synthesized recipes look like crafting_shapeless.
 	private const int CraftingTier = -1;
 	private static readonly Dictionary<int, (string Station, int Tier)> TileToStation = new()
 	{
@@ -50,12 +34,8 @@ public static class NativeRecipeProxy
 		{ TileID.WorkBenches,     ("crafting_shapeless", CraftingTier) },
 	};
 
-	// No-tile recipes share the workbench station - both are shapeless crafting.
 	private const string HandCraftingStation = "crafting_shapeless";
 
-	// Fallback station name for tiles not in TileToStation - TileID.Anvils ->
-	// "anvils", TileID.LunarCraftingStation -> "lunar_crafting_station". Modded
-	// tiles not in TileID.Search fall back to `tile_<id>`.
 	private static readonly Dictionary<int, string> _stationByTileCache = new();
 	private static string GenericStationForTile(int tile)
 	{
@@ -79,8 +59,6 @@ public static class NativeRecipeProxy
 		return sb.ToString();
 	}
 
-	// Pass A - called from RecipeJsonLoader.Load BEFORE RecipeRegistry.Set so
-	// we mutate the in-flight byStation dict directly.
 	public static void SynthesizeFromSmelting(Dictionary<string, List<GTRecipe>> byStation)
 	{
 		if (!byStation.TryGetValue("smelting", out var sources) || sources.Count == 0) return;
@@ -97,8 +75,6 @@ public static class NativeRecipeProxy
 		int n = 0;
 		foreach (var src in sources)
 		{
-			// Skip recipes that didn't resolve an output - TagIngredient with 0
-			// types, etc. The output map is empty in that case.
 			if (src.Outputs.Count == 0 || src.Inputs.Count == 0) continue;
 
 			efList.Add(BuildSynthetic(
@@ -114,8 +90,6 @@ public static class NativeRecipeProxy
 			.Info($"NativeRecipeProxy: synthesized {n} electric_furnace recipes from smelting bundle.");
 	}
 
-	// === Pass B - Terraria native recipes -> GT machine recipes ================
-	// Called from PostAddRecipes (after Main.recipe[] is populated).
 	public static void SynthesizeFromTerrariaRecipes()
 	{
 		var per = new Dictionary<string, List<GTRecipe>>();
@@ -126,17 +100,12 @@ public static class NativeRecipeProxy
 			var rec = Main.recipe[r];
 			if (rec is null) continue;
 
-			// Skip bridge-pushed recipes - already in RecipeRegistry under
-			// their original station; re-mirroring would dupe every workbench
-			// recipe in the browser.
 			if (VanillaCraftingBridge.BridgeRegistered.Contains(rec))
 			{
 				skippedBridged++;
 				continue;
 			}
 
-			// First mapped tile wins (multi-tile recipes are alternatives, not
-			// requirements). No-tile -> shapeless station.
 			(string Station, int Tier)? mapping = null;
 			for (int t = 0; t < rec.requiredTile.Count; t++)
 			{
@@ -146,8 +115,6 @@ public static class NativeRecipeProxy
 			}
 			if (mapping is null)
 			{
-				// Fallback to tile-NAME station - mirrors every Terraria recipe
-				// into the browser without per-tile hardcoding.
 				int firstTile = -1;
 				for (int t = 0; t < rec.requiredTile.Count; t++)
 					if (rec.requiredTile[t] > 0) { firstTile = rec.requiredTile[t]; break; }
@@ -158,7 +125,7 @@ public static class NativeRecipeProxy
 			}
 			scanned++;
 
-			if (rec.createItem.IsAir) continue;     // 1 createItem per Terraria recipe
+			if (rec.createItem.IsAir) continue;
 			var outputs = new Dictionary<object, List<RecipeContent>>
 			{
 				[ItemRecipeCapability.CAP] = new List<RecipeContent>
@@ -168,7 +135,6 @@ public static class NativeRecipeProxy
 				},
 			};
 
-			// RecipeGroup slots -> TagIngredient over every group member.
 			var inputs = new Dictionary<object, List<RecipeContent>>();
 			var itemInputs = new List<RecipeContent>();
 			bool ok = true;
@@ -189,8 +155,6 @@ public static class NativeRecipeProxy
 			if (!ok || itemInputs.Count == 0) continue;
 			inputs[ItemRecipeCapability.CAP] = itemInputs;
 
-			// Crafting tier (-1): no EU/instant. Tier >= 0: EUt = V[tier]/2 +
-			// SynthDuration so the recipe runs on a real GT machine too.
 			var tickInputs = new Dictionary<object, List<RecipeContent>>();
 			int duration = 0;
 			if (mapping.Value.Tier >= 0)
@@ -200,15 +164,18 @@ public static class NativeRecipeProxy
 				duration = SynthDuration;
 			}
 
-			// Source tile id for the recipe-browser's second-station chip - so
-			// "2 Clay -> 1 Red Brick" under electric_furnace also surfaces the
-			// vanilla Furnaces path. Browser only shows the chip when the
-			// native tile resolves to a different icon than the GT station.
 			var data = new TagCompound();
 			int sourceTile = -1;
 			for (int t = 0; t < rec.requiredTile.Count; t++)
 				if (rec.requiredTile[t] > 0) { sourceTile = rec.requiredTile[t]; break; }
 			if (sourceTile > 0) data.Set("nativeTile", sourceTile);
+
+			var conditions = new List<RecipeCondition>();
+			foreach (var c in rec.Conditions)
+			{
+				string d = c.Description.Value;
+				if (!string.IsNullOrEmpty(d)) conditions.Add(new NativeCraftingCondition(d));
+			}
 
 			var gtType = GTRecipeType.GetOrCreate(mapping.Value.Station);
 			var synthetic = new GTRecipe(
@@ -222,7 +189,7 @@ public static class NativeRecipeProxy
 				outputChanceLogics:      new Dictionary<object, ChanceLogic>(),
 				tickInputChanceLogics:   new Dictionary<object, ChanceLogic>(),
 				tickOutputChanceLogics:  new Dictionary<object, ChanceLogic>(),
-				conditions:              new List<RecipeCondition>(),
+				conditions:              conditions,
 				ingredientActions:       System.Array.Empty<object>(),
 				data:                    data,
 				duration:                duration,
@@ -247,8 +214,6 @@ public static class NativeRecipeProxy
 			      (skippedBridged > 0 ? $" (skipped {skippedBridged} bridge-registered)" : "") + ".");
 	}
 
-	// Group-slot -> TagIngredient over every group member; else false (caller
-	// falls back to ItemStackIngredient).
 	private static bool TryBuildGroupedIngredient(TRecipe rec, int slotItemType, out TagIngredient grouped)
 	{
 		grouped = null!;
@@ -265,7 +230,6 @@ public static class NativeRecipeProxy
 		return false;
 	}
 
-	// Pass-A builder (per-tick EU + items @ full chance). Pass B builds inline.
 	private static GTRecipe BuildSynthetic(GTRecipeType type, string id,
 		Dictionary<object, List<RecipeContent>> inputs,
 		Dictionary<object, List<RecipeContent>> outputs,
@@ -300,7 +264,6 @@ public static class NativeRecipeProxy
 		return new RecipeContent(payload, max, max, 0);
 	}
 
-	// Shallow copy - Content payloads are immutable Ingredient objects.
 	private static Dictionary<object, List<RecipeContent>> CloneContents(
 		Dictionary<object, List<RecipeContent>> src)
 	{

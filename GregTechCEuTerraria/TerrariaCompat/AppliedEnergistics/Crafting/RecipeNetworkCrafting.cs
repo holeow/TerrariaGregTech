@@ -5,6 +5,7 @@ using GregTechCEuTerraria.AppliedEnergistics.Api.Networking.Security;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Storage;
 using Terraria;
+using Terraria.ID;
 using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting;
@@ -13,10 +14,51 @@ public static class RecipeNetworkCrafting
 {
 	public static HashSet<int> StationTiles(Item[] stations)
 	{
-		var set = new HashSet<int>();
+		var adj = new bool[TileLoader.TileCount];
 		foreach (var it in stations)
-			if (it is { IsAir: false } && it.createTile > -1) set.Add(it.createTile);
+			AddStationAdj(it, adj);
+		var set = new HashSet<int>();
+		for (int t = 0; t < adj.Length; t++)
+			if (adj[t]) set.Add(t);
 		return set;
+	}
+
+	private static void AddStationAdj(Item item, bool[] adj)
+	{
+		if (item is not { IsAir: false } || item.createTile < TileID.Dirt) return;
+		adj[item.createTile] = true;
+		switch (item.createTile)
+		{
+			case TileID.GlassKiln:
+			case TileID.Hellforge:
+				adj[TileID.Furnaces] = true;
+				break;
+			case TileID.AdamantiteForge:
+				adj[TileID.Furnaces] = true;
+				adj[TileID.Hellforge] = true;
+				break;
+			case TileID.MythrilAnvil:
+				adj[TileID.Anvils] = true;
+				break;
+			case TileID.BewitchingTable:
+			case TileID.Tables2:
+				adj[TileID.Tables] = true;
+				goto case TileID.Tables;
+			case TileID.AlchemyTable:
+				adj[TileID.Bottles] = true;
+				adj[TileID.Tables] = true;
+				break;
+			case TileID.WorkBenches:
+			case TileID.Tables:
+				adj[TileID.Chairs] = true;
+				break;
+		}
+
+		var player = Main.LocalPlayer;
+		var old = player.adjTile;
+		player.adjTile = adj;
+		try { TileLoader.AdjTiles(player, item.createTile); }
+		finally { player.adjTile = old; }
 	}
 
 	private static HashSet<int>? _stationTiles;
@@ -38,8 +80,15 @@ public static class RecipeNetworkCrafting
 		return _stationTiles.Contains(tile);
 	}
 
-	public static bool IsCraftingStationItem(Item item) =>
-		item is { IsAir: false } && IsCraftingStationTile(item.createTile);
+	public static bool IsCraftingStationItem(Item item)
+	{
+		if (item is not { IsAir: false } || item.createTile < TileID.Dirt) return false;
+		var adj = new bool[TileLoader.TileCount];
+		AddStationAdj(item, adj);
+		for (int t = 0; t < adj.Length; t++)
+			if (adj[t] && IsCraftingStationTile(t)) return true;
+		return false;
+	}
 
 	private static void AcceptableTypes(Terraria.Recipe r, Item req, HashSet<int> outTypes)
 	{

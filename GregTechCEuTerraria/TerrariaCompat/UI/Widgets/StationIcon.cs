@@ -87,6 +87,29 @@ public static class StationIcon
 		return 0;
 	}
 
+	private static readonly Dictionary<int, string> _tileNameCache = new();
+	public static string TileDisplayName(int tileType)
+	{
+		if (tileType <= 0) return "";
+		if (_tileNameCache.TryGetValue(tileType, out var cached)) return cached;
+		string name = TileID.Search.TryGetName(tileType, out var raw) ? PascalSpace(raw) : "";
+		_tileNameCache[tileType] = name;
+		return name;
+	}
+
+	private static string PascalSpace(string s)
+	{
+		var sb = new StringBuilder(s.Length + 4);
+		for (int i = 0; i < s.Length; i++)
+		{
+			char c = s[i];
+			if (i > 0 && char.IsUpper(c) && (char.IsLower(s[i - 1]) || (i + 1 < s.Length && char.IsLower(s[i + 1]))))
+				sb.Append(' ');
+			sb.Append(c);
+		}
+		return sb.ToString();
+	}
+
 	private static string SnakeToPascal(string snake)
 	{
 		var sb = new StringBuilder(snake.Length);
