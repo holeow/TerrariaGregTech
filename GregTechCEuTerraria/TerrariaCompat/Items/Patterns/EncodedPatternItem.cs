@@ -81,8 +81,15 @@ public sealed class EncodedPatternItem : ModItem, ITextureWarmUp
 		if (Pattern.Inputs.Count > 0)
 		{
 			tooltips.Add(new TooltipLine(Mod, "me_pattern_in_h", "[c/88CCFF:Input:]"));
-			foreach (var (what, amount) in Pattern.Inputs)
-				tooltips.Add(new TooltipLine(Mod, "me_pattern_in", $"  {amount}x {what.GetDisplayName()}"));
+			for (int i = 0; i < Pattern.Inputs.Count; i++)
+			{
+				var (what, amount) = Pattern.Inputs[i];
+				string line = $"  {amount}x {what.GetDisplayName()}";
+				var tag = Pattern.InputTag(i);
+				if (tag != null)
+					line += $"  [c/7AA0FF:#{ShortTag(tag)}]";
+				tooltips.Add(new TooltipLine(Mod, "me_pattern_in", line));
+			}
 		}
 		if (Pattern.Outputs.Count > 0)
 		{
@@ -94,6 +101,12 @@ public sealed class EncodedPatternItem : ModItem, ITextureWarmUp
 		if (Pattern.Type == MePatternType.Crafting && Pattern.StationTile >= 0)
 			tooltips.Add(new TooltipLine(Mod, "me_pattern_station",
 				$"  station: {StationName(Pattern.StationTile)}"));
+	}
+
+	private static string ShortTag(string tag)
+	{
+		int colon = tag.IndexOf(':');
+		return colon >= 0 ? tag[(colon + 1)..] : tag;
 	}
 
 	private static Dictionary<int, string>? _stationNames;

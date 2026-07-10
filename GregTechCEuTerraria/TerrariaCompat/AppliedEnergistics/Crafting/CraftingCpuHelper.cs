@@ -47,6 +47,8 @@ public static partial class CraftingCpuHelper
 			foreach (var template in GetValidItemTemplates(inputs[x].what, inputs[x].amount, details.InputTag(x)))
 			{
 				long extracted = ExtractTemplates(sourceInv, template, remainingMultiplier);
+				if (extracted <= 0) continue;
+
 				list.Add(template.Key, extracted * template.Amount);
 
 				var containerItem = RemainingKey(template.Key);

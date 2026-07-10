@@ -168,6 +168,7 @@ public sealed class ItemCollectorMachine : TieredEnergyMachine, IFilterableMachi
 		{
 			Item it = Main.item[i];
 			if (it is null || !it.active || it.IsAir) continue;
+			if (Terraria.ID.ItemID.Sets.ItemsThatShouldNotBeInInventory[it.type]) continue;
 
 			float dx = cx - it.Center.X;
 			float dy = cy - it.Center.Y;

@@ -745,11 +745,37 @@ public static class CompatRecipes
 	]
 	""";
 
+	private const string Hellforge = """
+	[
+	  { "id": "assembler/compat_hellforge", "type": "gtceu:assembler", "duration": 200,
+	    "inputs":  { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 4, "ingredient": { "item": "terraria:Furnace" } } },
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "tag": "gtceu:circuits/lv" } } },
+	      { "content": { "type": "gtceu:sized", "count": 2, "ingredient": { "item": "GregTechCEuTerraria/hellstone_superconductor_double" } } },
+	      { "content": { "type": "gtceu:sized", "count": 8, "ingredient": { "item": "terraria:ObsidianBrick" } } }
+	    ] },
+	    "tickInputs": { "eu": [ { "content": 128 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Hellforge" } } ] } }
+	]
+	""";
+
+	private const string HellstoneOre = """
+	[
+	  { "id": "arc_furnace/compat_hellstone_ore", "type": "gtceu:arc_furnace", "duration": 100,
+	    "inputs":  {
+	      "item":  [ { "content": { "item": "gtceu:redstone_dust" } } ],
+	      "fluid": [ { "content": { "amount": 100, "value": { "tag": "forge:oxygen" } } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 512 } ] },
+	    "outputs": { "item": [ { "content": { "item": "terraria:Hellstone" } } ] } }
+	]
+	""";
+
 	private static readonly string[] JsonGroups =
 	{
 		HatchesAndBuses, Bootstrap, Misc, SimplePipes, Casings, Clay,
 		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins, LegacyConversions,
-		Ae2FluixCables, Ae2Machines, Money, Damascus,
+		Ae2FluixCables, Ae2Machines, Money, Damascus, Hellforge, HellstoneOre,
 	};
 
 	public sealed record RecipePatch(string BaseId, string NewId, string MergeJson)

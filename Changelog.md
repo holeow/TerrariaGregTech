@@ -1,10 +1,21 @@
+## 0.0.9
+
+Important:
+- Fixed tag resolution on processing patterns substitutions (thanks CloneCreatesClassics)
+- Fixed sand dupe on aoe mining (thanks rapter2561)
+- Fixed item collector picking up non-item pickups (thanks Bup Supreme)
+
+Qol:
+- Added hellforge and hellstone ore recipes (thanks Bup Supreme)
+
 ## 0.0.8
 
-Hotfix update, thanks to you all for early playtesting, we found potentially very critical compat bug
+Emergent hotfix update, thanks to you all for early playtesting, we found potentially very critical compat bug, now calamity should behave with ae
 
 Important:
 - Added chinese, japanese and all other IME languages typing support to input fields (thanks Aeolian)
 - Fixed other mods compatibility when they broke autocraft with their tags (thanks holeow)
+- Fixed drums could lose fluid when mined (thanks Bup Supreme)
 
 Qol:
 - Fixed composite crafting stations compatibility with terminal (thanks Bup Supreme)
