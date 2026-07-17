@@ -122,6 +122,19 @@ public static class CraftingStationRegistry
 		return 0;
 	}
 
+	private static Dictionary<int, string>? _tileToKey;
+	public static bool TryGetStationKey(int tileType, out string stationKey)
+	{
+		if (_tileToKey is null)
+		{
+			_tileToKey = new Dictionary<int, string>();
+			foreach (var d in _defs)
+				if (TryGetTile(d.Key, out int t)) _tileToKey[t] = d.Key;
+			if (TryGetTile(UltimateKey, out int ut)) _tileToKey[ut] = UltimateKey;
+		}
+		return _tileToKey.TryGetValue(tileType, out stationKey!);
+	}
+
 	private static HashSet<int>? _tileTypes;
 	public static bool IsStationTile(int tileType)
 	{

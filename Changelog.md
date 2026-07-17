@@ -1,3 +1,11 @@
+## 0.0.11
+
+Minor bugfix for better mod compatibility
+
+Important:
+- Fixed calamity compatibility with autocrafting, and other mods that add global serializable data (thanks holeow)
+- Fixed internal crafting pattern station encoding method so changing modpack content doesn't break patterns
+
 ## 0.0.10
 
 Fat steam multis update, other multis will be eventually updated too, to fit the small scale of terraria zoom which makes most multis look too weak

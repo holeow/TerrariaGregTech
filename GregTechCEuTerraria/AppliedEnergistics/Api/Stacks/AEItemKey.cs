@@ -52,7 +52,7 @@ public sealed class AEItemKey : AEKey
 			t["data"] = full.GetCompound("data");
 		if (full.ContainsKey("globalData"))
 		{
-			var gd = full.GetList<TagCompound>("globalData");
+			var gd = FilterIdentityGlobalData(stack.type, stack.maxStack, full.GetList<TagCompound>("globalData"));
 			if (gd.Count > 0)
 				t["globalData"] = gd;
 		}
@@ -64,6 +64,69 @@ public sealed class AEItemKey : AEKey
 			t["modPrefixName"] = full.GetString("modPrefixName");
 		}
 		return t.Count > 0 ? t : null;
+	}
+
+	private static readonly Dictionary<int, Dictionary<string, TagCompound?>> _pristineGlobalData = new();
+	private static readonly Dictionary<string, bool> _globalLoaded = new();
+
+	private static List<TagCompound> FilterIdentityGlobalData(int itemType, int maxStack, IList<TagCompound> entries)
+	{
+		var kept = new List<TagCompound>();
+		Dictionary<string, TagCompound?>? pristine = null;
+
+		foreach (var entry in entries)
+		{
+			string key = GlobalDataKey(entry.GetString("mod"), entry.GetString("name"));
+			pristine ??= PristineGlobalData(itemType);
+			var data = entry.ContainsKey("data") ? entry.GetCompound("data") : null;
+			bool sameAsPristine = pristine.TryGetValue(key, out var fresh) && CanonicalTag.Equal(fresh, data);
+			bool drop = sameAsPristine || (maxStack > 1 && !GlobalLoaded(key));
+
+			if (!drop)
+				kept.Add(entry);
+		}
+
+		return kept;
+	}
+
+	private static string GlobalDataKey(string mod, string name) => mod + ":" + name;
+
+	private static bool GlobalLoaded(string key)
+	{
+		if (_globalLoaded.TryGetValue(key, out var cached))
+			return cached;
+
+		int split = key.IndexOf(':');
+		bool loaded = split > 0
+			&& ModContent.TryFind<GlobalItem>(key.Substring(0, split), key.Substring(split + 1), out _);
+
+		_globalLoaded[key] = loaded;
+		return loaded;
+	}
+
+	private static Dictionary<string, TagCompound?> PristineGlobalData(int itemType)
+	{
+		if (_pristineGlobalData.TryGetValue(itemType, out var cached))
+			return cached;
+
+		var map = new Dictionary<string, TagCompound?>();
+		try
+		{
+			var sample = new Item();
+			sample.SetDefaults(itemType);
+			var full = ItemIO.Save(sample);
+			if (full.ContainsKey("globalData"))
+				foreach (var entry in full.GetList<TagCompound>("globalData"))
+					map[GlobalDataKey(entry.GetString("mod"), entry.GetString("name"))] =
+						entry.ContainsKey("data") ? entry.GetCompound("data") : null;
+		}
+		catch (Exception e)
+		{
+			AELog.Error(e, "Failed to sample pristine global data for item type " + itemType);
+		}
+
+		_pristineGlobalData[itemType] = map;
+		return map;
 	}
 
 	public static bool Matches(AEKey what, Item itemStack) =>

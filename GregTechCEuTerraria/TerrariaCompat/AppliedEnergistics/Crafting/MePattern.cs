@@ -1,6 +1,8 @@
 #nullable enable
 using System.Collections.Generic;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
+using GregTechCEuTerraria.TerrariaCompat.Tiles.CraftingStations;
+using Terraria.ID;
 using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting;
@@ -9,16 +11,18 @@ public sealed class MePattern
 {
 	public MePatternType Type { get; }
 	public int StationTile { get; }
+	public string? StationKey { get; }
 
 	private readonly (AEKey what, long amount)[] _inputs;
 	private readonly (AEKey what, long amount)[] _outputs;
 	private readonly string?[] _inputTags;
 
-	private MePattern(MePatternType type, int station,
+	private MePattern(MePatternType type, int station, string? stationKey,
 		(AEKey, long)[] inputs, (AEKey, long)[] outputs, string?[] inputTags)
 	{
 		Type = type;
 		StationTile = station;
+		StationKey = stationKey;
 		_inputs = inputs;
 		_outputs = outputs;
 		_inputTags = inputTags;
@@ -28,14 +32,39 @@ public sealed class MePattern
 		IReadOnlyList<(AEKey what, long amount)> inputs, IReadOnlyList<string?>? inputTags = null)
 	{
 		var (ins, tags) = FilterInputs(inputs, inputTags);
-		return new(MePatternType.Crafting, stationTile, ins, new[] { (output, amount) }, tags);
+		return new(MePatternType.Crafting, stationTile, StationKeyForTile(stationTile),
+			ins, new[] { (output, amount) }, tags);
 	}
 
 	public static MePattern Processing(IReadOnlyList<(AEKey what, long amount)> inputs,
 		IReadOnlyList<(AEKey what, long amount)> outputs, IReadOnlyList<string?>? inputTags = null)
 	{
 		var (ins, tags) = FilterInputs(inputs, inputTags);
-		return new(MePatternType.Processing, -1, ins, FilterStacks(outputs), tags);
+		return new(MePatternType.Processing, -1, null, ins, FilterStacks(outputs), tags);
+	}
+
+	internal static string? StationKeyForTile(int tileType)
+	{
+		if (tileType < 0) return null;
+		return CraftingStationRegistry.TryGetStationKey(tileType, out var k) ? k : null;
+	}
+
+	private static (int station, string? key) NormalizeStation(int station, string? key,
+		List<(AEKey what, long amount)> outputs, List<(AEKey what, long amount)> inputs)
+	{
+		if (key != null)
+		{
+			if (CraftingStationRegistry.TryGetTile(key, out int t)) return (t, key);
+		}
+		else
+		{
+			if (station < 0) return (-1, null);
+			if (station < TileID.Count) return (station, null);
+		}
+
+		int rederived = CraftingRecipeResolver.ReDeriveStationTile(outputs, inputs);
+		if (rederived >= 0) return (rederived, StationKeyForTile(rederived));
+		return (station, key);
 	}
 
 	private static ((AEKey, long)[] inputs, string?[] tags) FilterInputs(
@@ -110,23 +139,33 @@ public sealed class MePattern
 	public AEKey PrimaryOutput => _outputs[0].what;
 	public long PrimaryOutputAmount => _outputs[0].amount;
 
-	public TagCompound Encode() => new()
+	public TagCompound Encode()
 	{
-		["type"] = (byte)Type,
-		["station"] = StationTile,
-		["in"] = WriteInputs(),
-		["out"] = WriteStacks(_outputs),
-	};
+		var t = new TagCompound
+		{
+			["type"] = (byte)Type,
+			["station"] = StationTile,
+			["in"] = WriteInputs(),
+			["out"] = WriteStacks(_outputs),
+		};
+		if (StationKey != null) t["stationkey"] = StationKey;
+		return t;
+	}
 
 	public static MePattern? Decode(TagCompound tag)
 	{
 		if (!tag.ContainsKey("type")) return null;
 		var type = (MePatternType)tag.GetByte("type");
 		int station = tag.ContainsKey("station") ? tag.GetInt("station") : -1;
+		string? stationKey = tag.ContainsKey("stationkey") ? tag.GetString("stationkey") : null;
 		var (inputs, tags) = ReadInputs(tag, "in");
 		var outputs = ReadStacks(tag, "out");
 		if (outputs.Count == 0) return null;
-		return new MePattern(type, station, inputs.ToArray(), outputs.ToArray(), tags.ToArray());
+
+		if (type == MePatternType.Crafting)
+			(station, stationKey) = NormalizeStation(station, stationKey, outputs, inputs);
+
+		return new MePattern(type, station, stationKey, inputs.ToArray(), outputs.ToArray(), tags.ToArray());
 	}
 
 	private List<TagCompound> WriteInputs()

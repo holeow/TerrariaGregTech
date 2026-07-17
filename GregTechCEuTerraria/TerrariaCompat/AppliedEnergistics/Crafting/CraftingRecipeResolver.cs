@@ -26,6 +26,33 @@ public static class CraftingRecipeResolver
 		return null;
 	}
 
+	public static int ReDeriveStationTile(
+		IReadOnlyList<(AEKey what, long amount)> outputs,
+		IReadOnlyList<(AEKey what, long amount)> inputs)
+	{
+		if (outputs.Count == 0 || outputs[0].what is not AEItemKey outKey) return -1;
+		int outType = outKey.GetItem();
+		long outAmt = outputs[0].amount;
+
+		foreach (var r in Main.recipe)
+		{
+			if (r is null || r.createItem is null || r.createItem.IsAir) continue;
+			if (r.createItem.type != outType || r.createItem.stack != outAmt) continue;
+			if (!InputsMatch(r, inputs)) continue;
+
+			int firstReq = -1, modReq = -1;
+			foreach (var t in r.requiredTile)
+			{
+				if (t < 0) continue;
+				if (firstReq < 0) firstReq = t;
+				if (t >= Terraria.ID.TileID.Count && modReq < 0) modReq = t;
+			}
+			int pick = modReq >= 0 ? modReq : firstReq;
+			if (pick >= 0) return pick;
+		}
+		return -1;
+	}
+
 	public static IEnumerable<Terraria.Recipe> ForOutput(int outType)
 	{
 		foreach (var r in Main.recipe)
