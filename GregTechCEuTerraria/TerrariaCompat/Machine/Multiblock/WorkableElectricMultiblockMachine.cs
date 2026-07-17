@@ -10,10 +10,6 @@ using GregTechCEuTerraria.Common.Energy;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock;
 
-// Port of WorkableElectricMultiblockMachine. Aggregates bound hatches into
-// one EnergyContainerList; supplies IOverclockMachine for ELECTRIC_OVERCLOCK.
-// Concrete (was abstract) - standard electric multis share via
-// MachineFamily.MultiblockElectricStandard.
 public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 	ITieredMachine, IOverclockMachine
 {
@@ -21,10 +17,8 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 
 	protected EnergyContainerList? _energyContainer;
 
-	// Hatch-derived recipe-match cap (distinct from MetaMachine.Tier).
 	public int MultiTier { get; protected set; }
 
-	// MP clients (no _parts binding) read display values from this snapshot.
 	public long DisplayEnergyStored   { get; private set; }
 	public long DisplayEnergyCapacity { get; private set; }
 	public long DisplayInputVoltage   { get; private set; }
@@ -58,7 +52,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 		MultiTier = 0;
 	}
 
-	// Per-tick walk so a hatch swap re-aggregates without unform.
 	private void RefreshDisplaySnapshot()
 	{
 		var ec = _energyContainer ?? GetEnergyContainer();
@@ -73,7 +66,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 	protected override void OnTick()
 	{
 		base.OnTick();
-		// Aligns with 6-tick state-sync broadcast.
 		if (IsServer && IsFormed && (Terraria.Main.GameUpdateCount & 0x7) == 0)
 			RefreshDisplaySnapshot();
 	}
@@ -93,11 +85,9 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 
 	public int OverclockTier => GetTier();
 	public int MaxOverclockTier => GetTier();
-	public int MinOverclockTier => GetTier();
-	public void SetOverclockTier(int tier) { /* fixed at hatch tier */ }
+	public virtual int MinOverclockTier => GetTier();
+	public virtual void SetOverclockTier(int tier) { /* fixed at hatch tier */ }
 
-	// Verbatim getOverclockVoltage. Generator multis (LargeCombustionEngine,
-	// LargeTurbine) override with tier / rotor-power voltage sources.
 	public virtual long OverclockVoltage
 	{
 		get
@@ -118,15 +108,12 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 
 			if (amperage == 1)
 			{
-				// Off-tier - floor to nearest lower tier (VEX for post-OC extended tiers).
 				return VoltageTiers.VoltageEx(VoltageTiers.FloorTierByVoltage(voltage));
 			}
-			// On-tier - use as-is.
 			return voltage;
 		}
 	}
 
-	// IN-side first (consumers); falls back to OUT (generators).
 	public EnergyContainerList GetEnergyContainer()
 	{
 		var containers = new List<IEnergyContainer>();
@@ -149,7 +136,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 		return new List<object>();
 	}
 
-	// +1 tier bonus for multiple top-tier hatches (4xHV runs as EV).
 	public virtual long GetMaxVoltage()
 	{
 		if (_energyContainer is null) _energyContainer = GetEnergyContainer();
@@ -167,7 +153,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 			long highestVoltage = _energyContainer.HighestInputVoltage;
 			if (_energyContainer.NumHighestInputContainers > 1)
 			{
-				// +1 tier bounded by MAX; safe to use V[] here.
 				int tier = VoltageTiers.TierByVoltage(highestVoltage);
 				int capped = System.Math.Min(tier + 1, (int)VoltageTier.MAX);
 				return VoltageTiers.V(capped);
@@ -184,8 +169,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 
 	public bool IsGenerator() => Definition?.IsGenerator ?? false;
 
-	// Generator multis override to (int)MetaMachine.Tier - rotor holder needs
-	// it for tierDifference math.
 	public virtual int GetTier() => MultiTier;
 
 	protected override void AppendEnergyLine(System.Collections.Generic.List<string> lines)
@@ -211,8 +194,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 		}
 	}
 
-	// PARALLEL_HATCH first, then def modifier (verbatim GCYMMachines).
-	// PARALLEL_HATCH = IDENTITY when no parallel hatch.
 	private RecipeModifier? _cachedModifier;
 	public override RecipeModifier GetRecipeModifier()
 	{
@@ -223,7 +204,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 		return _cachedModifier;
 	}
 
-	// Display fields ride SaveData so MP clients (no _parts) get correct values.
 	public override void SaveData(Terraria.ModLoader.IO.TagCompound tag)
 	{
 		base.SaveData(tag);
@@ -241,8 +221,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 	{
 		base.LoadData(tag);
 		MultiTier              = tag.GetInt("wemm_tier");
-		// wemm_des omitted from sync blob (synced via MachineEnergySyncPacket).
-		// ContainsKey guard so a sync-blob load doesn't reset to 0.
 		if (tag.ContainsKey("wemm_des"))
 			DisplayEnergyStored = tag.GetLong("wemm_des");
 		DisplayEnergyCapacity  = tag.GetLong("wemm_dec");
@@ -253,8 +231,6 @@ public class WorkableElectricMultiblockMachine : WorkableMultiblockMachine,
 		BatchEnabled           = tag.GetBool("wemm_batch");
 	}
 
-	// Periodic sync blob omits the per-tick DisplayEnergyStored - it rides
-	// MachineEnergySyncPacket. Disk/join blob is unchanged.
 	public override void SaveDataForSync(Terraria.ModLoader.IO.TagCompound tag)
 	{
 		base.SaveDataForSync(tag);

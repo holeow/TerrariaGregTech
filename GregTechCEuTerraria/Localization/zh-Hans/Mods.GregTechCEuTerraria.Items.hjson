@@ -32594,7 +32594,7 @@ tempered_glass: {
 
 terminal: {
 	DisplayName: 终端
-	Tooltip: 潜行右击多方块控制器，以用你物品栏中的物品自动搭建此结构
+	// Tooltip: ""
 }
 
 the_end_marker: {

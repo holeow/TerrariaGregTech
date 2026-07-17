@@ -96,16 +96,17 @@ public static class MeBusPackets
 	public static void HandleLayerRequest(BinaryReader r, int whoAmI)
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		var p = NetRouter.NewPacket(PacketType.MeBusLayerFull);
-		p.Write(MeBusLayerSystem.Buses.All.Count);
-		foreach (var kv in MeBusLayerSystem.Buses.All)
+		LargePacket.Send(PacketType.MeBusLayerFull, p =>
 		{
-			p.Write((short)kv.Key.x);
-			p.Write((short)kv.Key.y);
-			for (int i = 0; i < 4; i++)
-				WriteAttachment(p, kv.Value[i]);
-		}
-		p.Send(toClient: whoAmI);
+			p.Write(MeBusLayerSystem.Buses.All.Count);
+			foreach (var kv in MeBusLayerSystem.Buses.All)
+			{
+				p.Write((short)kv.Key.x);
+				p.Write((short)kv.Key.y);
+				for (int i = 0; i < 4; i++)
+					WriteAttachment(p, kv.Value[i]);
+			}
+		}, toClient: whoAmI);
 	}
 
 	public static void HandleLayerFull(BinaryReader r)

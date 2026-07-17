@@ -112,4 +112,7 @@ public enum PacketType : byte
 
 	// Gregtech Toilet aura
 	ToiletAura,            // C->S  placed / removed a Gregtech Toilet
+
+	// Transport
+	Fragment,              // C<->S one chunk of LargePacket
 }

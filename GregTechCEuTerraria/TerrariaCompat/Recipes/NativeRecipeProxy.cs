@@ -82,7 +82,8 @@ public static class NativeRecipeProxy
 				id:       $"electric_furnace/proxy/{src.Id}",
 				inputs:   CloneContents(src.Inputs),
 				outputs:  CloneContents(src.Outputs),
-				eutInput: ulvEUt));
+				eutInput: ulvEUt,
+				nativeTile: TileID.Furnaces));
 			n++;
 		}
 
@@ -233,10 +234,13 @@ public static class NativeRecipeProxy
 	private static GTRecipe BuildSynthetic(GTRecipeType type, string id,
 		Dictionary<object, List<RecipeContent>> inputs,
 		Dictionary<object, List<RecipeContent>> outputs,
-		long eutInput)
+		long eutInput, int nativeTile = -1)
 	{
 		var tickInputs = new Dictionary<object, List<RecipeContent>>();
 		EURecipeCapability.PutEUContent(tickInputs, new EnergyStack(eutInput, 1));
+
+		var data = new TagCompound();
+		if (nativeTile > 0) data.Set("nativeTile", nativeTile);
 
 		return new GTRecipe(
 			recipeType:              type,
@@ -251,7 +255,7 @@ public static class NativeRecipeProxy
 			tickOutputChanceLogics:  new Dictionary<object, ChanceLogic>(),
 			conditions:              new List<RecipeCondition>(),
 			ingredientActions:       System.Array.Empty<object>(),
-			data:                    new TagCompound(),
+			data:                    data,
 			duration:                SynthDuration,
 			recipeCategory:          GTRecipeCategory.DEFAULT,
 			groupColor:              -1);

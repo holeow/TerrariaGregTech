@@ -8,55 +8,93 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Periodic per-fluid-pipe tank-contents broadcast (every 6 ticks via
-// FluidPipeNetSystem.PostUpdateWorld). Without this MP clients read zeros
-// from FluidPipeState.GetContainedFluids - tanks only mutate server-side.
-// Empty pipes are skipped.
 public static class FluidPipeStatsPacket
 {
+	private const float SyncRangePx = 2500f;
+
+	private static readonly List<string> _palette = new();
+	private static readonly Dictionary<string, int> _paletteIdx = new();
+
 	public static void Broadcast()
 	{
 		if (Main.netMode != NetmodeID.Server) return;
 
-		int n = 0;
-		foreach (var kv in FluidPipeLayerSystem.AllStates)
-		{
-			foreach (var f in kv.Value.GetContainedFluids())
-				if (!f.IsEmpty) { n++; break; }
-		}
+		const float rangeSq = SyncRangePx * SyncRangePx;
 
-		var p = NetRouter.NewPacket(PacketType.FluidPipeStats);
-		p.Write(n);
-		foreach (var kv in FluidPipeLayerSystem.AllStates)
+		for (int pid = 0; pid < Main.maxPlayers; pid++)
 		{
-			var fluids = kv.Value.GetContainedFluids();
-			bool any = false;
-			foreach (var f in fluids) if (!f.IsEmpty) { any = true; break; }
-			if (!any) continue;
+			var plr = Main.player[pid];
+			if (plr is null || !plr.active) continue;
+			float cx = plr.Center.X, cy = plr.Center.Y;
 
-			p.Write((short)kv.Key.x);
-			p.Write((short)kv.Key.y);
-			p.Write((byte)fluids.Length);
-			foreach (var f in fluids)
+			_palette.Clear();
+			_paletteIdx.Clear();
+			int n = 0;
+			foreach (var kv in FluidPipeLayerSystem.AllStates)
 			{
-				if (f.IsEmpty || f.Type is null)
+				float dx = (kv.Key.x * 16f + 8f) - cx, dy = (kv.Key.y * 16f + 8f) - cy;
+				if (dx * dx + dy * dy > rangeSq) continue;
+				bool any = false;
+				foreach (var f in kv.Value.GetContainedFluids())
 				{
-					p.Write("");
-					p.Write(0);
+					if (f.IsEmpty || f.Type is null) continue;
+					any = true;
+					if (!_paletteIdx.ContainsKey(f.Type.Id))
+					{
+						_paletteIdx[f.Type.Id] = _palette.Count;
+						_palette.Add(f.Type.Id);
+					}
 				}
-				else
-				{
-					p.Write(f.Type.Id);
-					p.Write(f.Amount);
-				}
+				if (any) n++;
 			}
+
+			int count = n;
+			LargePacket.Send(PacketType.FluidPipeStats, p =>
+			{
+				p.Write((ushort)_palette.Count);
+				foreach (var id in _palette) p.Write(id);
+
+				p.Write(count);
+				foreach (var kv in FluidPipeLayerSystem.AllStates)
+				{
+					float dx = (kv.Key.x * 16f + 8f) - cx, dy = (kv.Key.y * 16f + 8f) - cy;
+					if (dx * dx + dy * dy > rangeSq) continue;
+					var fluids = kv.Value.GetContainedFluids();
+					bool any = false;
+					foreach (var f in fluids) if (!f.IsEmpty && f.Type != null) { any = true; break; }
+					if (!any) continue;
+
+					int cap = kv.Value.CapacityPerTank;
+					p.Write((short)kv.Key.x);
+					p.Write((short)kv.Key.y);
+					p.Write((byte)fluids.Length);
+					foreach (var f in fluids)
+					{
+						if (f.IsEmpty || f.Type is null)
+						{
+							p.Write((ushort)0xFFFF);
+							p.Write((byte)0);
+						}
+						else
+						{
+							p.Write((ushort)_paletteIdx[f.Type.Id]);
+							int fill = cap > 0 ? (int)((long)f.Amount * 255 / cap) : 255;
+							p.Write((byte)System.Math.Clamp(fill, 1, 255));
+						}
+					}
+				}
+			}, toClient: pid);
 		}
-		p.Send();
 	}
 
 	public static void HandleOnClient(BinaryReader r)
 	{
 		if (Main.netMode != NetmodeID.MultiplayerClient) return;
+
+		int paletteCount = r.ReadUInt16();
+		var palette = new string[paletteCount];
+		for (int i = 0; i < paletteCount; i++) palette[i] = r.ReadString();
+
 		int n = r.ReadInt32();
 		var cache = FluidPipeLayerSystem.ClientTankSnapshots;
 		cache.Clear();
@@ -65,16 +103,27 @@ public static class FluidPipeStatsPacket
 			int x = r.ReadInt16();
 			int y = r.ReadInt16();
 			int channels = r.ReadByte();
+			int cap = ClientCapacity(x, y);
 			var stacks = new FluidStack[channels];
 			for (int c = 0; c < channels; c++)
 			{
-				string id = r.ReadString();
-				int amount = r.ReadInt32();
-				stacks[c] = (id.Length == 0 || amount <= 0 || !FluidRegistry.TryGet(id, out var ft))
-					? FluidStack.Empty
-					: new FluidStack(ft, amount);
+				int pi   = r.ReadUInt16();
+				int fill = r.ReadByte();
+				if (pi >= paletteCount || fill <= 0 || !FluidRegistry.TryGet(palette[pi], out var ft))
+					stacks[c] = FluidStack.Empty;
+				else
+				{
+					int amount = System.Math.Max(1, (int)((long)fill * cap / 255));
+					stacks[c] = new FluidStack(ft, amount);
+				}
 			}
 			cache[(x, y)] = stacks;
 		}
+	}
+
+	private static int ClientCapacity(int x, int y)
+	{
+		var c = FluidPipeLayerSystem.Pipes.CellAt(x, y);
+		return c.HasValue ? System.Math.Max(1, c.Value.Throughput * 20) : 1;
 	}
 }

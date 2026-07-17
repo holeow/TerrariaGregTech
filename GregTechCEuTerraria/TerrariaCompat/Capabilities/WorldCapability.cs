@@ -67,9 +67,9 @@ public static class WorldCapability
 		if (modTile is not null) return modTile.Name;
 		bool container = Terraria.Main.tileContainer[tile.TileType];
 		int style = container ? tile.TileFrameX / 36 : 0;
-		string name = MapObjectName(tile.TileType, style);
-		if (string.IsNullOrEmpty(name) && container)
-			name = ContainerItemName(tile.TileType, style);
+		string name = container
+			? ContainerItemName(tile.TileType, style)
+			: MapObjectName(tile.TileType, style);
 		return string.IsNullOrEmpty(name) ? "Tile" : name;
 	}
 

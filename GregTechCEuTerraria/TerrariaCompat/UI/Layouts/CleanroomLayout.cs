@@ -55,7 +55,7 @@ public static class CleanroomLayout
 			if (cleanroomType != null)
 				lines.Add(MultiblockDisplayText.Tr(cleanroomType.TranslationKey));
 
-			if (!recipeLogic.IsWorkingEnabled())
+			if (!machine.WorkingEnabled)
 			{
 				lines.Add(MultiblockDisplayText.Tr("gtceu.multiblock.work_paused"));
 			}

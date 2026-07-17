@@ -135,6 +135,11 @@ public sealed class MeInterfaceMachine : MetaMachine, IMeInventoryExposer, IMeCr
 		get
 		{
 			foreach (var (cx, cy) in Cells())
+			{
+				var own = MeNetworkSystem.NetAt(cx, cy);
+				if (own != null) return own;
+			}
+			foreach (var (cx, cy) in Cells())
 				foreach (var (side, dx, dy) in IODirectionExtensions.Cardinal4)
 				{
 					int nx = cx + dx, ny = cy + dy;

@@ -16,12 +16,7 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Port of CleanroomMachine. Encloses a 2D rectangular room (plascrete walls +
-// cleanroom_filter ceiling), exposes a CleanroomProviderTrait that interior
-// receiver machines consult via CleanroomCondition. Custom CleanroomLogic
-// drains EU + ratchets cleanliness; provider goes active at clean >= 95.
-// Parametric size-scan replaced by the hand-authored RepeatableBlockPattern.
-public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
+public sealed class CleanroomMachine : WorkableElectricMultiblockMachine, IControllable
 {
 	public const int CLEAN_AMOUNT_THRESHOLD = 95;
 	public const int MIN_CLEAN_AMOUNT       = 0;
@@ -31,19 +26,16 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 	private int  _cleanAmount;
 	public  int  CleanAmount => _cleanAmount;
 
-	// Resolved from the filter casing; defaults to CLEANROOM defensively.
 	private CleanroomType? _cleanroomType;
 	public  CleanroomType? CleanroomTypeResolved => _cleanroomType;
 
 	private EnergyContainerList? _inputEnergyContainers;
 	public  EnergyContainerList? InputEnergyContainers => _inputEnergyContainers;
 
-	// Held so we can unbind on invalidate (order-stable copy of match-context set).
 	private List<CleanroomReceiverTrait>? _cleanroomReceivers;
 
 	private readonly CleanroomProviderTrait _cleanroomProvider;
 
-	// Formed-room bounds in tile coords - persisted; read by the wall renderer.
 	public Terraria.DataStructures.Point16 FormedTopLeft { get; private set; }
 	public int FormedTileWidth  { get; private set; }
 	public int FormedTileHeight { get; private set; }
@@ -79,8 +71,6 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		_cleanroomReceivers = receivers.ToList();
 		foreach (var r in _cleanroomReceivers) r.CleanroomProvider = _cleanroomProvider;
 
-		// Upstream `((w*d)^0.8 * h)` -> 2D `width^0.8 x height`; baseline 100
-		// matches upstream's 5x5x5.
 		var ctx = GetMultiblockState().MatchContext;
 		int horizontal = ctx.GetOrDefault("horizontalRepeats", 3);
 		int vertical   = ctx.GetOrDefault("verticalRepeats",   3);
@@ -89,7 +79,6 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		int duration   = System.Math.Max(100, (int)(System.Math.Pow(width, 0.8) * height));
 		Recipe.SetDuration(duration);
 
-		// Controller cell sits at shape (1 + horizontal/2, 0); each cell = 2 tiles.
 		int controllerCol = 1 + horizontal / 2;
 		FormedTopLeft     = new Terraria.DataStructures.Point16(
 			Position.X - controllerCol * 2,
@@ -113,8 +102,6 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		FormedTileHeight = 0;
 	}
 
-	// Only bind perimeter parts - in 2D, "outside the room" = "has >=1 non-cached
-	// cardinal neighbour" (mirrors upstream's cache-relative check).
 	public override bool ShouldAddPartToController(IMultiPart part)
 	{
 		var state = GetMultiblockState();
@@ -124,7 +111,7 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		for (int dx = -1; dx <= 1; dx++)
 		for (int dy = -1; dy <= 1; dy++)
 		{
-			if ((dx == 0) == (dy == 0)) continue; // cardinals only
+			if ((dx == 0) == (dy == 0)) continue;
 			long key = ((long)(pos.X + dx) << 32) | (uint)(pos.Y + dy);
 			if (!cache.Contains(key)) return true;
 		}
@@ -151,13 +138,8 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		MultiTier = VoltageTiers.FloorTierByVoltage(GetMaxVoltage());
 	}
 
-	// Diodes (tier-passthrough endpoints) are upstream's only blacklist - not ported.
 	private static bool IsPartIgnored(IMultiPart part) => false;
 
-	// Interior-cell predicate: allow non-banned occupants + accumulate any
-	// CleanroomReceiverTrait into the MatchContext.
-	// state.GetMachine() resolves the multi-tile machine occupying the cell
-	// regardless of anchor alignment (see MultiblockState.GetMachine).
 	internal static bool InnerPredicateMatch(MultiblockState state)
 	{
 		var machine = state.GetMachine();
@@ -175,8 +157,6 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		return true;
 	}
 
-	// Upstream blacklist (muffler + generators + miners + primitives) + any
-	// provider-bearing machine. Only muffler/coke_oven are placeable+ported.
 	private static bool IsMachineBanned(MetaMachine machine)
 	{
 		if (machine.Traits.GetTrait(CleanroomProviderTrait.TYPE) != null) return true;
@@ -185,7 +165,6 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 		return false;
 	}
 
-	// Clamps to [0, 100]; crossing 95 flips IsActive.
 	public void AdjustCleanAmount(int delta)
 	{
 		_cleanAmount = System.Math.Clamp(_cleanAmount + delta, 0, 100);
@@ -195,9 +174,8 @@ public sealed class CleanroomMachine : WorkableElectricMultiblockMachine
 	public override long GetMaxVoltage() =>
 		_inputEnergyContainers?.InputVoltage ?? VoltageTiers.V((int)VoltageTier.LV);
 
-	// Upstream: cleanroom can't be manually paused.
-	public bool IsWorkingEnabled() => true;
-	public new void SetWorkingEnabled(bool ignored) { }
+	bool IControllable.IsWorkingEnabled() => true;
+	void IControllable.SetWorkingEnabled(bool ignored) { }
 
 	public override void SaveData(TagCompound tag)
 	{

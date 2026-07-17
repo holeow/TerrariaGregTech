@@ -106,11 +106,14 @@ public sealed class PipeCoverable : ICoverable
 
 	public PipeSideMode GetMode(CoverSide side) => _modes[(int)side];
 
+	private void InvalidateRender() => PipeRenderer.InvalidateGeom(X, Y);
+
 	public void SetMode(CoverSide side, PipeSideMode mode)
 	{
 		int i = (int)side;
 		var oldMode = _modes[i];
 		if (oldMode == mode) return;
+		InvalidateRender();
 
 		switch (mode)
 		{
@@ -262,6 +265,7 @@ public sealed class PipeCoverable : ICoverable
 
 	public void SetCoverAtSide(CoverBehavior? cover, CoverSide side)
 	{
+		InvalidateRender();
 		int i = (int)side;
 		switch (cover)
 		{
@@ -309,6 +313,7 @@ public sealed class PipeCoverable : ICoverable
 
 	internal void SetFilterType(CoverSide side, PipeFilterType type)
 	{
+		InvalidateRender();
 		int i = (int)side;
 		_filterTypes[i] = type;
 		switch (_modes[i])
@@ -420,6 +425,7 @@ public sealed class PipeCoverable : ICoverable
 
 	void ICoverable.LoadCovers(TagCompound tag)
 	{
+		InvalidateRender();
 		foreach (var side in CoverSides.All)
 		{
 			int i = (int)side;

@@ -8,7 +8,7 @@ available_recipe_map_1: Verfügbare Rezepttypen: %s
 available_recipe_map_2: Verfügbare Rezepttypen: %s, %s
 available_recipe_map_3: Verfügbare Rezepttypen: %s, %s, %s
 available_recipe_map_4: Verfügbare Rezepttypen: %s, %s, %s, %s
-block_breaker: "[c/AAAAAA:Minen blockieren auf der Vorderseite und sammeln ihre Tropfen]"
+block_breaker: "[c/AAAAAA:Mines a column of blocks below it, or fells and replants trees to its sides]"
 buffer: Ein kleiner Puffer zum Speichern von Itemsn und Flüssigkeiten
 central_monitor: Aber kann es Doom ausführen?
 charcoal_pile: Unterirdische Brennstoffbäckerei

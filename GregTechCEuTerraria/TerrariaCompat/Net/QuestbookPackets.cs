@@ -19,18 +19,17 @@ public static class QuestbookPackets
 	public static void HandleStateRequest(BinaryReader r, int whoAmI)
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		BuildSync(initial: true).Send(toClient: whoAmI);
+		LargePacket.Send(PacketType.QuestbookSync, p => WriteSync(p, initial: true), toClient: whoAmI);
 	}
 
 	public static void BroadcastSync()
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		BuildSync(initial: false).Send();
+		LargePacket.Send(PacketType.QuestbookSync, p => WriteSync(p, initial: false));
 	}
 
-	private static ModPacket BuildSync(bool initial)
+	private static void WriteSync(System.IO.BinaryWriter p, bool initial)
 	{
-		var p = NetRouter.NewPacket(PacketType.QuestbookSync);
 		p.Write(initial);
 
 		p.Write(QuestbookWorldProgress.Completed.Count);
@@ -40,8 +39,6 @@ public static class QuestbookPackets
 		p.Write(QuestbookWorldProgress.SatisfiedTasks.Count);
 		foreach (string key in QuestbookWorldProgress.SatisfiedTasks)
 			p.Write(key);
-
-		return p;
 	}
 
 	public static void HandleSync(BinaryReader r)

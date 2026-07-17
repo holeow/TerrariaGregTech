@@ -17,6 +17,8 @@ public sealed class FluidPipeLayerSystem : ModSystem
 
 	private static readonly Dictionary<(int x, int y), FluidPipeState> _states = new();
 
+	private static bool _hadPipes;
+
 	public static readonly Dictionary<(int x, int y), global::GregTechCEuTerraria.Api.Fluids.FluidStack[]>
 		ClientTankSnapshots = new();
 
@@ -98,6 +100,8 @@ public sealed class FluidPipeLayerSystem : ModSystem
 		_sides.Clear();
 		_states.Clear();
 		ClientTankSnapshots.Clear();
+		_hadPipes = false;
+		PipeRenderer.ClearGeomCaches();
 	}
 
 	public override void PostDrawTiles()
@@ -119,7 +123,13 @@ public sealed class FluidPipeLayerSystem : ModSystem
 
 	public override void SaveWorldData(TagCompound tag)
 	{
-		if (Pipes.Count == 0) return;
+		if (Pipes.Count == 0)
+		{
+			if (_hadPipes)
+				Mod.Logger.Warn("[FluidPipes] SaveWorldData: layer is empty but this world had pipes");
+			return;
+		}
+		_hadPipes = true;
 		var xs     = new List<int>   (Pipes.Count);
 		var ys     = new List<int>   (Pipes.Count);
 		var mats   = new List<string>(Pipes.Count);
@@ -221,6 +231,7 @@ public sealed class FluidPipeLayerSystem : ModSystem
 				AcidProof:   (proof & 8)  != 0,
 				IsSimple:    (proof & 16) != 0));
 		}
+		if (Pipes.Count > 0) _hadPipes = true;
 
 		if (tag.ContainsKey("fluid_pipes.covers.xs"))
 		{

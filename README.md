@@ -12,6 +12,8 @@ A port of [GregTech Modern (GTCEu)](https://github.com/GregTechCEu/GregTech-Mode
 
 Discord: https://discord.gg/sqs4G7u6eX
 
+Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3736597795
+
 ## Why this exists?
 
 - Several years ago I thought "are there actually any tech mods for terraria?" - and it turned out those are almost completely non-existent (hope Macrocosm releases soon....)

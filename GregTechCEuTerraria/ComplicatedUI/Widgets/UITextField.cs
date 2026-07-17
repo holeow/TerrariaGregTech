@@ -28,6 +28,10 @@ public sealed class UITextField : UIElement, ITextInput
 	private readonly string _placeholder;
 	private readonly string? _tooltip;
 	private readonly bool _forceUpper;
+	private readonly Func<bool>? _isDisabled;
+	private readonly string? _disabledTooltip;
+
+	private bool Disabled => _isDisabled?.Invoke() ?? false;
 
 	private string _buffer = "";
 	private int _caret;
@@ -42,7 +46,8 @@ public sealed class UITextField : UIElement, ITextInput
 
 	public UITextField(Func<string> current, Action<string> onConfirm,
 		int maxLength = 32, Func<char, bool>? filter = null, string placeholder = "",
-		string? tooltip = null, bool forceUpper = false)
+		string? tooltip = null, bool forceUpper = false,
+		Func<bool>? isDisabled = null, string? disabledTooltip = null)
 	{
 		_current = current;
 		_onConfirm = onConfirm;
@@ -51,6 +56,8 @@ public sealed class UITextField : UIElement, ITextInput
 		_placeholder = placeholder;
 		_tooltip = tooltip;
 		_forceUpper = forceUpper;
+		_isDisabled = isDisabled;
+		_disabledTooltip = disabledTooltip;
 		OnLeftMouseDown += (_, _) => FocusFromMouse();
 	}
 
@@ -68,6 +75,7 @@ public sealed class UITextField : UIElement, ITextInput
 
 	private void FocusFromMouse()
 	{
+		if (Disabled) return;
 		Focus();
 		_caret = CaretFromMouse();
 		_selAnchor = _caret;
@@ -93,6 +101,18 @@ public sealed class UITextField : UIElement, ITextInput
 		base.Update(gameTime);
 		var bounds = GetDimensions().ToRectangle();
 		bool over = bounds.Contains(ModalEscape.PollCursor());
+
+		if (Disabled)
+		{
+			if (IsFocused) Discard();
+			if (over)
+			{
+				Main.LocalPlayer.mouseInterface = true;
+				string? tip = _disabledTooltip ?? _tooltip;
+				if (tip != null) Main.instance.MouseText(tip);
+			}
+			return;
+		}
 
 		if (_mouseSelecting)
 		{
@@ -264,8 +284,10 @@ public sealed class UITextField : UIElement, ITextInput
 	{
 		var bounds = GetDimensions().ToRectangle();
 		var px = TextureAssets.MagicPixel.Value;
-		sb.Draw(px, bounds, new Color(8, 10, 28) * 0.85f);
-		var border = IsFocused ? new Color(255, 235, 140) : new Color(60, 70, 100);
+		bool dis = Disabled;
+		sb.Draw(px, bounds, new Color(8, 10, 28) * (dis ? 0.5f : 0.85f));
+		var border = dis ? new Color(40, 45, 60)
+			: IsFocused ? new Color(255, 235, 140) : new Color(60, 70, 100);
 		sb.Draw(px, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), border);
 		sb.Draw(px, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), border);
 		sb.Draw(px, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), border);
@@ -295,8 +317,9 @@ public sealed class UITextField : UIElement, ITextInput
 			int caret = Math.Min(_caret, shown.Length);
 			string left = shown.Substring(0, caret);
 			string right = shown.Substring(caret);
+			var textColor = dis ? new Color(110, 110, 125) : Color.White;
 			float x = tx;
-			Terraria.Utils.DrawBorderString(sb, left, new Vector2(x, ty), Color.White, TextScale);
+			Terraria.Utils.DrawBorderString(sb, left, new Vector2(x, ty), textColor, TextScale);
 			x += font.MeasureString(left).X * TextScale;
 			if (comp.Length > 0)
 			{
@@ -304,7 +327,7 @@ public sealed class UITextField : UIElement, ITextInput
 				x += font.MeasureString(comp).X * TextScale;
 			}
 			if (right.Length > 0)
-				Terraria.Utils.DrawBorderString(sb, right, new Vector2(x, ty), Color.White, TextScale);
+				Terraria.Utils.DrawBorderString(sb, right, new Vector2(x, ty), textColor, TextScale);
 			if (IsFocused && Main.GameUpdateCount % 30 < 15)
 				Terraria.Utils.DrawBorderString(sb, "|", new Vector2(x, ty), Color.LightYellow, TextScale);
 		}

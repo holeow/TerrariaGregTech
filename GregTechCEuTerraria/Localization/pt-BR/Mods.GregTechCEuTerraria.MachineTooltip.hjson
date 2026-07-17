@@ -8,7 +8,7 @@ available_recipe_map_1: Tipos de Receita Disponíveis: %s
 available_recipe_map_2: Tipos de Receita Disponíveis: %s, %s
 available_recipe_map_3: Tipos de Receita Disponíveis: %s, %s, %s
 available_recipe_map_4: Tipos de Receita Disponíveis: %s, %s, %s, %s
-block_breaker: "[c/AAAAAA:Minera o bloco na face frontal e coleta seus drops]"
+block_breaker: "[c/AAAAAA:Mines a column of blocks below it, or fells and replants trees to its sides]"
 buffer: Um Pequeno Buffer para armazenar Itens e Fluidos
 central_monitor: Mas roda Doom?
 charcoal_pile: Padaria de combustível subterrânea

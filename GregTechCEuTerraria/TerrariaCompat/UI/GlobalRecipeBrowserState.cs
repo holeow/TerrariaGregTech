@@ -134,9 +134,32 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 	private string? _filterTagLabel;
 	private HashSet<int>? _filterTagItems;
 
+	private readonly struct FilterState
+	{
+		public readonly BrowseFilter Filter;
+		public readonly int Item;
+		public readonly string? Fluid;
+		public readonly string? FluidLabel;
+		public readonly string? TagLabel;
+		public readonly HashSet<int>? TagItems;
+
+		public FilterState(BrowseFilter filter, int item, string? fluid,
+			string? fluidLabel, string? tagLabel, HashSet<int>? tagItems)
+		{
+			Filter = filter; Item = item; Fluid = fluid;
+			FluidLabel = fluidLabel; TagLabel = tagLabel; TagItems = tagItems;
+		}
+	}
+
+	private readonly List<FilterState> _history = new();
+	private UITextButton? _backButton;
+	private bool _backShown;
+	private int _chipFullW;
+
 	private const int HeaderPad = 8;
 	private const int SearchH   = 26;
 	private const int ChipH     = 18;
+	private const int BackW     = 52;
 	private const int HintH     = 32;
 	private const int ResizeKnobSz = 32;
 	private const int MoveKnobW    = 20;
@@ -485,17 +508,30 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 			Height = StyleDimension.FromPixels(HintH),
 			TextColor = new Color(150, 160, 190),
 		};
+		_chipFullW = (int)(w - HeaderPad * 2);
 		_chipButton = new UITextButton(
 			label:    () => _chipLabel,
 			onLeft:   () => { if (_filter != BrowseFilter.None) ClearFilter(); },
 			tooltip:  "Click to clear the active filter",
-			width:    (int)(w - HeaderPad * 2),
+			width:    _chipFullW,
 			height:   ChipH)
 		{
 			Left = StyleDimension.FromPixels(HeaderPad),
 			Top  = StyleDimension.FromPixels(HeaderPad + SearchH + 5),
 		};
 		_chipShown = null;
+		_backShown = false;
+		_backButton = new UITextButton(
+			label:    () => "< Back",
+			onLeft:   GoBack,
+			width:    BackW,
+			height:   ChipH)
+		{
+			Left = StyleDimension.FromPixels(HeaderPad),
+			Top  = StyleDimension.FromPixels(HeaderPad + SearchH + 5),
+		};
+		_backButton.IsVisible = () => _backShown;
+		_panel.Append(_backButton);
 
 		void ToggleHideObvious()
 		{
@@ -696,6 +732,7 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 	public void ApplyItemFilter(int itemType, BrowseFilter filter)
 	{
 		if (itemType <= 0 || filter == BrowseFilter.None) { ClearFilter(); return; }
+		PushHistoryBefore(filter, itemType, null, null);
 		SetMode(BrowseMode.Recipes);
 		_filter = filter;
 		_filterItem = itemType;
@@ -710,6 +747,7 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 	public void ApplyFluidFilter(string fluidId, string label, BrowseFilter filter)
 	{
 		if (string.IsNullOrEmpty(fluidId) || filter == BrowseFilter.None) { ClearFilter(); return; }
+		PushHistoryBefore(filter, 0, fluidId, null);
 		SetMode(BrowseMode.Recipes);
 		_filter = filter;
 		_filterItem = 0;
@@ -724,6 +762,7 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 	public void ApplyTagFilter(string tagLabel, HashSet<int> items, BrowseFilter filter)
 	{
 		if (items.Count == 0 || filter == BrowseFilter.None) { ClearFilter(); return; }
+		PushHistoryBefore(filter, 0, null, tagLabel);
 		SetMode(BrowseMode.Recipes);
 		_filter = filter;
 		_filterItem = 0;
@@ -737,12 +776,38 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 
 	private void ClearFilter()
 	{
+		_history.Clear();
 		_filter = BrowseFilter.None;
 		_filterItem = 0;
 		_filterFluid = null;
 		_filterFluidLabel = null;
 		_filterTagLabel = null;
 		_filterTagItems = null;
+		RecomputeAll();
+	}
+
+	private void PushHistoryBefore(BrowseFilter filter, int item, string? fluid, string? tagLabel)
+	{
+		if (_filter == BrowseFilter.None) return;
+		if (_filter == filter && _filterItem == item && _filterFluid == fluid && _filterTagLabel == tagLabel) return;
+		_history.Add(new FilterState(_filter, _filterItem, _filterFluid,
+			_filterFluidLabel, _filterTagLabel, _filterTagItems));
+		if (_history.Count > 64) _history.RemoveAt(0);
+	}
+
+	public void GoBack()
+	{
+		if (_history.Count == 0) return;
+		var s = _history[_history.Count - 1];
+		_history.RemoveAt(_history.Count - 1);
+		SetMode(BrowseMode.Recipes);
+		_filter = s.Filter;
+		_filterItem = s.Item;
+		_filterFluid = s.Fluid;
+		_filterFluidLabel = s.FluidLabel;
+		_filterTagLabel = s.TagLabel;
+		_filterTagItems = s.TagItems;
+		_search?.SetText("");
 		RecomputeAll();
 	}
 
@@ -1672,10 +1737,32 @@ public sealed class GlobalRecipeBrowserState : FreeModalWindow
 	private void ApplyPendingChipSwap()
 	{
 		if (_panel is null || _chipPending is null) return;
-		if (ReferenceEquals(_chipPending, _chipShown)) return;
-		if (_chipShown is not null) _panel.RemoveChild(_chipShown);
-		_panel.Append(_chipPending);
-		_chipShown = _chipPending;
+		if (!ReferenceEquals(_chipPending, _chipShown))
+		{
+			if (_chipShown is not null) _panel.RemoveChild(_chipShown);
+			_panel.Append(_chipPending);
+			_chipShown = _chipPending;
+		}
+		UpdateBackLayout();
+	}
+
+	private void UpdateBackLayout()
+	{
+		if (_chipButton is null) return;
+		bool show = ReferenceEquals(_chipShown, _chipButton) && _history.Count > 0;
+		if (show == _backShown) return;
+		_backShown = show;
+		if (show)
+		{
+			_chipButton.Left  = StyleDimension.FromPixels(HeaderPad + BackW + 4);
+			_chipButton.Width = StyleDimension.FromPixels(_chipFullW - BackW - 4);
+		}
+		else
+		{
+			_chipButton.Left  = StyleDimension.FromPixels(HeaderPad);
+			_chipButton.Width = StyleDimension.FromPixels(_chipFullW);
+		}
+		_panel?.Recalculate();
 	}
 
 	protected override void ApplyOffsetLive()

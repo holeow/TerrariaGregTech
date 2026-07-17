@@ -39,9 +39,9 @@ public sealed class UIMeTerminalGrid : UIElement, IScrollSource, ISortSource
 	private readonly UISearchBar _search;
 	private readonly Repo _repo;
 
-	private SortOrder _sortBy = SortOrder.NAME;
-	private SortDir _sortDir = SortDir.ASCENDING;
-	private ViewItems _viewMode = ViewItems.ALL;
+	private SortOrder _sortBy = TerminalSortPersist.SortBy;
+	private SortDir _sortDir = TerminalSortPersist.SortDir;
+	private ViewItems _viewMode = TerminalSortPersist.ViewMode;
 
 	private int _scroll;
 	private readonly Scrollbar _bar = new();
@@ -351,12 +351,14 @@ public sealed class UIMeTerminalGrid : UIElement, IScrollSource, ISortSource
 			SortOrder.AMOUNT => SortOrder.MOD,
 			_ => SortOrder.NAME,
 		};
+		TerminalSortPersist.SortBy = _sortBy;
 		_repo.UpdateView();
 	}
 
 	public void ToggleDir()
 	{
 		_sortDir = _sortDir == SortDir.ASCENDING ? SortDir.DESCENDING : SortDir.ASCENDING;
+		TerminalSortPersist.SortDir = _sortDir;
 		_repo.UpdateView();
 	}
 
@@ -368,6 +370,7 @@ public sealed class UIMeTerminalGrid : UIElement, IScrollSource, ISortSource
 			ViewItems.STORED => ViewItems.CRAFTABLE,
 			_ => ViewItems.ALL,
 		};
+		TerminalSortPersist.ViewMode = _viewMode;
 		_repo.UpdateView();
 	}
 

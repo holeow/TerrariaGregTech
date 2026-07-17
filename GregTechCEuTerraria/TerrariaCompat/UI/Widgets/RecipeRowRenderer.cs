@@ -264,14 +264,29 @@ public static class RecipeRowRenderer
 
 	private static string ConditionSummary(GTRecipe recipe)
 	{
-		if (recipe.Conditions.Count == 0) return "";
 		var sb = new System.Text.StringBuilder();
+
+		string heat = HeatRequirement(recipe);
+		if (heat.Length > 0) sb.Append(heat);
+
 		foreach (var c in recipe.Conditions)
 		{
 			if (sb.Length > 0) sb.Append("   ");
 			sb.Append(ConditionText(c));
 		}
 		return sb.ToString();
+	}
+
+	private static string HeatRequirement(GTRecipe recipe)
+	{
+		if (recipe.Data is null || !recipe.Data.ContainsKey("ebf_temp")) return "";
+		int kelvin = Common.Recipe.GTRecipeModifiers.ReadDataInt(recipe.Data, "ebf_temp");
+		if (kelvin <= 0) return "";
+
+		foreach (var coil in Api.Block.CoilType.All)
+			if (coil.Temperature >= kelvin)
+				return $"Heat: {kelvin:N0} K ({Humanize(coil.Name)})";
+		return $"Heat: {kelvin:N0} K";
 	}
 
 	private static string ConditionText(RecipeCondition c)

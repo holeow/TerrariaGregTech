@@ -7,70 +7,24 @@ using PredicatesNs = GregTechCEuTerraria.Api.Pattern.Predicates;
 
 namespace GregTechCEuTerraria.Api.Pattern;
 
-// ADAPTED - 2D matcher equivalent of
-// com.gregtechceu.gtceu.api.pattern.BlockPattern (657 LOC upstream, ~120 here).
-//
-// Upstream's matcher is heavily 3D-coupled - `.aisle("XXX", ...)` rows stack
-// along an axis, the front-facing direction picks one of four 90deg rotations
-// to try, and `setRepeatable(...)` aisles allow variable-height structures.
-// Our 2D world strips most of that:
-//
-//   - The shape is a flat `string[]` (rows top-to-bottom, cols left-to-right).
-//     No aisles.
-//   - No rotation pass - Terraria placement has no facing.
-//   - No mirror/flip pass for v1 (could add later; trivially: re-test with
-//     each row's chars reversed).
-//   - No in-matcher repeat - variable-size multis (DistillationTower etc.)
-//     compose their final shape (top + Nxrepeat + bottom) at the caller
-//     level and pass the materialised `string[]` here. The matcher tries
-//     each candidate N in turn until one matches.
-//   - 2x2-tile stepping: every shape cell == 2 Terraria tiles in each axis.
-//     The shape's controller cell maps to the controller's anchor tile;
-//     other cells map to anchor +/- `col*2, row*2`.
-//
-// === Algorithm ==============================================================
-//
-//   1. Find the shape cell whose char's predicate has IsController = true.
-//      That's (controllerCol, controllerRow). The matcher needs exactly one.
-//   2. Origin tile = controllerAnchor - (controllerCol * 2, controllerRow * 2).
-//   3. Iterate every (col, row) cell:
-//        - Compute tile coord (origin + col*2, origin + row*2).
-//        - Call `state.Update(tileX, tileY, predicate)`.
-//        - If `predicate.AddCache()`, record the tile in `state.Cache`.
-//        - If the cell's MetaMachine implements `IMultiPart`, add to the
-//          match-context "parts" set (subject to sharing rules).
-//        - Run `predicate.Test(state)`. Fail -> return false.
-//   4. Verify all per-predicate min-count constraints are met (each
-//      `state.GlobalCount[predicate] >= predicate.MinCount`).
-//   5. On success, the state's `Cache` + "parts" set describe the formed
-//      structure; the controller persists them.
-//
-// `savePredicate` mirrors upstream - when true, the matcher records a
-// `tileLong -> predicate` map in the match-context's "predicates" entry so
-// post-match code can look up which predicate matched each cell (used by
-// hatches in upstream to know their I/O role from the controller's pattern).
 public class BlockPattern : IBlockPattern
 {
 	public readonly string[] Shape;
 	public readonly IReadOnlyDictionary<char, TraceabilityPredicate> Predicates;
 
-	// Controller-cell coords in shape space, computed once at ctor. Exposed
-	// for the preview renderer (it needs the same anchor math the matcher
-	// uses to position ghost cells relative to the controller's tile).
 	public int ControllerCol { get; }
 	public int ControllerRow { get; }
 
-	// Width of each row (every row must be the same length).
 	public readonly int Width;
 	public readonly int Height;
 
-	public BlockPattern(string[] shape, IReadOnlyDictionary<char, TraceabilityPredicate> predicates)
+	private readonly bool _validateReachable;
+
+	public BlockPattern(string[] shape, IReadOnlyDictionary<char, TraceabilityPredicate> predicates,
+		bool validateReachable = true)
 	{
 		Shape = shape;
-		// Universal '#' fallback - upstream convention is "interior empty /
-		// don't-care" cell; in 2D those become walk-through gaps the matcher
-		// shouldn't check at all. Saves every pattern factory from repeating
-		// `['#'] = Predicates.Any()`. Caller-supplied mapping wins if present.
+		_validateReachable = validateReachable;
 		if (!predicates.ContainsKey('#'))
 		{
 			var merged = new Dictionary<char, TraceabilityPredicate>(predicates) { ['#'] = PredicatesNs.Any() };
@@ -99,6 +53,30 @@ public class BlockPattern : IBlockPattern
 					$"BlockPattern: row {r} has length {Shape[r].Length}, expected {Width} " +
 					"(all rows must be the same width).");
 		}
+		if (_validateReachable)
+			WarnUnreachableRequiredChars(Predicates, Shape);
+	}
+
+	public static void WarnUnreachableRequiredChars(
+		IReadOnlyDictionary<char, TraceabilityPredicate> predicates, params string[] rows)
+	{
+		var used = new HashSet<char>();
+		foreach (var row in rows)
+			foreach (char ch in row)
+				used.Add(ch);
+
+		foreach (var kv in predicates)
+		{
+			if (used.Contains(kv.Key)) continue;
+			foreach (var sp in kv.Value.Limited)
+			{
+				if (sp.MinCount <= 0) continue;
+				Terraria.ModLoader.ModLoader.GetMod("GregTechCEuTerraria").Logger.Warn(
+					$"BlockPattern: char '{kv.Key}' requires a minimum of {sp.MinCount} but never appears " +
+					"in the shape this structure is impossible");
+				break;
+			}
+		}
 	}
 
 	private (int Col, int Row) FindController()
@@ -126,8 +104,6 @@ public class BlockPattern : IBlockPattern
 		return hit.Value;
 	}
 
-	// Run the matcher. `state.ControllerPosX/Y` is the anchor tile of the
-	// controller's 2x2 block. Returns true on match.
 	public bool CheckPatternAt(MultiblockState state, bool savePredicate = false)
 	{
 		state.Clean();
@@ -137,12 +113,6 @@ public class BlockPattern : IBlockPattern
 
 		for (int row = 0; row < Height; row++)
 		{
-			// Each shape row = one layer (a horizontal Y-aligned strip in 2D,
-			// upstream's per-aisle layer in 3D). `setMaxLayerLimited(N)` /
-			// `setMinLayerLimited(N)` are PER-layer, so the layer counter
-			// resets when we move to a new row. Without this reset,
-			// `setMaxLayerLimited(1)` silently acts as a global cap and
-			// shapes with one allowed-per-row hatch on multiple rows fail.
 			state.LayerCount.Clear();
 			for (int col = 0; col < Width; col++)
 			{
@@ -169,9 +139,6 @@ public class BlockPattern : IBlockPattern
 					}
 				}
 
-				// If the cell hosts a part machine, add it to the parts set
-				// (unless it's already bound to a different controller and
-				// disallows sharing).
 				bool canPartShared = true;
 				if (state.GetMachine() is IMultiPart part)
 				{
@@ -194,33 +161,16 @@ public class BlockPattern : IBlockPattern
 
 				if (!predicate.Test(state) || !canPartShared)
 				{
-					// Cell didn't match any of its allowed predicates (player put
-					// the wrong block here) AND no inner predicate set a more
-					// specific error (e.g. MaxCount overflow -> SinglePredicateError).
-					// Without this catch-all, the matcher returns false with
-					// state.Error=null and the player sees a bare "Structure not
-					// formed" line with no hint of WHICH cell is wrong. Default
-					// PatternError.ErrorInfo reads "Wrong block at (X, Y):
-					// expected <candidates>" off the current cell's predicate
-					// candidates - actionable for every pattern type.
 					if (state.Error == null)
 						state.SetError(new Error.PatternError());
 					return false;
 				}
 
-				// Record IO role for this cell (consumed by the controller
-				// when aggregating its parts' handlers).
 				var ioMap = state.MatchContext.GetOrCreate("ioMap", () => new Dictionary<long, Capability.Recipe.IO>());
 				ioMap[MultiblockState.PackPos(tileX, tileY)] = state.Io;
 			}
 		}
 
-		// All cells matched - verify min-count constraints. A predicate that
-		// has MinCount > 0 but never matched any cell is also a failure: seed
-		// every reachable Limited predicate at count 0 here so the iteration
-		// below catches them. (Without this, e.g. a cleanroom missing its
-		// required maintenance hatch silently forms because the maintenance
-		// predicate never landed in GlobalCount.)
 		foreach (var predicate in Predicates.Values)
 		{
 			foreach (var sp in predicate.Limited)

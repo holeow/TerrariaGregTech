@@ -98,9 +98,11 @@ public sealed class EncodedPatternItem : ModItem, ITextureWarmUp
 				tooltips.Add(new TooltipLine(Mod, "me_pattern_out", $"  {amount}x {what.GetDisplayName()}"));
 		}
 
-		if (Pattern.Type == MePatternType.Crafting && Pattern.StationTile >= 0)
+		if (Pattern.Type == MePatternType.Crafting)
 			tooltips.Add(new TooltipLine(Mod, "me_pattern_station",
-				$"  station: {StationName(Pattern.StationTile)}"));
+				Pattern.StationTile >= 0
+					? $"  station: {StationName(Pattern.StationTile)}"
+					: "  station: not required"));
 	}
 
 	private static string ShortTag(string tag)

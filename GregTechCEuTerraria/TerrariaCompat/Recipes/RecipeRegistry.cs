@@ -6,9 +6,6 @@ using GregTechCEuTerraria.Api.Recipe;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// Station-keyed GTRecipe index. Populated by RecipeJsonLoader at Mod.Load.
-// Collapses upstream's GTRegistries.RECIPE_TYPES.get(id).getRecipes() to a
-// direct map - every JSON recipe knows its station up-front.
 public static class RecipeRegistry
 {
 	private static IReadOnlyDictionary<string, IReadOnlyList<GTRecipe>> _byStation =
@@ -29,9 +26,6 @@ public static class RecipeRegistry
 		Count = 0;
 	}
 
-	// Append after Set - used by NativeRecipeProxy Pass B which can only run
-	// after ModSystem.AddRecipes. Rebuilds the map so the next SearchRecipe
-	// sees the trie's count change and re-compiles.
 	public static void AppendAll(IDictionary<string, List<GTRecipe>> additions)
 	{
 		var map = new Dictionary<string, IReadOnlyList<GTRecipe>>(_byStation);
@@ -44,6 +38,15 @@ public static class RecipeRegistry
 				map[station] = extras;
 		}
 		Set(map);
+	}
+
+	public static void RemoveStations(params string[] stations)
+	{
+		var map = new Dictionary<string, IReadOnlyList<GTRecipe>>(_byStation);
+		bool changed = false;
+		foreach (var station in stations)
+			if (map.Remove(station)) changed = true;
+		if (changed) Set(map);
 	}
 
 	public static IReadOnlyList<GTRecipe> ForStation(string station) =>

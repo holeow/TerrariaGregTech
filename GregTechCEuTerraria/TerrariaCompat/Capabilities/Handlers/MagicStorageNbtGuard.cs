@@ -7,25 +7,29 @@ using Terraria.Chat;
 using Terraria.ID;
 using Terraria.Localization;
 using Terraria.ModLoader;
+using Terraria.ModLoader.Default;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Capabilities.Handlers;
 
 public static class MagicStorageNbtGuard
 {
 	private const string Message =
-		"Magic Storage has some NBT-holding items (non-empty drums, non-empty super tanks, non-empty fluid cells). " +
-		"This can lead to item duping because Magic Storage doesn't handle items with custom data properly. " +
+		"Magic Storage has some NBT-holding items (non-empty drums, non-empty super tanks, non-empty fluid cells) " +
+		"or items from missing mods (shown as \"Unloaded Item\"). " +
+		"You won't be able to pipe/terminal those items because Magic Storage doesn't handle items with custom data properly. " +
 		"Please don't store those kinds of items in Magic Storage, use chests or crates for now";
 
 	private static bool _warned;
+	private static uint _lastWarnTick;
 
 	public static bool HasWarned => _warned;
 
-	public static void Reset() => _warned = false;
+	public static void Reset() { _warned = false; _lastWarnTick = 0; }
 
 	public static bool HoldsCustomData(Item? item)
 	{
 		if (item is null || item.IsAir) return false;
+		if (item.ModItem is UnloadedItem) return true;
 		if (item.ModItem is FluidCellItem cell && !cell.GetFluidStack().IsEmpty) return true;
 		if (item.TryGetGlobalItem<MachinePortableData>(out var data) && data.Data is { Count: > 0 }) return true;
 		return false;
@@ -33,10 +37,12 @@ public static class MagicStorageNbtGuard
 
 	public static void Warn()
 	{
-		if (_warned) return;
-		_warned = true;
+		if (_warned && Main.GameUpdateCount - _lastWarnTick < 120) return;
+		_lastWarnTick = Main.GameUpdateCount;
 
-		ModContent.GetInstance<GregTechCEuTerraria>().Logger.Error(Message);
+		if (!_warned)
+			ModContent.GetInstance<GregTechCEuTerraria>().Logger.Error(Message);
+		_warned = true;
 
 		var color = new Color(255, 120, 120);
 		if (Main.netMode == NetmodeID.Server)

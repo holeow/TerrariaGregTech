@@ -8,7 +8,7 @@ available_recipe_map_1: 可用配方类型：%s
 available_recipe_map_2: 可用配方类型：%s，%s
 available_recipe_map_3: 可用配方类型：%s，%s，%s
 available_recipe_map_4: 可用配方类型：%s，%s，%s，%s
-block_breaker: "[c/AAAAAA:挖掘正面的方块并收集掉落物]"
+block_breaker: "[c/AAAAAA:Mines a column of blocks below it, or fells and replants trees to its sides]"
 buffer: 存储物品和流体的小小缓冲器
 central_monitor: 但它能运行《毁灭战士》吗？
 charcoal_pile: 不烤面包烤燃料的地下面包房

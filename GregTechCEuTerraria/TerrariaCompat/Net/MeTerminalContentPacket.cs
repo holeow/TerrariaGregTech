@@ -12,17 +12,50 @@ namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
 public static class MeTerminalContentPacket
 {
+	private const int MaxPayloadBytes = 60000;
+
+	private static readonly MemoryStream _measureBuf = new();
+	private static readonly BinaryWriter _measureW = new(_measureBuf);
+
 	public static void SendTo(int toClient, Point16 pos, bool fullUpdate, List<GridInventoryEntry> entries)
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		var p = NetRouter.NewPacket(PacketType.MeTerminalContent);
-		p.Write(pos.X);
-		p.Write(pos.Y);
-		p.Write(fullUpdate);
-		p.Write7BitEncodedInt(entries.Count);
-		foreach (var e in entries)
-			WriteEntry(p, e);
-		p.Send(toClient: toClient);
+
+		int i = 0;
+		bool first = true;
+		do
+		{
+			var p = NetRouter.NewPacket(PacketType.MeTerminalContent);
+			p.Write(pos.X);
+			p.Write(pos.Y);
+			p.Write(first && fullUpdate);
+
+			int start = i;
+			int size = 0;
+			while (i < entries.Count)
+			{
+				int entrySize = MeasureEntry(entries[i]);
+				if (i > start && size + entrySize > MaxPayloadBytes)
+					break;
+				size += entrySize;
+				i++;
+			}
+
+			p.Write7BitEncodedInt(i - start);
+			for (int j = start; j < i; j++)
+				WriteEntry(p, entries[j]);
+			p.Send(toClient: toClient);
+			first = false;
+		}
+		while (i < entries.Count);
+	}
+
+	private static int MeasureEntry(GridInventoryEntry e)
+	{
+		_measureBuf.SetLength(0);
+		WriteEntry(_measureW, e);
+		_measureW.Flush();
+		return (int)_measureBuf.Length;
 	}
 
 	private static void WriteEntry(BinaryWriter w, GridInventoryEntry e)

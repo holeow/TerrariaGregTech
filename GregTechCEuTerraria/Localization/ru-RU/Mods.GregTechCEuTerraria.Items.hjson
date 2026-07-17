@@ -32594,7 +32594,7 @@ tempered_glass: {
 
 terminal: {
 	DisplayName: Терминал
-	Tooltip: SHIFT+ПКМ на котроллере чтобы автоматически собрать многоблочную структуру из предметов в вашем инвентаре
+	// Tooltip: ""
 }
 
 the_end_marker: {

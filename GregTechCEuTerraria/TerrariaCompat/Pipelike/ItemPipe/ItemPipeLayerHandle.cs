@@ -46,6 +46,7 @@ public sealed class ItemPipeLayerHandle : IGridLayerHandle
 
 	internal static void NotifyAdjacentCoversNeighborChanged(int x, int y)
 	{
+		PipeRenderer.InvalidateGeom(x, y);
 		foreach (var (_, dx, dy) in IODirectionExtensions.Cardinal4)
 		{
 			int nx = x + dx, ny = y + dy;

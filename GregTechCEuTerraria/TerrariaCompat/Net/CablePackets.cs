@@ -9,10 +9,6 @@ using Terraria.ModLoader;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Cable-layer sync (place / remove / late-join). Client mutates locally +
-// ships; server applies + echoes. Server-initiated burnouts go to ALL
-// clients via SendRemoveBroadcast. Cable cells are immutable post-place so
-// last-write-wins is safe.
 public static class CablePackets
 {
 	private static void WriteCell(BinaryWriter w, CableCell cell)
@@ -114,16 +110,16 @@ public static class CablePackets
 	public static void HandleLayerRequest(BinaryReader r, int whoAmI)
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		var p = NetRouter.NewPacket(PacketType.CableLayerFull);
-		int n = CableLayerSystem.Cables.Count;
-		p.Write(n);
-		foreach (var kv in CableLayerSystem.Cables.All)
+		LargePacket.Send(PacketType.CableLayerFull, p =>
 		{
-			p.Write((short)kv.Key.x);
-			p.Write((short)kv.Key.y);
-			WriteCell(p, kv.Value);
-		}
-		p.Send(toClient: whoAmI);
+			p.Write(CableLayerSystem.Cables.Count);
+			foreach (var kv in CableLayerSystem.Cables.All)
+			{
+				p.Write((short)kv.Key.x);
+				p.Write((short)kv.Key.y);
+				WriteCell(p, kv.Value);
+			}
+		}, toClient: whoAmI);
 	}
 
 	public static void HandleLayerFull(BinaryReader r)

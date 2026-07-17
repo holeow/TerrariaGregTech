@@ -32594,7 +32594,7 @@ tempered_glass: {
 
 terminal: {
 	DisplayName: Terminal
-	Tooltip: Shift + R-Klick auf einen Controller, um automatisch einen Multiblock mit Itemsn aus Ihrem Inventar zu erstellen
+	// Tooltip: ""
 }
 
 the_end_marker: {

@@ -30,7 +30,7 @@ public static class BossDropRegistry
 	{
 		new("Steam", new[] { "copper", "tin", "sulfur" },                       null),
 		new("LV",    new[] { "iron", "nickel", "redstone", "ender_pearl_gem" }, null),
-		new("MV",    new[] { "gold", "silver", "aluminium", "ender_pearl_gem" },null),
+		new("MV",    new[] { "gold", "silver", "sapphire", "ender_pearl_gem" },null),
 		new("HV",    new[] { "platinum", "bauxite" },                           null),
 		new("EV",    new[] { "magnesite", "ilmenite" },                         null),
 		new("IV",    new[] { "tungstate" },                                     null),

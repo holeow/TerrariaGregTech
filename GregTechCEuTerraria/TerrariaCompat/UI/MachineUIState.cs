@@ -695,7 +695,8 @@ public sealed class MachineUIState : UIModalWindow
 	{
 		if (_uiDims is { } d) return d;
 		float uiScale = Main.UIScale <= 0 ? 1f : Main.UIScale;
-		var dims = (Main.screenWidth / uiScale, Main.screenHeight / uiScale);
+		var orig = Terraria.GameInput.PlayerInput.OriginalScreenSize;
+		var dims = (orig.X / uiScale, orig.Y / uiScale);
 		_uiDims = dims;
 		return dims;
 	}

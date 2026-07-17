@@ -71,6 +71,46 @@ public static class PipeRenderer
 		finally { sb.End(); }
 	}
 
+	private struct PipeGeom
+	{
+		public int Mask;
+		public int Thickness;
+		public int FluidCapacity;
+		public Color BaseTint;
+		public Texture2D? ConnUp, ConnDown, ConnLeft, ConnRight;
+	}
+
+	private const int GeomTtlFrames = 300;
+	private static readonly Dictionary<(int x, int y), PipeGeom> _fluidGeom = new();
+	private static readonly Dictionary<(int x, int y), PipeGeom> _itemGeom  = new();
+
+	public static void ClearGeomCaches()
+	{
+		_fluidGeom.Clear();
+		_itemGeom.Clear();
+	}
+
+	public static void InvalidateGeom(int x, int y)
+	{
+		Drop(x, y);
+		Drop(x, y - 1); Drop(x, y + 1);
+		Drop(x - 1, y); Drop(x + 1, y);
+	}
+
+	public static void InvalidateGeomAround(int x, int y)
+	{
+		for (int dy = -3; dy <= 3; dy++)
+		for (int dx = -3; dx <= 3; dx++)
+			Drop(x + dx, y + dy);
+	}
+
+	private static void Drop(int x, int y)
+	{
+		var key = (x, y);
+		_fluidGeom.Remove(key);
+		_itemGeom.Remove(key);
+	}
+
 	private static void DrawLayer<TCell>(SpriteBatch sb, GridLayer<TCell> layer, PipeKind kind, bool foreground)
 		where TCell : struct
 	{
@@ -82,93 +122,104 @@ public static class PipeRenderer
 		var tex = PipeBodyArt.Tex(PipeSideTex);
 		if (tex is null) return;
 
+		var geomCache = kind == PipeKind.Fluid ? _fluidGeom : _itemGeom;
+		uint frame = Main.GameUpdateCount;
+
 		foreach (var kv in layer.All)
 		{
 			int x = kv.Key.x;
 			int y = kv.Key.y;
 			if (x < firstX || x > lastX || y < firstY || y > lastY) continue;
 
-			(string materialId, PipeSize size, bool restrictive) = ReadCell(kv.Value, kind);
-			int mask = layer.ConnectionMask(x, y) | EndpointMask(kind, x, y);
+			uint phase = (uint)(((x * 13 + y * 7) % GeomTtlFrames + GeomTtlFrames) % GeomTtlFrames);
+			if (!geomCache.TryGetValue(kv.Key, out var g) || (frame + phase) % GeomTtlFrames == 0)
+			{
+				(string materialId, PipeSize size, bool restrictive) = ReadCell(kv.Value, kind);
+				g = BuildGeom(kind, x, y, materialId, size, restrictive, layer.ConnectionMask(x, y));
+				geomCache[kv.Key] = g;
+			}
 
 			Vector2 pos = new Vector2(
 				x * 16 - (int)Main.screenPosition.X,
 				y * 16 - (int)Main.screenPosition.Y);
 
 			Color light = foreground ? Color.White : Lighting.GetColor(x, y);
+			Color tint  = Mul(g.BaseTint, light);
 
-			Color tint = MaterialColor(materialId);
-			if (restrictive) tint = Darken(tint, 0.55f);
-			tint = Mul(tint, light);
-
-			PipeBodyArt.DrawCell(sb, tex, pos, mask, ThicknessFor(size), tint);
+			PipeBodyArt.DrawCell(sb, tex, pos, g.Mask, g.Thickness, tint);
 
 			if (kind == PipeKind.Fluid)
-				DrawFluidFill(sb, x, y, pos, mask, size, light);
+				DrawFluidFill(sb, x, y, pos, g.Mask, g.Thickness, g.FluidCapacity, light);
 			else
-				DrawItemDots(sb, x, y, pos, mask, light);
+				DrawItemDots(sb, x, y, pos, g.Mask, light);
 
-			DrawSideConnectors(sb, x, y, kind, pos);
+			DrawConnectors(sb, pos, in g, Lighting.GetColor(x, y));
 		}
 	}
 
-	private static int EndpointMask(PipeKind kind, int x, int y)
+	private static PipeGeom BuildGeom(PipeKind kind, int x, int y, string materialId, PipeSize size,
+	                                  bool restrictive, int connMask)
 	{
 		var pcv = kind == PipeKind.Fluid
 			? FluidPipeLayerSystem.GetSides(x, y)
 			: ItemPipeLayerSystem .GetSides(x, y);
-		if (pcv is null) return 0;
-		int m = 0;
-		foreach (var side in CoverSides.All)
+
+		Color baseTint = MaterialColor(materialId);
+		if (restrictive) baseTint = Darken(baseTint, 0.55f);
+
+		var g = new PipeGeom { Thickness = ThicknessFor(size), BaseTint = baseTint };
+
+		if (kind == PipeKind.Fluid)
 		{
-			if (pcv.GetMode(side) == PipeSideMode.Off) continue;
-			if (PipeNeighborProbe.ProbeAt(x, y, side, kind) != SideNeighbourKind.Inventory) continue;
-			m |= side switch
-			{
-				CoverSide.Up    => 1,
-				CoverSide.Down  => 2,
-				CoverSide.Left  => 4,
-				CoverSide.Right => 8,
-				_               => 0,
-			};
+			var c = FluidPipeLayerSystem.Pipes.CellAt(x, y);
+			g.FluidCapacity = c.HasValue ? System.Math.Max(1, c.Value.Throughput * 20) : 1;
 		}
-		return m;
+
+		int endpointMask = 0;
+		if (pcv is not null)
+		{
+			foreach (var side in CoverSides.All)
+			{
+				var mode = pcv.GetMode(side);
+				if (mode == PipeSideMode.Off) continue;
+				if (PipeNeighborProbe.ProbeAt(x, y, side, kind) != SideNeighbourKind.Inventory) continue;
+
+				endpointMask |= side switch
+				{
+					CoverSide.Up    => 1,
+					CoverSide.Down  => 2,
+					CoverSide.Left  => 4,
+					CoverSide.Right => 8,
+					_               => 0,
+				};
+
+				var conn = ConnectorTex(kind, mode, pcv, side);
+				switch (side)
+				{
+					case CoverSide.Up:    g.ConnUp    = conn; break;
+					case CoverSide.Down:  g.ConnDown  = conn; break;
+					case CoverSide.Left:  g.ConnLeft  = conn; break;
+					case CoverSide.Right: g.ConnRight = conn; break;
+				}
+			}
+		}
+
+		g.Mask = connMask | endpointMask;
+		return g;
+	}
+
+	private static void DrawConnectors(SpriteBatch sb, Vector2 pos, in PipeGeom g, Color light)
+	{
+		if (g.ConnUp is null && g.ConnDown is null && g.ConnLeft is null && g.ConnRight is null) return;
+		Vector2 center = pos + new Vector2(8, 8);
+		Vector2 origin = new Vector2(8, 8);
+		if (g.ConnDown  is not null) sb.Draw(g.ConnDown,  center, null, light, 0f,                                origin, 1f, SpriteEffects.None, 0f);
+		if (g.ConnLeft  is not null) sb.Draw(g.ConnLeft,  center, null, light, MathHelper.PiOver2,                origin, 1f, SpriteEffects.None, 0f);
+		if (g.ConnUp    is not null) sb.Draw(g.ConnUp,    center, null, light, MathHelper.Pi,                     origin, 1f, SpriteEffects.None, 0f);
+		if (g.ConnRight is not null) sb.Draw(g.ConnRight, center, null, light, MathHelper.Pi + MathHelper.PiOver2, origin, 1f, SpriteEffects.None, 0f);
 	}
 
 	private const string ConnectorDir = "GregTechCEuTerraria/Content/TerrariaCompat/Connectors";
-
-	private static void DrawSideConnectors(SpriteBatch sb, int x, int y, PipeKind kind, Vector2 cellScreenPos)
-	{
-		var pcv = kind == PipeKind.Fluid
-			? FluidPipeLayerSystem.GetSides(x, y)
-			: ItemPipeLayerSystem .GetSides(x, y);
-		if (pcv is null) return;
-
-		Color light = Lighting.GetColor(x, y);
-
-		foreach (var side in CoverSides.All)
-		{
-			var mode = pcv.GetMode(side);
-			if (mode == PipeSideMode.Off) continue;
-
-			var probe = PipeNeighborProbe.ProbeAt(x, y, side, kind);
-			if (probe != SideNeighbourKind.Inventory) continue;
-
-			var conn = ConnectorTex(kind, mode, pcv, side);
-			if (conn is null) continue;
-
-			float rotation = side switch
-			{
-				CoverSide.Down  => 0f,
-				CoverSide.Left  => MathHelper.PiOver2,
-				CoverSide.Up    => MathHelper.Pi,
-				CoverSide.Right => MathHelper.Pi + MathHelper.PiOver2,
-				_               => 0f,
-			};
-			sb.Draw(conn, cellScreenPos + new Vector2(8, 8), null, light, rotation,
-				new Vector2(8, 8), 1f, SpriteEffects.None, 0f);
-		}
-	}
 
 	private static Texture2D? ConnectorTex(PipeKind kind, PipeSideMode mode, PipeCoverable pcv, CoverSide side)
 	{
@@ -259,26 +310,24 @@ public static class PipeRenderer
 
 	private static float Frac(float v) => v - (float)System.Math.Floor(v);
 
-	private static void DrawFluidFill(SpriteBatch sb, int x, int y, Vector2 pos, int mask, PipeSize size, Color light)
+	private static void DrawFluidFill(SpriteBatch sb, int x, int y, Vector2 pos, int mask, int thickness,
+	                                  int capacity, Color light)
 	{
-		var (fluid, fill) = GetPipeFluid(x, y);
+		var (fluid, fill) = GetPipeFluid(x, y, capacity);
 		if (fluid is null || fill <= 0f) return;
 		if (!FluidIconRenderer.TryGetFrame(fluid, out var ftex, out var fsrc, out var fbase) || ftex is null)
 			return;
-		int maxInner = System.Math.Max(2, ThicknessFor(size) - 2);
+		int maxInner = System.Math.Max(2, thickness - 2);
 		int inner    = System.Math.Max(1, (int)(maxInner * fill + 0.5f));
 		PipeBodyArt.DrawCellStretch(sb, ftex, fsrc, pos, mask, inner, Mul(fbase, light));
 	}
 
-	private static (FluidType? fluid, float fill) GetPipeFluid(int x, int y)
+	private static (FluidType? fluid, float fill) GetPipeFluid(int x, int y, int capacity)
 	{
 		if (Main.netMode == Terraria.ID.NetmodeID.MultiplayerClient)
 		{
 			if (Fluid.FluidPipeLayerSystem.ClientTankSnapshots.TryGetValue((x, y), out var stacks) && stacks != null)
-			{
-				int cap = ClientCapacity(x, y);
-				foreach (var f in stacks) if (!f.IsEmpty) return (f.Type, Frac(f.Amount, cap));
-			}
+				foreach (var f in stacks) if (!f.IsEmpty) return (f.Type, Frac(f.Amount, capacity));
 			return (null, 0f);
 		}
 		var st = Fluid.FluidPipeLayerSystem.GetState(x, y);
@@ -286,12 +335,6 @@ public static class PipeRenderer
 		int cap2 = st.CapacityPerTank;
 		foreach (var f in st.GetContainedFluids()) if (!f.IsEmpty) return (f.Type, Frac(f.Amount, cap2));
 		return (null, 0f);
-	}
-
-	private static int ClientCapacity(int x, int y)
-	{
-		var c = Fluid.FluidPipeLayerSystem.Pipes.CellAt(x, y);
-		return c.HasValue ? System.Math.Max(1, c.Value.Throughput * 20) : 1;
 	}
 
 	private static float Frac(int amount, int cap)

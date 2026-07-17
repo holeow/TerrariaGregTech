@@ -34,21 +34,24 @@ public sealed class PipeSettingsState : UIModalWindow
 		public readonly PipeCoverable.PipeFilterType FilterType;
 		public readonly System.Type?      CoverType;
 		public readonly int               TransferMode;
+		public readonly int               Io;
+		public readonly bool              FilterAmounts;
 
 		public SideSignature(SideNeighbourKind kind, PipeSideMode mode,
-			PipeCoverable.PipeFilterType filterType, System.Type? coverType, int transferMode)
+			PipeCoverable.PipeFilterType filterType, System.Type? coverType, int transferMode, int io, bool filterAmounts)
 		{
 			Kind = kind; Mode = mode; FilterType = filterType;
-			CoverType = coverType; TransferMode = transferMode;
+			CoverType = coverType; TransferMode = transferMode; Io = io; FilterAmounts = filterAmounts;
 		}
 
 		public bool Equals(SideSignature o) =>
 			Kind == o.Kind && Mode == o.Mode && FilterType == o.FilterType &&
-			ReferenceEquals(CoverType, o.CoverType) && TransferMode == o.TransferMode;
+			ReferenceEquals(CoverType, o.CoverType) && TransferMode == o.TransferMode && Io == o.Io &&
+			FilterAmounts == o.FilterAmounts;
 
 		public override bool Equals(object? obj) => obj is SideSignature s && Equals(s);
 		public override int GetHashCode() =>
-			System.HashCode.Combine((int)Kind, (int)Mode, (int)FilterType, CoverType, TransferMode);
+			System.HashCode.Combine((int)Kind, (int)Mode, (int)FilterType, CoverType, TransferMode, Io, FilterAmounts);
 		public static bool operator ==(SideSignature a, SideSignature b) =>  a.Equals(b);
 		public static bool operator !=(SideSignature a, SideSignature b) => !a.Equals(b);
 	}
@@ -62,7 +65,9 @@ public sealed class PipeSettingsState : UIModalWindow
 			mode:         (pcv is PipeCoverable pipe) ? pipe.GetMode(side) : PipeSideMode.Off,
 			filterType:   (PipeCoverable.PipeFilterType)CurrentFilterType(side),
 			coverType:    cov?.GetType(),
-			transferMode: ActiveTransferMode(cov) is { } t ? (int)t : -1);
+			transferMode: ActiveTransferMode(cov) is { } t ? (int)t : -1,
+			io:           (pcv is PipeCoverable p && PipeCoverable.ActiveIoAt(p, side) is { } io) ? (int)io : -1,
+			filterAmounts: FilterSuppliesAmounts(cov, _layer == PipeKind.Fluid));
 	}
 
 	public PipeKind Layer => _layer;
@@ -413,6 +418,10 @@ public sealed class PipeSettingsState : UIModalWindow
 		             : (cover.UiItemFilter ?.IsBlackList ?? false);
 	}
 
+	private static bool FilterSuppliesAmounts(CoverBehavior? cover, bool fluid) =>
+		fluid ? cover?.UiFluidFilter is { IsBlackList: false }
+		      : cover?.UiItemFilter  is { IsBlackList: false };
+
 	private static bool TryReadFilterModeAllowFlow(CoverBehavior? cover, out FilterMode mode, out ManualIOMode flow)
 	{
 		switch (cover)
@@ -561,13 +570,23 @@ public sealed class PipeSettingsState : UIModalWindow
 		var activeTm = ActiveTransferMode(activeCover);
 		if (activeTm is not null && activeTm.Value != TransferMode.TransferAny)
 		{
+			bool keepExactInPull = activeTm == TransferMode.KeepExact
+				&& PipeCoverable.ActiveIoAt(pcv, side) == IO.IN;
+			bool filterSuppliesAmount = FilterSuppliesAmounts(activeCover, isFluid);
+			bool amountDead = keepExactInPull || filterSuppliesAmount;
+			string deadTooltip = keepExactInPull
+				? "Keep Exact keeps nothing in Pull - switch to Push, or use Exact / Any"
+				: "A whitelist filter's slots set the per-type amount - this field is unused";
+
 			int limitField = ActiveLimitField(activeCover);
 			rowY += btnH + rowGap;
-			cell.Append(new UIText("Amount:", 0.55f)
+			var amountLabel = new UIText("Amount:", 0.55f)
 			{
 				Left = StyleDimension.FromPixels(x),
 				Top  = StyleDimension.FromPixels(rowY + 3),
-			});
+			};
+			if (amountDead) amountLabel.TextColor = new Microsoft.Xna.Framework.Color(110, 110, 125);
+			cell.Append(amountLabel);
 			cell.Append(new UITextField(
 				current: () => (ActiveGlobalLimit(pcv.GetCoverAtSide(side)) ?? 0L).ToString(),
 				onConfirm: txt => { if (long.TryParse(txt, out long v))
@@ -575,7 +594,9 @@ public sealed class PipeSettingsState : UIModalWindow
 				maxLength: 10,
 				filter: ch => ch >= '0' && ch <= '9',
 				placeholder: "per-type amount",
-				tooltip: "Per-type amount used by Exact / Keep Exact modes.")
+				tooltip: "Per-type amount used by Exact / Keep Exact modes",
+				isDisabled: () => amountDead,
+				disabledTooltip: deadTooltip)
 			{
 				Left   = StyleDimension.FromPixels(x + 50),
 				Top    = StyleDimension.FromPixels(rowY),

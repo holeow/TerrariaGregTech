@@ -11,10 +11,6 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Pipe-layer sync (item + fluid under one packet family, kind byte first).
-// Authority model matches CablePackets: client mutates locally + ships,
-// server applies + echoes to other clients. Late-join via PipeLayerRequest.
-// Pipe cells are immutable post-place, so last-write-wins is safe.
 public static class PipePackets
 {
 	private static void WriteItem(BinaryWriter w, ItemPipeCell c)
@@ -93,8 +89,6 @@ public static class PipePackets
 		p.Send();
 	}
 
-	// Laser cells have zero payload (single NORMAL variant upstream) - only
-	// the kind byte + coords ship.
 	public static void SendPlacedLaser(int x, int y)
 	{
 		if (Main.netMode == NetmodeID.SinglePlayer) return;
@@ -105,8 +99,6 @@ public static class PipePackets
 		p.Send();
 	}
 
-	// Optical cells have zero payload (single NORMAL variant upstream) - only
-	// the kind byte + coords ship.
 	public static void SendPlacedOptical(int x, int y)
 	{
 		if (Main.netMode == NetmodeID.SinglePlayer) return;
@@ -117,8 +109,6 @@ public static class PipePackets
 		p.Send();
 	}
 
-	// LD cells carry a single Type byte (item / fluid). No open-mask: LD pipes
-	// bend/branch freely, connectivity is implicit same-type adjacency.
 	public static void SendPlacedLongDistance(int x, int y, LongDistancePipeType type)
 	{
 		if (Main.netMode == NetmodeID.SinglePlayer) return;
@@ -156,9 +146,6 @@ public static class PipePackets
 
 		if (kind == PipeKind.Optical)
 		{
-			// ConnectOnPlace recomputes the <=2 reciprocal connections from the
-			// (synced) layer state - deterministic, so server + every client
-			// converge to the same open-masks without shipping them per-place.
 			if (Main.netMode == NetmodeID.Server)
 			{
 				OpticalConn.ConnectOnPlace(OpticalPipeLayerSystem.Pipes, x, y);
@@ -176,8 +163,6 @@ public static class PipePackets
 
 		if (kind == PipeKind.Laser)
 		{
-			// ConnectOnPlace recomputes the straight-only connections from the
-			// (synced) layer - deterministic, so server + clients converge.
 			if (Main.netMode == NetmodeID.Server)
 			{
 				LaserConn.ConnectOnPlace(LaserPipeLayerSystem.Pipes, x, y);
@@ -191,7 +176,6 @@ public static class PipePackets
 			if (Main.netMode == NetmodeID.MultiplayerClient)
 			{
 				LaserConn.ConnectOnPlace(LaserPipeLayerSystem.Pipes, x, y);
-				// Net rebuild fires on PostUpdateEverything when IsDirty is set.
 			}
 			return;
 		}
@@ -349,72 +333,76 @@ public static class PipePackets
 	{
 		if (Main.netMode != NetmodeID.Server) return;
 		var kind = (PipeKind)r.ReadByte();
-		var p = NetRouter.NewPacket(PacketType.PipeLayerFull);
-		p.Write((byte)kind);
-		if (kind == PipeKind.LongDistance)
-		{
-			var layer = LongDistancePipeLayerSystem.Pipes;
-			p.Write(layer.Count);
-			foreach (var kv in layer.All)
-			{
-				p.Write((short)kv.Key.x);
-				p.Write((short)kv.Key.y);
-				p.Write((byte)kv.Value.Type);
-			}
-			p.Send(toClient: whoAmI);
-			return; // No covers on LD pipes; skip the cover sync.
-		}
-		if (kind == PipeKind.Optical)
-		{
-			var layer = OpticalPipeLayerSystem.Pipes;
-			p.Write(layer.Count);
-			foreach (var kv in layer.All)
-			{
-				p.Write((short)kv.Key.x);
-				p.Write((short)kv.Key.y);
-				p.Write(kv.Value.Open);   // late-joiner can't replay placement order
-			}
-			p.Send(toClient: whoAmI);
-			return; // No covers on optical pipes; skip the cover sync.
-		}
-		if (kind == PipeKind.Laser)
-		{
-			var layer = LaserPipeLayerSystem.Pipes;
-			p.Write(layer.Count);
-			foreach (var kv in layer.All)
-			{
-				p.Write((short)kv.Key.x);
-				p.Write((short)kv.Key.y);
-				p.Write(kv.Value.Open);   // late-joiner can't replay placement order
-			}
-			p.Send(toClient: whoAmI);
-			return; // No covers on laser pipes; skip the cover sync.
-		}
-		if (kind == PipeKind.Fluid)
-		{
-			var layer = FluidPipeLayerSystem.Pipes;
-			p.Write(layer.Count);
-			foreach (var kv in layer.All)
-			{
-				p.Write((short)kv.Key.x);
-				p.Write((short)kv.Key.y);
-				WriteFluid(p, kv.Value);
-			}
-		}
-		else
-		{
-			var layer = ItemPipeLayerSystem.Pipes;
-			p.Write(layer.Count);
-			foreach (var kv in layer.All)
-			{
-				p.Write((short)kv.Key.x);
-				p.Write((short)kv.Key.y);
-				WriteItem(p, kv.Value);
-			}
-		}
-		p.Send(toClient: whoAmI);
 
-		// Late-join cover sync - one PipeCoverable blob per configured side.
+		LargePacket.Send(PacketType.PipeLayerFull, p =>
+		{
+			p.Write((byte)kind);
+			switch (kind)
+			{
+				case PipeKind.LongDistance:
+				{
+					var layer = LongDistancePipeLayerSystem.Pipes;
+					p.Write(layer.Count);
+					foreach (var kv in layer.All)
+					{
+						p.Write((short)kv.Key.x);
+						p.Write((short)kv.Key.y);
+						p.Write((byte)kv.Value.Type);
+					}
+					break;
+				}
+				case PipeKind.Optical:
+				{
+					var layer = OpticalPipeLayerSystem.Pipes;
+					p.Write(layer.Count);
+					foreach (var kv in layer.All)
+					{
+						p.Write((short)kv.Key.x);
+						p.Write((short)kv.Key.y);
+						p.Write(kv.Value.Open);
+					}
+					break;
+				}
+				case PipeKind.Laser:
+				{
+					var layer = LaserPipeLayerSystem.Pipes;
+					p.Write(layer.Count);
+					foreach (var kv in layer.All)
+					{
+						p.Write((short)kv.Key.x);
+						p.Write((short)kv.Key.y);
+						p.Write(kv.Value.Open);
+					}
+					break;
+				}
+				case PipeKind.Fluid:
+				{
+					var layer = FluidPipeLayerSystem.Pipes;
+					p.Write(layer.Count);
+					foreach (var kv in layer.All)
+					{
+						p.Write((short)kv.Key.x);
+						p.Write((short)kv.Key.y);
+						WriteFluid(p, kv.Value);
+					}
+					break;
+				}
+				default:
+				{
+					var layer = ItemPipeLayerSystem.Pipes;
+					p.Write(layer.Count);
+					foreach (var kv in layer.All)
+					{
+						p.Write((short)kv.Key.x);
+						p.Write((short)kv.Key.y);
+						WriteItem(p, kv.Value);
+					}
+					break;
+				}
+			}
+		}, toClient: whoAmI);
+
+		if (kind != PipeKind.Fluid && kind != PipeKind.Item) return;
 		var sides = kind == PipeKind.Fluid
 			? FluidPipeLayerSystem.AllSides
 			: ItemPipeLayerSystem .AllSides;
@@ -437,7 +425,6 @@ public static class PipePackets
 				var type = (LongDistancePipeType)r.ReadByte();
 				LongDistancePipeLayerSystem.Pipes.Set(x, y, new LongDistancePipeCell(type));
 			}
-			// IsDirty auto-set; net rebuild fires on next PostUpdateEverything.
 			return;
 		}
 		if (kind == PipeKind.Optical)
@@ -462,8 +449,6 @@ public static class PipePackets
 				byte open = r.ReadByte();
 				LaserPipeLayerSystem.Pipes.Set(x, y, new LaserPipeCell { Open = open });
 			}
-			// IsDirty auto-set; LaserPipeNetSystem.MaybeRebuild rebuilds the
-			// client-side net on next PostUpdateEverything.
 			return;
 		}
 		if (kind == PipeKind.Fluid)
@@ -485,8 +470,6 @@ public static class PipePackets
 				int y = r.ReadInt16();
 				ItemPipeLayerSystem.Pipes.Set(x, y, ReadItem(r));
 			}
-			// Pipes.IsDirty auto-set; net rebuild fires on next
-			// PostUpdateEverything via ItemPipeNetSystem.MaybeRebuild.
 		}
 	}
 }

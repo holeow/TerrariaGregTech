@@ -20,20 +20,21 @@ public static class EnergyNetStatsPacket
 		for (int i = 0; i < nets.Count; i++)
 			if (Active(nets[i])) n++;
 
-		var p = NetRouter.NewPacket(PacketType.EnergyNetStats);
-		p.Write(n);
-		for (int i = 0; i < nets.Count; i++)
+		LargePacket.Send(PacketType.EnergyNetStats, p =>
 		{
-			var net = nets[i];
-			if (!Active(net)) continue;
-			var anchor = net.AnchorCell;
-			p.Write((short)anchor.x);
-			p.Write((short)anchor.y);
-			p.Write(net.LastTickExtracted);
-			p.Write(net.LastTickDelivered);
-			p.Write((byte)(net.SmoothedLoad * 255f));
-		}
-		p.Send();
+			p.Write(n);
+			for (int i = 0; i < nets.Count; i++)
+			{
+				var net = nets[i];
+				if (!Active(net)) continue;
+				var anchor = net.AnchorCell;
+				p.Write((short)anchor.x);
+				p.Write((short)anchor.y);
+				p.Write(net.LastTickExtracted);
+				p.Write(net.LastTickDelivered);
+				p.Write((byte)(net.SmoothedLoad * 255f));
+			}
+		});
 	}
 
 	public static void HandleOnClient(BinaryReader r)

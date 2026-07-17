@@ -32594,7 +32594,7 @@ tempered_glass: {
 
 terminal: {
 	DisplayName: Terminal
-	Tooltip: Clique com Shift + Botão Direito em um controlador para construir automaticamente um multibloco com itens do seu inventário
+	// Tooltip: ""
 }
 
 the_end_marker: {

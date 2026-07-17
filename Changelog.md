@@ -1,3 +1,33 @@
+## 0.0.10
+
+Fat steam multis update, other multis will be eventually updated too, to fit the small scale of terraria zoom which makes most multis look too weak
+
+Important:
+- Fixed lag on unloaded tml items in terminal and terminal overflow (thanks holeow)
+- Fixed subnet merging with main net in some configurations (thanks 404岛主)
+- Fixed blocking mode ignoring subnet contents (thanks holeow)
+
+Qol:
+- Added back button to recipe browser
+- Added persistence to sort buttons in terminal (thanks 404岛主)
+- Changed mv bosses to drop sapphire instead of aluminium (thanks holeow)
+- Changed shapes for steam oven and grinder (thanks Tama)
+- Fixed cleanroom paused state (thanks Bup Supreme)
+- Fixed fusion reactor max energy tier
+- Fixed fishing junk roll (thanks Bup Supreme)
+- Fixed terminal open click leaking into terminal (thanks holeow)
+
+Visuals:
+- Added texture to history of logistics (thanks Flareguy)
+- Added coil temp into recipe browser (thanks TheHatShallDie)
+- Changed pipe filtering options to hide irrelevant fields (thanks Bup Supreme)
+- Fixed fluid pipe rendering performance (thanks Bup Supreme)
+- Fixed distillation tower insufficient output tooltip (thanks TheBobster)
+- Fixed duplicated smelting recipes in recipe browser (thanks holeow)
+- Fixed chest name render in storage bus (thanks Tama)
+- Fixed widgets positioning when opening through the world space modal
+- Fixed multitool preview render for ME cables (thanks holeow)
+
 ## 0.0.9
 
 Important:

@@ -84,15 +84,16 @@ public static class MeCablePackets
 	public static void HandleLayerRequest(BinaryReader r, int whoAmI)
 	{
 		if (Main.netMode != NetmodeID.Server) return;
-		var p = NetRouter.NewPacket(PacketType.MeCableLayerFull);
-		p.Write(MeCableLayerSystem.Cables.Count);
-		foreach (var kv in MeCableLayerSystem.Cables.All)
+		LargePacket.Send(PacketType.MeCableLayerFull, p =>
 		{
-			p.Write((short)kv.Key.x);
-			p.Write((short)kv.Key.y);
-			WriteCell(p, kv.Value);
-		}
-		p.Send(toClient: whoAmI);
+			p.Write(MeCableLayerSystem.Cables.Count);
+			foreach (var kv in MeCableLayerSystem.Cables.All)
+			{
+				p.Write((short)kv.Key.x);
+				p.Write((short)kv.Key.y);
+				WriteCell(p, kv.Value);
+			}
+		}, toClient: whoAmI);
 	}
 
 	public static void HandleLayerFull(BinaryReader r)

@@ -40,6 +40,9 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 	private uint _openedTick = uint.MaxValue;
 	private bool OpenedThisFrame => _openedTick == Main.GameUpdateCount;
 
+	private bool _openPressHeld;
+	private uint _openPressTick = uint.MaxValue;
+
 	private string? _parentLayer;
 
 	private bool _pendingClose;
@@ -50,6 +53,8 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 		_parentLayer = parentLayer;
 		UILayers.Push(LayerName);
 		_openedTick = Main.GameUpdateCount;
+		_openPressHeld = Main.mouseLeft || Main.mouseRight;
+		_openPressTick = Main.GameUpdateCount;
 	}
 
 	protected void CloseInternal()
@@ -116,8 +121,18 @@ public abstract class ModalUISystem : ModSystem, IModalHost
 	}
 
 	private bool InputBlocked()
-		=> UILayers.IsCursorOverHigherModal(LayerName) || OpenedThisFrame
+	{
+		MaintainOpenPress();
+		return UILayers.IsCursorOverHigherModal(LayerName) || OpenedThisFrame || _openPressHeld
 			|| UILayers.PressBelongsToAnotherModal(LayerName);
+	}
+
+	private void MaintainOpenPress()
+	{
+		if (!_openPressHeld || _openPressTick == Main.GameUpdateCount) return;
+		_openPressTick = Main.GameUpdateCount;
+		if (!Main.mouseLeft && !Main.mouseRight) _openPressHeld = false;
+	}
 
 	public override void PostUpdateInput()
 	{

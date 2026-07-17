@@ -69,6 +69,7 @@ public sealed class ItemPipeLayerSystem : ModSystem
 		Pipes.Clear();
 		foreach (var c in _sides.Values) ((ICoverable)c).OnCoversUnload();
 		_sides.Clear();
+		PipeRenderer.ClearGeomCaches();
 	}
 
 	public override void PostDrawTiles()

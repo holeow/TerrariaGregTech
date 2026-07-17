@@ -32,7 +32,7 @@ internal abstract class MultitoolLayer
 	public abstract List<MultitoolVariant> Variants(Player p);
 
 	public virtual int AffordableTiles(in MultitoolVariant v, int width)
-		=> width > 0 ? v.Units / width : int.MaxValue;
+		=> width > 0 ? v.Units / width : v.Units;
 
 	public abstract bool HasCellAt(int x, int y);
 

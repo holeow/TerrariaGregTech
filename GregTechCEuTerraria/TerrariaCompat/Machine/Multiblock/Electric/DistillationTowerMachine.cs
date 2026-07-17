@@ -97,7 +97,7 @@ public sealed class DistillationTowerMachine : WorkableElectricMultiblockMachine
 				continue;
 			int accepted = tank.FillInternal(stack, simulate: true);
 			if (accepted < stack.Amount)
-				return ActionResult.Fail(null, FluidRecipeCapability.CAP, IO.OUT);
+				return ActionResult.Fail("gtceu.recipe_logic.insufficient_out", FluidRecipeCapability.CAP, IO.OUT);
 		}
 		return ActionResult.SUCCESS;
 	}

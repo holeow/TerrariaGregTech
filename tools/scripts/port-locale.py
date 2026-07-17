@@ -503,19 +503,19 @@ def _mc_to_terraria(s):
     return text.strip()
 
 
-_TOOLTIP_2D_OVERRIDES = {
-    "Place Water and Lava horizontally adjacent": None,
-    "Can be used to pick up crates without dropping their items": None,
-    "Mines block on front face and collects its drops":
+_TOOLTIP_LINE_OVERRIDES = {
+    **{(f"gtceu.machine.{mid}_rock_crusher.tooltip", 0): None
+       for mid in ("lv", "mv", "hv", "ev", "lp_steam", "hp_steam")},
+    ("gtceu.machine.block_breaker.tooltip", 0):
         "§7Mines a column of blocks below it, or fells and replants trees to its sides",
+    ("item.gtceu.terminal.tooltip", 0): None,
 }
 
 
-def _convert_tooltip(v):
-    """_mc_to_terraria + the 2D-deviation override. Returns None to drop the line."""
-    key = re.sub("§.", "", v).strip()
-    if key in _TOOLTIP_2D_OVERRIDES:
-        repl = _TOOLTIP_2D_OVERRIDES[key]
+def _convert_tooltip(v, key=None, idx=0):
+    """_mc_to_terraria + the port-deviation override. Returns None to drop the line."""
+    if (key, idx) in _TOOLTIP_LINE_OVERRIDES:
+        repl = _TOOLTIP_LINE_OVERRIDES[(key, idx)]
         if repl is None:
             return None
         v = repl
@@ -536,7 +536,8 @@ def _item_tooltip(lang, iid):
             n += 1
         if raw:
             text = "\n".join(raw)
-            out = [c for ln in text.split("\n") if (c := _convert_tooltip(ln)) is not None]
+            out = [c for i, ln in enumerate(text.split("\n"))
+                   if (c := _convert_tooltip(ln, base, i)) is not None]
             return "\n".join(out) if out else None
     return None
 
@@ -564,7 +565,7 @@ def emit_machine_tooltips(lines, indent, lang):
                 continue
             # includes available_recipe_map_N templates (appended by
             # MachineTooltipLookup to multi-type defs).
-            conv = _convert_tooltip(v)
+            conv = _convert_tooltip(v, k)
             if conv is None:
                 continue
             out[_MACHINE_TOOLTIP_ALIASES.get(mid, mid)] = conv
@@ -574,7 +575,7 @@ def emit_machine_tooltips(lines, indent, lang):
             continue
         mid, n = m.group(1), int(m.group(2))
         mid = _MACHINE_TOOLTIP_ALIASES.get(mid, mid)
-        conv = _convert_tooltip(v)
+        conv = _convert_tooltip(v, k)
         if conv is None:
             continue
         out[f"{mid}_{n}"] = conv

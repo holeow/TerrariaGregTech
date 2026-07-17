@@ -6,8 +6,6 @@ using Terraria.ID;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Net;
 
-// Periodic per-pipe TransferredItems broadcast (every 10 ticks via
-// ItemPipeNetSystem.PostUpdateWorld). Idle pipes skipped.
 public static class PipeStatsPacket
 {
 	public static void Broadcast()
@@ -18,17 +16,18 @@ public static class PipeStatsPacket
 		foreach (var kv in ItemPipeLayerSystem.AllSides)
 			if (kv.Value.TransferredItems > 0) n++;
 
-		var p = NetRouter.NewPacket(PacketType.PipeStats);
-		p.Write(n);
-		foreach (var kv in ItemPipeLayerSystem.AllSides)
+		LargePacket.Send(PacketType.PipeStats, p =>
 		{
-			int v = kv.Value.TransferredItems;
-			if (v <= 0) continue;
-			p.Write((short)kv.Key.x);
-			p.Write((short)kv.Key.y);
-			p.Write(v);
-		}
-		p.Send();
+			p.Write(n);
+			foreach (var kv in ItemPipeLayerSystem.AllSides)
+			{
+				int v = kv.Value.TransferredItems;
+				if (v <= 0) continue;
+				p.Write((short)kv.Key.x);
+				p.Write((short)kv.Key.y);
+				p.Write(v);
+			}
+		});
 	}
 
 	public static void HandleOnClient(BinaryReader r)

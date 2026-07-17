@@ -42,8 +42,6 @@ internal abstract class SimplePipeMultitoolLayer : MultitoolLayer
 		return list;
 	}
 
-	public override int AffordableTiles(in MultitoolVariant v, int width) => v.Units;
-
 	public override bool HasCellAt(int x, int y)
 	{
 		foreach (var k in Kinds) if (k.Has(x, y)) return true;

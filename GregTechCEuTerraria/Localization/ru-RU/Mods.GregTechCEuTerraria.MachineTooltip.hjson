@@ -8,7 +8,7 @@ available_recipe_map_1: Доступные рецепты: %s
 available_recipe_map_2: Доступные рецепты: %s, %s
 available_recipe_map_3: Доступные рецепты: %s, %s, %s
 available_recipe_map_4: Доступные рецепты: %s, %s, %s, %s
-block_breaker: "[c/AAAAAA:Разрушает блок перед собой и подбирает то, что выпало]"
+block_breaker: "[c/AAAAAA:Mines a column of blocks below it, or fells and replants trees to its sides]"
 buffer: Небольшой буфер для хранения предметов и жидкостей
 central_monitor: Но сможет ли он запустить Doom?
 charcoal_pile: Подземная топливная пекарня

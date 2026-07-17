@@ -1,46 +1,6 @@
 #nullable enable
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock;
 
-// =============================================================================
-//  Hand-authored 2D footprint per multiblock controller. Edit freely.
-// =============================================================================
-//
-//  Each entry mirrors upstream's `.aisle(...)` / `.where(...)` block (kept in a
-//  comment) from `common/data/machines/{GTMultiMachines,GCYMMachines,
-//  GTResearchMachines,GTMachineUtils}.java`; the `string[]` is the 2D footprint.
-//
-//  Tiered families that share a single pattern (large_boiler x4 casing
-//  materials, fusion_reactor x3 tiers, etc.) collapse to ONE shape entry; the
-//  concrete tier variants are listed in the entry's comment.
-//
-//  Char conventions (mirrored from upstream where they agree across multis;
-//  per-multi overrides - including which letter is the controller - are in
-//  each entry's `.where(...)` comment):
-//    S / Y / O    controller block (one per shape)
-//    X / H        casing
-//    C            heating coil
-//    P            inner pipe / catalyst
-//    M            muffler-ability slot
-//    #            air / hollow
-//
-//  Variable-size patterns (upstream `.setRepeatable(min, max)`) are declared
-//  with the `RepeatableShape` record instead of a `string[]`:
-//
-//      public static readonly RepeatableShape DistillationTower = new(
-//          Head:       new RowPattern[] { "XXXXX", "X#S#X" },   // top rows (fixed)
-//          Body:       new RowPattern[] { "X###X" },             // repeated 0..10 times
-//          Tail:       new RowPattern[] { "X###X", "XXXXX" },   // bottom rows (fixed)
-//          MinVerticalRepeats: 0,
-//          MaxVerticalRepeats: 10,
-//          Axis:       RepeatAxis.Vertical);         // grows downward
-//
-//  Use `RepeatAxis.Horizontal` for assembly-line-style multis that grow
-//  along the X axis instead - Head/Body/Tail then become left/middle/right
-//  column-segments, each with the same row count. The matcher iterates
-//  N = MinRepeats..MaxRepeats and picks the first N that matches the world.
-//
-//  Removed from the port (do NOT add entries for these): charcoal_pile_igniter,
-//  central_monitor.
 public static class MultiblockShapes
 {
 	// =========================================================================
@@ -1391,9 +1351,11 @@ public static class MultiblockShapes
 	// .where('X', blocks(CASING_BRONZE_BRICKS.get()) .or(Predicates.abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1)) .or(Predicates.abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1)) .or(Predicates.abilities(PartAbility.STEAM).setExactLimit(1)))
 	public static readonly string[] SteamGrinder =
 	{
-		"XXX",
-		"XSX",
-		"XXX",
+		"XXXXX",
+		"XXXXX",
+		"XXSXX",
+		"XXXXX",
+		"XXXXX",
 	};
 
 	// =========================================================================
@@ -1412,9 +1374,10 @@ public static class MultiblockShapes
 	// .where('F', blocks(FIREBOX_BRONZE.get()) .or(Predicates.abilities(PartAbility.STEAM).setExactLimit(1)))
 	public static readonly string[] SteamOven =
 	{
-		"#X#",
-		"XSX",
-		"XXX",
+		"#XXX#",
+		"XXXXX",
+		"XXSXX",
+		"FFFFF",
 	};
 
 	// =========================================================================

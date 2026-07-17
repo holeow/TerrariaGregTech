@@ -123,6 +123,8 @@ public static class NetRouter
 
 			case PacketType.ToiletAura:       ToiletAuraPacket.Handle(reader, whoAmI); break;
 
+			case PacketType.Fragment:         LargePacket.HandleFragment(reader, whoAmI); break;
+
 			default:
 				NetHelpers.LogBadPacket("dispatch", $"unknown PacketType={(byte)type} from whoAmI={whoAmI}");
 				break;

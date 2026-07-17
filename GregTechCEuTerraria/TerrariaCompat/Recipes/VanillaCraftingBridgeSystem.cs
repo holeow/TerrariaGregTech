@@ -30,6 +30,7 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		NativeRecipeProxy.SynthesizeFromTerrariaRecipes();
 		BlockBridgedRecipesFromMagicStorageRecursion();
 		GateSubstitutedIngotShimmer();
+		RecipeRegistry.RemoveStations("smelting", "blasting");
 	}
 
 	private void GateSubstitutedIngotShimmer()

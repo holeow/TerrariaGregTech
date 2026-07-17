@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -341,9 +342,52 @@ def is_stripped_wood_recipe(recipe_id, obj):
 
 REMOVED_RECIPE_TYPES = (
     "minecraft:smithing_transform",
+    "minecraft:blasting",
     "gtceu:crafting_facade_cover",
     "gtceu:crafting_tool_head_replace",
 )
+
+_ORE_ITEM_RE = re.compile(r"^gtceu:(.+)_ore$")
+
+
+def _ingredient_item_id(ing):
+    if not isinstance(ing, dict):
+        return None
+    if "item" in ing:
+        return ing["item"]
+    if "ingredient" in ing:
+        return _ingredient_item_id(ing["ingredient"])
+    return None
+
+
+def _input_item_ids(entry):
+    ids = []
+    ing = entry.get("ingredient")
+    if isinstance(ing, dict):
+        iid = _ingredient_item_id(ing)
+        if iid:
+            ids.append(iid)
+    inputs = entry.get("inputs")
+    if isinstance(inputs, dict):
+        for c in inputs.get("item", []):
+            content = c.get("content", c) if isinstance(c, dict) else c
+            iid = _ingredient_item_id(content)
+            if iid:
+                ids.append(iid)
+    return ids
+
+
+def is_redundant_ore_recipe(entry, all_ids):
+    items = _input_item_ids(entry)
+    if len(items) != 1:
+        return False
+    m = _ORE_ITEM_RE.match(items[0])
+    if not m:
+        return False
+    material = m.group(1)
+    rid = entry["id"]
+    twin = rid.replace(f"{material}_ore", f"raw_{material}_ore", 1)
+    return twin != rid and twin in all_ids
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -404,6 +448,13 @@ def main():
 
     if not recipes:
         raise SystemExit("No recipes found - check --input path.")
+
+    all_ids = {e["id"] for e in recipes}
+    before_ore = len(recipes)
+    recipes = [e for e in recipes if not is_redundant_ore_recipe(e, all_ids)]
+    dropped_ore = before_ore - len(recipes)
+    if dropped_ore:
+        print(f"  dropped {dropped_ore:,} ore-block recipes duplicating their raw-material twin")
 
     if dropped_wood:
         print(f"  dropped {dropped_wood:,} non-oak wood-species recipes (kept oak only)")

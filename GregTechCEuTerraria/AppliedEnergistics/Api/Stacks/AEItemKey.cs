@@ -30,7 +30,7 @@ public sealed class AEItemKey : AEKey
 	{
 		_item = item;
 		_tag = tag;
-		_hashCode = item;
+		_hashCode = HashCode.Combine(item, CanonicalTag.Hash(tag));
 	}
 
 	public static AEItemKey? Of(Item stack)
@@ -83,14 +83,14 @@ public sealed class AEItemKey : AEKey
 			return true;
 		if (o is not AEItemKey k)
 			return false;
-		return _item == k._item && ItemLoader.CanStack(GetReadOnlyStack(), k.GetReadOnlyStack());
+		return _hashCode == k._hashCode && _item == k._item && CanonicalTag.Equal(_tag, k._tag);
 	}
 
 	public override int GetHashCode() => _hashCode;
 
 	public bool Matches(Item stack) =>
 		stack is not null && !stack.IsAir && stack.type == _item
-		&& ItemLoader.CanStack(GetReadOnlyStack(), stack);
+		&& CanonicalTag.Equal(_tag, ExtractIdentityTag(stack));
 
 	public bool Matches(Ingredient ingredient) => ingredient.Test(GetReadOnlyStack());
 

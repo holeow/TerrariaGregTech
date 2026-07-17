@@ -10,7 +10,7 @@ namespace GregTechCEuTerraria.TerrariaCompat.Items;
 public sealed class HistoryOfLogisticsItem : ModItem
 {
 	public override string Name => "the_history_of_logistics";
-	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/TooManyItemsItem";
+	public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/lore";
 
 	private const string LoreTitle = "The History of Logistics";
 

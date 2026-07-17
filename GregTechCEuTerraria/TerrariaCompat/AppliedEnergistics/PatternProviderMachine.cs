@@ -5,6 +5,7 @@ using GregTechCEuTerraria.AppliedEnergistics.Api.Config;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Networking.Security;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Storage;
+using GregTechCEuTerraria.AppliedEnergistics.Me.Storage;
 using GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting;
 using GregTechCEuTerraria.TerrariaCompat.Capabilities;
 using GregTechCEuTerraria.TerrariaCompat.Cover;
@@ -383,17 +384,27 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 		}
 	}
 
-	private long InsertIntoCell((int x, int y, IODirection arrival) t, AEKey what, long amount, Actionable mode)
+	private MEStorage? FindTarget((int x, int y, IODirection arrival) t)
 	{
-		var src = IActionSource.Empty();
-		if (what is AEFluidKey)
-			return WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival) != null
-				? new FluidHandlerMeStorage(() => WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival)).Insert(what, amount, mode, src)
-				: 0;
-		return WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival) != null
-			? new ItemHandlerMeStorage(() => WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival)).Insert(what, amount, mode, src)
-			: 0;
+		if (MachineCellResolver.TryFindMachineAt(t.x, t.y, out var m) && m is IMeInventoryExposer exposer)
+		{
+			var meStorage = exposer.GetExposedInventory();
+			if (meStorage != null) return meStorage;
+		}
+
+		var externalStorages = new Dictionary<AEKeyType, MEStorage>();
+		if (WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival) != null)
+			externalStorages[AEKeyType.Items()] = new ItemHandlerMeStorage(
+				() => WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival), filterAvailableContents: false);
+		if (WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival) != null)
+			externalStorages[AEKeyType.Fluids()] = new FluidHandlerMeStorage(
+				() => WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival), filterAvailableContents: false);
+
+		return externalStorages.Count > 0 ? new CompositeStorage(externalStorages) : null;
 	}
+
+	private long InsertIntoCell((int x, int y, IODirection arrival) t, AEKey what, long amount, Actionable mode)
+		=> FindTarget(t)?.Insert(what, amount, mode, IActionSource.Empty()) ?? 0;
 
 	private bool CellAcceptsAll((int x, int y, IODirection arrival) t, KeyCounter[] inputHolder)
 	{
@@ -408,13 +419,12 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 	{
 		var inputs = AllPatternInputs();
 		if (inputs.Count == 0) return false;
+		var target = FindTarget(t);
+		if (target is null) return false;
 		var combined = new KeyCounter();
-		if (WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival) != null)
-			new ItemHandlerMeStorage(() => WorldCapability.ItemHandlerAt(t.x, t.y, t.arrival), filterAvailableContents: false).GetAvailableStacks(combined);
-		if (WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival) != null)
-			new FluidHandlerMeStorage(() => WorldCapability.FluidHandlerAt(t.x, t.y, t.arrival), filterAvailableContents: false).GetAvailableStacks(combined);
-		foreach (var key in inputs)
-			if (combined.Get(key) > 0) return true;
+		target.GetAvailableStacks(combined);
+		foreach (var entry in combined)
+			if (inputs.Contains(entry.Key.DropSecondary())) return true;
 		return false;
 	}
 
@@ -423,7 +433,7 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 		var set = new HashSet<AEKey>();
 		foreach (var p in Patterns)
 			foreach (var (what, _) in p.Inputs)
-				if (what != null) set.Add(what);
+				if (what != null) set.Add(what.DropSecondary());
 		return set;
 	}
 
