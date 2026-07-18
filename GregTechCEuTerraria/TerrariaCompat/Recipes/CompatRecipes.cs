@@ -770,12 +770,38 @@ public static class CompatRecipes
 	    "outputs": { "item": [ { "content": { "item": "terraria:Hellstone" } } ] } }
 	]
 	""";
+	private const string CreosoteCoating = """
+	[
+	  { "id": "crafting_shapeless/creosote_bucket_creosote_coating", "type": "minecraft:crafting_shapeless",
+	    "inputs":  { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "item": "GregTechCEuTerraria/creosote_bucket" } } }
+	    ] },
+	    "outputs": { "item": [ { "content":{ "type": "gtceu:sized", "count": 8,
+	      "ingredient": { "item": "gtceu:creosote_coating" } } } ] } },
+	  { "id": "crafting_shapeless/creosote_coating_treated_wood_planks", "type": "minecraft:crafting_shapeless",
+	    "inputs":  { "item": [
+	      { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "item": "GregTechCEuTerraria/creosote_coating" } } },
+		  { "content": { "type": "gtceu:sized", "count": 1, "ingredient": { "item": "GregTechCEuTerraria/wood_plate" } } }
+	    ] },
+	    "outputs": { "item": [ { "content":{ "type": "gtceu:sized", "count": 1,
+	      "ingredient": { "item": "gtceu:treated_wood_planks" } } } ] } },
+
+	  { "id": "fluid_solidifier/compat_creosote_creosote_coating", "type": "gtceu:fluid_solidifier", "duration": 300,
+	    "inputs": {
+	      "fluid": [ { "content": { "amount": 1000, "value": { "fluid": "gtceu:creosote" } } } ]
+	    },
+	    "tickInputs": { "eu": [ { "content": 8 } ] },
+	    "outputs": { "item": [ { "content":{ "type": "gtceu:sized", "count": 8,
+	      "ingredient": { "item": "gtceu:creosote_coating" } } } ] } }
+	]
+	""";
 
 	private static readonly string[] JsonGroups =
 	{
 		HatchesAndBuses, Bootstrap, Misc, SimplePipes, Casings, Clay,
 		TerrariaIntermediates, TerraPrisma, RedstoneGem, Coins, LegacyConversions,
 		Ae2FluixCables, Ae2Machines, Money, Damascus, Hellforge, HellstoneOre,
+		CreosoteCoating
 	};
 
 	public sealed record RecipePatch(string BaseId, string NewId, string MergeJson)
