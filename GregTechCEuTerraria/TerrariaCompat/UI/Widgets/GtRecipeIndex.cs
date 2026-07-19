@@ -28,11 +28,11 @@ public static class GtRecipeIndex
 	{
 		rec = null!;
 		index = -1;
-		if (!VanillaCraftingBridge.GTToVanilla.TryGetValue(g, out var r) || r is null || r.createItem.IsAir) return false;
+		var r = AppliedEnergistics.Crafting.CraftingRecipeResolver.FindForGtRecipe(g, out int found);
+		if (r is null || found < 0) return false;
 		rec = r;
-		for (int i = 0; i < Terraria.Recipe.numRecipes; i++)
-			if (ReferenceEquals(Main.recipe[i], r)) { index = i; return true; }
-		return false;
+		index = found;
+		return true;
 	}
 
 	private static void Build()
@@ -69,7 +69,7 @@ public static class GtRecipeIndex
 		for (int i = 0; i < list.Count; i++)
 		{
 			var r = list[i];
-			if (VanillaCraftingBridge.GTToVanilla.ContainsKey(r)) list[w++] = r;
+			if (AppliedEnergistics.Crafting.CraftingRecipeResolver.FindForGtRecipe(r, out _) != null) list[w++] = r;
 			else gt.Add(r);
 		}
 		for (int i = 0; i < gt.Count; i++) list[w++] = gt[i];

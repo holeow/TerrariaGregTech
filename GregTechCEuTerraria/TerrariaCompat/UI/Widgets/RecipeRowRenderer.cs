@@ -250,7 +250,7 @@ public static class RecipeRowRenderer
 
 	public static Terraria.Recipe? FindAvailableVanillaCraft(GTRecipe recipe)
 	{
-		if (!VanillaCraftingBridge.GTToVanilla.TryGetValue(recipe, out var rec)) return null;
+		var rec = AppliedEnergistics.Crafting.CraftingRecipeResolver.FindForGtRecipe(recipe, out _);
 		if (rec is null || rec.createItem.IsAir) return null;
 		int n = Main.numAvailableRecipes;
 		for (int i = 0; i < n; i++)

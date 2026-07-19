@@ -1,3 +1,15 @@
+## 0.0.12
+
+Minor bugfix
+
+Important:
+- Fixed data stick metadata (thanks Isenki)
+- Fixed manual crafting of the recipes that are done in both gt and vanilla stations (thanks TheHatShallDie)
+- Fixed assembly line 2+ fluid input hatches (thanks Isenki)
+
+Visuals:
+- Fixed magic storage warning unsafe items spam if piping from the heart (thanks Bup Supreme)
+
 ## 0.0.11
 
 Minor bugfix for better mod compatibility

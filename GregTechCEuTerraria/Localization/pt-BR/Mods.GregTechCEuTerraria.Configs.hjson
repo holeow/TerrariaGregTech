@@ -16,11 +16,6 @@ GTConfig: {
 		// Tooltip: ""
 	}
 
-	OrderedAssemblyLineFluids: {
-		// Tooltip: ""
-		// Label: Ordered Assembly Line Fluids
-	}
-
 	OrderedAssemblyLineItems: {
 		// Tooltip: ""
 		// Label: Ordered Assembly Line Items

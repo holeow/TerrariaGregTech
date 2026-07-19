@@ -375,8 +375,11 @@ public abstract class MultiblockControllerMachine : MetaMachine
 
 		if (ok)
 		{
-			SetFlipped(GetMultiblockState().NeededFlip);
-			OnStructureFormed();
+			if (unformed)
+			{
+				SetFlipped(GetMultiblockState().NeededFlip);
+				OnStructureFormed();
+			}
 		}
 		else if (IsFormed)
 		{

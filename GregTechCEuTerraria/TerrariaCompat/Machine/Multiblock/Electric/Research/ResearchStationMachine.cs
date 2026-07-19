@@ -199,16 +199,16 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			foreach (var content in recipe.GetOutputContents(ItemRecipeCapability.CAP))
 			{
 				if (content.Payload is not Ingredient ing) continue;
-				var (type, outNbt) = PeelItem(ing);
+				var (type, outNbt) = TerrariaCompat.Items.ResearchSnbt.PeelItem(ing);
 				if (type <= 0) continue;
 				var stack = new Item();
 				stack.SetDefaults(type);
 				if (!string.IsNullOrEmpty(outNbt))
 				{
-					var (rid, rtype) = ParseResearch(outNbt!);
+					var (rid, rtype) = TerrariaCompat.Items.ResearchSnbt.Parse(outNbt!);
 					if (!string.IsNullOrEmpty(rid))
 					{
-						var recType = GTRecipeType.Get(StripNs(rtype)) ?? recipe.RecipeType;
+						var recType = GTRecipeType.Get(rtype) ?? recipe.RecipeType;
 						ResearchManager.WriteResearchToStack(stack, rid, recType);
 					}
 				}
@@ -217,37 +217,5 @@ public class ResearchStationMachine : WorkableElectricMultiblockMachine, IOptica
 			return null;
 		}
 
-		private static (int type, string? nbt) PeelItem(Ingredient ing) => ing switch
-		{
-			SizedIngredient s          => PeelItem(s.Inner),
-			NBTPredicateIngredient nbt => (nbt.ItemType, nbt.OutputNbt),
-			ItemStackIngredient isi    => (isi.ItemType, null),
-			TagIngredient tag          => (tag.GetItems().Count > 0 ? tag.GetItems()[0].type : 0, null),
-			_                          => (0, null),
-		};
-
-		private static (string id, string type) ParseResearch(string snbt)
-		{
-			string id   = ExtractQuoted(snbt, "research_id");
-			string type = ExtractQuoted(snbt, "research_type");
-			return (id, type);
-		}
-
-		private static string ExtractQuoted(string snbt, string key)
-		{
-			int k = snbt.IndexOf(key, StringComparison.Ordinal);
-			if (k < 0) return "";
-			int q1 = snbt.IndexOf('"', k);
-			if (q1 < 0) return "";
-			int q2 = snbt.IndexOf('"', q1 + 1);
-			if (q2 < 0) return "";
-			return snbt.Substring(q1 + 1, q2 - q1 - 1);
-		}
-
-		private static string StripNs(string id)
-		{
-			int i = id.IndexOf(':');
-			return i >= 0 ? id[(i + 1)..] : id;
-		}
 	}
 }

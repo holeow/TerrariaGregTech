@@ -118,21 +118,12 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 		{
 			foreach (var content in recipe.GetOutputContents(ItemRecipeCapability.CAP))
 			{
-				int t = PeelItemType(content.Payload as Ingredient);
+				var (t, _) = ResearchSnbt.PeelItem(content.Payload as Ingredient);
 				if (t > 0) return t;
 			}
 		}
 		return -1;
 	}
-
-	private static int PeelItemType(Ingredient? ing) => ing switch
-	{
-		SizedIngredient s        => PeelItemType(s.Inner),
-		NBTPredicateIngredient n => n.ItemType,
-		ItemStackIngredient i    => i.ItemType,
-		TagIngredient t          => t.GetItems().Count > 0 ? t.GetItems()[0].type : 0,
-		_                        => 0,
-	};
 
 	private static string StripNs(string id)
 	{
@@ -140,27 +131,25 @@ public sealed class ResearchDataGlobalItem : GlobalItem
 		return i >= 0 ? id[(i + 1)..] : id;
 	}
 
-	// Stamp from recipe-ingredient SNBT so the recipe browser shows a researched output orb, not a blank.
+	public static void RegisterHooks()
+	{
+		NBTPredicateIngredient.ApplyOutputNbt = StampFromSnbt;
+	}
+
+	public static void UnloadHooks()
+	{
+		NBTPredicateIngredient.ApplyOutputNbt = null;
+	}
+
 	public static void StampFromSnbt(Item stack, string? snbt)
 	{
 		if (stack is null || stack.IsAir || string.IsNullOrEmpty(snbt)) return;
 		if (!IsDataItemType(stack.type)) return;
-		string rid = ExtractQuoted(snbt!, "research_id");
+		var (rid, rtype) = ResearchSnbt.Parse(snbt!);
 		if (string.IsNullOrEmpty(rid)) return;
 		var blob = stack.GetGlobalItem<ResearchDataGlobalItem>();
 		blob.ResearchId   = rid;
-		blob.ResearchType = StripNs(ExtractQuoted(snbt!, "research_type"));
-	}
-
-	private static string ExtractQuoted(string snbt, string key)
-	{
-		int k = snbt.IndexOf(key, System.StringComparison.Ordinal);
-		if (k < 0) return "";
-		int q1 = snbt.IndexOf('"', k);
-		if (q1 < 0) return "";
-		int q2 = snbt.IndexOf('"', q1 + 1);
-		if (q2 < 0) return "";
-		return snbt.Substring(q1 + 1, q2 - q1 - 1);
+		blob.ResearchType = rtype;
 	}
 
 	public override void ModifyTooltips(Item item, List<TooltipLine> tooltips)

@@ -8,10 +8,6 @@ using Terraria.ModLoader.IO;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Machine.Multiblock.Electric;
 
-// Verbatim port of PowerSubstationMachine.PowerStationEnergyBank.
-// Multi-array EU storage; cursor walks slots bottom-up fill / top-down drain
-// (upstream "stable last-touched battery" indexing). BigInteger totals -
-// UHV alone is Long.MaxValue.
 public sealed class PowerStationEnergyBank : MachineTrait
 {
 	public static readonly MachineTraitType<PowerStationEnergyBank> TYPE = new(allowMultipleInstances: false);
@@ -42,8 +38,6 @@ public sealed class PowerStationEnergyBank : MachineTrait
 		_capacity = Summarize(_maximums);
 	}
 
-	// Verbatim rebuild (422-436). Preserves stored EU across rebuilds; any EU
-	// above new total capacity is lost.
 	public void Rebuild(IReadOnlyList<IBatteryData> batteries)
 	{
 		if (batteries.Count == 0)
@@ -51,10 +45,10 @@ public sealed class PowerStationEnergyBank : MachineTrait
 				"Cannot rebuild Power Substation power bank with no batteries!");
 		long[] oldStorage = (long[])_storage.Clone();
 		SetupBatteries(batteries);
+		_index = 0;
 		foreach (long stored in oldStorage) Fill(stored);
 	}
 
-	// Verbatim fill (438-466). Returns amount banked.
 	public long Fill(long amount)
 	{
 		if (amount < 0)
@@ -76,7 +70,6 @@ public sealed class PowerStationEnergyBank : MachineTrait
 		return maxFill;
 	}
 
-	// Verbatim drain (468-497). Returns amount drained.
 	public long Drain(long amount)
 	{
 		if (amount < 0)
@@ -108,7 +101,6 @@ public sealed class PowerStationEnergyBank : MachineTrait
 		return false;
 	}
 
-	// Verbatim summarize (510-525). Folds running long sum into BigInteger on overflow.
 	private static BigInteger Summarize(long[] values)
 	{
 		BigInteger retVal = BigInteger.Zero;
@@ -126,8 +118,6 @@ public sealed class PowerStationEnergyBank : MachineTrait
 		return retVal;
 	}
 
-	// Verbatim getPassiveDrainPerTick (528-545). 1% capacity per 24h, capped at
-	// 100k EU/t per storage block.
 	public long GetPassiveDrainPerTick()
 	{
 		long[] maxExcl = new long[_maximums.Length];
@@ -148,8 +138,6 @@ public sealed class PowerStationEnergyBank : MachineTrait
 			capacityExcl / new BigInteger(PowerSubstationMachine.PassiveDrainDivisor)
 			+ new BigInteger(PowerSubstationMachine.PassiveDrainMaxPerStorage * numExcl));
 	}
-
-	// === Persistence ======================================================
 
 	public override void Save(TagCompound tag)
 	{
