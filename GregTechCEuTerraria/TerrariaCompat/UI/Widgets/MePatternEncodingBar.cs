@@ -136,17 +136,13 @@ public sealed class MePatternEncodingBar : UIElement
 
 	public static void FillFromRecipe(IMePatternEncodingHost term, GTRecipe gt)
 	{
-		if (VanillaCraftingBridge.GTToVanilla.ContainsKey(gt)) FillCrafting(term, gt);
+		var tr = CraftingRecipeResolver.FindForGtRecipe(gt, out _);
+		if (tr != null) FillCrafting(term, gt, tr);
 		else FillProcessing(term, gt);
 	}
 
-	private static void FillCrafting(IMePatternEncodingHost term, GTRecipe gt)
+	private static void FillCrafting(IMePatternEncodingHost term, GTRecipe gt, Terraria.Recipe tr)
 	{
-		if (!VanillaCraftingBridge.GTToVanilla.TryGetValue(gt, out var tr))
-		{
-			FillProcessing(term, gt);
-			return;
-		}
 		var inputs = new List<(AEKey, long)>();
 		var tags = new List<string?>();
 		foreach (var req in tr.requiredItem)

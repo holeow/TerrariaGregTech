@@ -51,15 +51,32 @@ public sealed class MagicStorageNbtScanSystem : ModSystem
 	[JITWhenModsEnabled("MagicStorage")]
 	private static void ScanHearts()
 	{
+		var logger = ModContent.GetInstance<GregTechCEuTerraria>().Logger;
+		Item? first = null;
+		Point16 firstHeart = default;
+		int count = 0;
+
 		foreach (var te in TileEntity.ByID.Values)
 		{
 			if (te is not TEStorageHeart heart) continue;
 			foreach (var item in heart.GetStoredItems())
 			{
 				if (!MagicStorageNbtGuard.HoldsCustomData(item)) continue;
-				MagicStorageNbtGuard.Warn();
-				return;
+				count++;
+				if (first is null) { first = item; firstHeart = heart.Position; }
+				logger.Warn($"[MagicStorageNbtScan] bad item: '{MagicStorageNbtGuard.Describe(item)}' " +
+					$"type={item.type} mod={item.ModItem?.GetType().Name ?? "-"} stack={item.stack} " +
+					$"heart=({heart.Position.X},{heart.Position.Y})");
 			}
 		}
+
+		if (first is null)
+		{
+			logger.Info("[MagicStorageNbtScan] no un-pipeable items found in Magic Storage");
+			return;
+		}
+
+		logger.Warn($"[MagicStorageNbtScan] {count} un-pipeable item stack(s) in Magic Storage");
+		MagicStorageNbtGuard.Warn($"ScanHearts heart=({firstHeart.X},{firstHeart.Y})", first);
 	}
 }

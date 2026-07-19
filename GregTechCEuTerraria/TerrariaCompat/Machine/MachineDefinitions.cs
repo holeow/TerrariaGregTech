@@ -1854,7 +1854,10 @@ public static class MachineDefinitions
 		var def = MachineRegistry.Get("assembly_line")!;
 		var steel = Predicates.Blocks("steel_machine_casing");
 		var energyIn   = Predicates.Abilities(Api.Machine.Multiblock.PartAbility.INPUT_ENERGY);
-		var fluidImport = Predicates.Abilities(Api.Machine.Multiblock.PartAbility.IMPORT_FLUIDS_1X);
+		var fluidImport = Predicates.Abilities(
+			Api.Machine.Multiblock.PartAbility.IMPORT_FLUIDS_1X,
+			Api.Machine.Multiblock.PartAbility.IMPORT_FLUIDS_4X,
+			Api.Machine.Multiblock.PartAbility.IMPORT_FLUIDS_9X);
 		var dataAccess = Predicates.Abilities(
 				Api.Machine.Multiblock.PartAbility.DATA_ACCESS,
 				Api.Machine.Multiblock.PartAbility.OPTICAL_DATA_RECEPTION)

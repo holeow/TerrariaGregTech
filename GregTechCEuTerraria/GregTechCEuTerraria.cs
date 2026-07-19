@@ -122,6 +122,7 @@ public sealed class GregTechCEuTerraria : Mod
 		TerrariaCompat.Tiles.CraftingStations.CraftingStationRegistry.RegisterAll(this);
 		Stage("Registering turbine rotors");
 		TerrariaCompat.Items.TurbineRotorItemLoader.Register(this);
+		TerrariaCompat.Items.ResearchDataGlobalItem.RegisterHooks();
 		TerrariaCompat.Pipelike.PipeIntersection.InstallHook();
 
 		var resolver = TerrariaCompat.Recipes.IngredientResolverImpl.Instance;
@@ -175,6 +176,7 @@ public sealed class GregTechCEuTerraria : Mod
 		TerrariaCompat.Items.Tools.GregithItemLoader.Unload();
 		TerrariaCompat.Items.Armor.ArmorItemLoader.Unload();
 		TerrariaCompat.Items.TurbineRotorItemLoader.Unload();
+		TerrariaCompat.Items.ResearchDataGlobalItem.UnloadHooks();
 		TerrariaCompat.Items.Registry.RegistryItemLoader.Unload();
 		TerrariaCompat.Items.Registry.RegistryTagLoader.Unload();
 		TerrariaCompat.Items.Covers.CoverItemLoader.Unload();

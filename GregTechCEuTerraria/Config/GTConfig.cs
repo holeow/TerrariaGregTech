@@ -62,9 +62,6 @@ public sealed class GTConfig : ModConfig
 	[DefaultValue(true)]
 	public bool OrderedAssemblyLineItems { get; set; } = true;
 
-	[DefaultValue(false)]
-	public bool OrderedAssemblyLineFluids { get; set; } = false;
-
 	public override void OnChanged()
 	{
 		TerrariaCompat.Profiler.Profiler.Enabled = EnableProfiler;

@@ -31,6 +31,7 @@ public sealed class VanillaCraftingBridgeSystem : ModSystem
 		BlockBridgedRecipesFromMagicStorageRecursion();
 		GateSubstitutedIngotShimmer();
 		RecipeRegistry.RemoveStations("smelting", "blasting");
+		AppliedEnergistics.Crafting.CraftingRecipeResolver.ClearResolvedCache();
 	}
 
 	private void GateSubstitutedIngotShimmer()

@@ -26,6 +26,13 @@ public static class MagicStorageNbtGuard
 
 	public static void Reset() { _warned = false; _lastWarnTick = 0; }
 
+	public static string Describe(Item item)
+	{
+		if (item.ModItem is UnloadedItem unloaded)
+			return $"{unloaded.ItemName} [{unloaded.ModName}]";
+		return item.Name;
+	}
+
 	public static bool HoldsCustomData(Item? item)
 	{
 		if (item is null || item.IsAir) return false;
@@ -35,19 +42,29 @@ public static class MagicStorageNbtGuard
 		return false;
 	}
 
-	public static void Warn()
+	public static void Warn(string source = "", Item? item = null)
 	{
 		if (_warned && Main.GameUpdateCount - _lastWarnTick < 120) return;
 		_lastWarnTick = Main.GameUpdateCount;
 
+		var logger = ModContent.GetInstance<GregTechCEuTerraria>().Logger;
+		string detail = item is null || item.IsAir
+			? source
+			: $"{source} item='{Describe(item)}' type={item.type} mod={item.ModItem?.GetType().Name ?? "-"} stack={item.stack}";
+		logger.Warn($"[MagicStorageNbtGuard] triggered by {detail} (netMode={Main.netMode}, tick={Main.GameUpdateCount})");
+
 		if (!_warned)
-			ModContent.GetInstance<GregTechCEuTerraria>().Logger.Error(Message);
+			logger.Error(Message);
 		_warned = true;
+
+		string chat = item is null || item.IsAir
+			? Message
+			: $"{Message} (e.g. \"{Describe(item)}\" x{item.stack})";
 
 		var color = new Color(255, 120, 120);
 		if (Main.netMode == NetmodeID.Server)
-			ChatHelper.BroadcastChatMessage(NetworkText.FromLiteral(Message), color);
+			ChatHelper.BroadcastChatMessage(NetworkText.FromLiteral(chat), color);
 		else if (Main.netMode == NetmodeID.SinglePlayer)
-			Main.NewText(Message, color.R, color.G, color.B);
+			Main.NewText(chat, color.R, color.G, color.B);
 	}
 }
