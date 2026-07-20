@@ -66,7 +66,7 @@ public class CustomItemStackHandler : IItemHandlerModifiable
 
 	public virtual bool IsItemValid(int slot, Item stack) => Filter(stack);
 
-	public virtual int GetSlotLimit(int slot) => Item.CommonMaxStack;
+	public virtual int GetSlotLimit(int slot) => 64;
 
 	public virtual Item Insert(int slot, Item item, bool simulate)
 	{

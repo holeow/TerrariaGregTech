@@ -20,6 +20,12 @@ public sealed class CrateMachine : MetaMachine, IItemHandler
 
 	public int InventorySize => Definition?.Capacity ?? 27;
 
+	private sealed class CrateStorage : Api.Transfer.CustomItemStackHandler
+	{
+		public CrateStorage(int size) : base(size) { }
+		public override int GetSlotLimit(int slot) => Item.CommonMaxStack;
+	}
+
 	private NotifiableItemStackHandler? _inventory;
 	public NotifiableItemStackHandler Inventory { get { EnsureTraits(); return _inventory!; } }
 
@@ -27,7 +33,8 @@ public sealed class CrateMachine : MetaMachine, IItemHandler
 	{
 		if (_inventory is not null) return;
 		BindDefinition();
-		_inventory = new NotifiableItemStackHandler(InventorySize, Api.Capability.Recipe.IO.BOTH);
+		_inventory = new NotifiableItemStackHandler(InventorySize, Api.Capability.Recipe.IO.BOTH,
+			Api.Capability.Recipe.IO.BOTH, n => new CrateStorage(n));
 		Traits.Attach(_inventory);
 		Traits.RegisterPersistent("inventory", _inventory);
 	}

@@ -268,6 +268,19 @@ public abstract class MetaMachine : ModTileEntity, ITickSubscription, ICoverable
 
 	public virtual bool IsItemValidForSlot(SlotGroup group, int index, Item item) => true;
 
+	public virtual int GetSlotLimitFor(SlotGroup group, int index)
+	{
+		var slots = GetSlotGroup(group);
+		if (slots is null) return Item.CommonMaxStack;
+		foreach (var trait in Traits.AllTraits)
+		{
+			if (trait is Api.Machine.Trait.NotifiableItemStackHandler nish &&
+			    ReferenceEquals(nish.Storage.Stacks, slots))
+				return nish.GetSlotLimit(index);
+		}
+		return Item.CommonMaxStack;
+	}
+
 	public virtual bool AcceptsOutputDeposit(int index, Item item) => false;
 
 	public virtual void NotifySlotGroupChanged(SlotGroup group)

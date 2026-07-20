@@ -39,10 +39,10 @@ public sealed class MachineShiftClickPlayer : ModPlayer
 			return true;
 		}
 
-		var (slots, _) = SlotAction.ResolveShiftInSlots(machine);
+		var (slots, group) = SlotAction.ResolveShiftInSlots(machine);
 		if (slots is null) return false;
 
-		int amount = SlotAction.FitCapacity(slots, src);
+		int amount = SlotAction.FitCapacity(slots, src, 0, -1, machine.GetSlotLimitFor(group, 0));
 		if (amount <= 0) return true;
 
 		var moving = src.Clone();
