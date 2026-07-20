@@ -143,7 +143,13 @@ public sealed class FavoritesPlayer : ModPlayer
 			else if (!string.IsNullOrEmpty(e.TagLabel))
 			{
 				sub["tagLabel"] = e.TagLabel;
-				sub["tagMembers"] = new List<int>(e.TagMembers ?? System.Array.Empty<int>());
+				var ids = new List<string>();
+				foreach (int type in e.TagMembers ?? System.Array.Empty<int>())
+				{
+					var id = Api.Recipe.Ingredient.IIngredientResolver.Default?.StableItemId(type);
+					if (!string.IsNullOrEmpty(id)) ids.Add(id!);
+				}
+				sub["tagMemberIds"] = ids;
 			}
 			else continue;
 			list.Add(sub);
@@ -170,10 +176,17 @@ public sealed class FavoritesPlayer : ModPlayer
 			}
 			else if (sub.ContainsKey("tagLabel"))
 			{
+				if (!sub.ContainsKey("tagMemberIds")) continue;
 				string label = sub.GetString("tagLabel");
-				var members = sub.ContainsKey("tagMembers") ? sub.GetList<int>("tagMembers") : new List<int>();
-				if (!target.Exists(e => e.TagLabel == label))
-					target.Add(new Entry(0, null, null, label, new List<int>(members).ToArray()));
+				var resolver = Api.Recipe.Ingredient.IIngredientResolver.Default;
+				var members = new List<int>();
+				foreach (var id in sub.GetList<string>("tagMemberIds"))
+				{
+					int type = resolver?.ResolveItemType(id) ?? 0;
+					if (type > 0 && !members.Contains(type)) members.Add(type);
+				}
+				if (members.Count > 0 && !target.Exists(e => e.TagLabel == label))
+					target.Add(new Entry(0, null, null, label, members.ToArray()));
 			}
 		}
 	}

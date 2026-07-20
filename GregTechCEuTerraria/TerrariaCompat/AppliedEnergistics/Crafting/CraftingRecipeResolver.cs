@@ -4,6 +4,7 @@ using GregTechCEuTerraria.Api.Recipe;
 using GregTechCEuTerraria.Api.Recipe.Ingredient;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.TerrariaCompat.Recipes;
+using GregTechCEuTerraria.TerrariaCompat.Tiles.CraftingStations;
 using Terraria;
 
 namespace GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting;
@@ -16,77 +17,84 @@ public static class CraftingRecipeResolver
 		if (pattern.PrimaryOutput is not AEItemKey outKey) return null;
 		int outType = outKey.GetItem();
 		long outAmt = pattern.PrimaryOutputAmount;
-		int station = pattern.StationTile;
+		var stations = pattern.StationIds;
 
-		foreach (var r in Main.recipe)
+		foreach (var (_, r) in CandidatesFor(outType))
 		{
-			if (r is null || r.createItem is null || r.createItem.IsAir) continue;
-			if (r.createItem.type != outType) continue;
 			if (r.createItem.stack != outAmt) continue;
-			if (!StationMatches(r, station)) continue;
+			if (!StationMatches(r, stations)) continue;
 			if (InputsMatch(r, pattern.Inputs)) return r;
 		}
 		return null;
 	}
 
-	public static int ReDeriveStationTile(
-		IReadOnlyList<(AEKey what, long amount)> outputs,
-		IReadOnlyList<(AEKey what, long amount)> inputs)
-	{
-		if (outputs.Count == 0 || outputs[0].what is not AEItemKey outKey) return -1;
-		int outType = outKey.GetItem();
-		long outAmt = outputs[0].amount;
-
-		foreach (var r in Main.recipe)
-		{
-			if (r is null || r.createItem is null || r.createItem.IsAir) continue;
-			if (r.createItem.type != outType || r.createItem.stack != outAmt) continue;
-			if (!InputsMatch(r, inputs)) continue;
-
-			int firstReq = -1, modReq = -1;
-			foreach (var t in r.requiredTile)
-			{
-				if (t < 0) continue;
-				if (firstReq < 0) firstReq = t;
-				if (t >= Terraria.ID.TileID.Count && modReq < 0) modReq = t;
-			}
-			int pick = modReq >= 0 ? modReq : firstReq;
-			if (pick >= 0) return pick;
-		}
-		return -1;
-	}
-
 	public static IEnumerable<Terraria.Recipe> ForOutput(int outType)
 	{
-		foreach (var r in Main.recipe)
-		{
-			if (r is null || r.createItem is null || r.createItem.IsAir) continue;
-			if (r.createItem.type == outType) yield return r;
-		}
+		foreach (var (_, r) in CandidatesFor(outType))
+			yield return r;
 	}
 
-	private static bool StationMatches(Terraria.Recipe r, int station)
+	private static Dictionary<int, List<(int index, Terraria.Recipe recipe)>>? _byOutputType;
+
+	private static readonly List<(int index, Terraria.Recipe recipe)> _noCandidates = new();
+
+	private static List<(int index, Terraria.Recipe recipe)> CandidatesFor(int outType)
 	{
-		if (station < 0)
+		if (_byOutputType == null)
 		{
-			foreach (var t in r.requiredTile)
-				if (t >= 0) return false;
-			return true;
+			var d = new Dictionary<int, List<(int, Terraria.Recipe)>>();
+			int count = Terraria.Recipe.numRecipes;
+			for (int i = 0; i < count; i++)
+			{
+				var r = Main.recipe[i];
+				if (r is null || r.createItem is null || r.createItem.IsAir) continue;
+				int t = r.createItem.type;
+				if (!d.TryGetValue(t, out var l)) d[t] = l = new List<(int, Terraria.Recipe)>();
+				l.Add((i, r));
+			}
+			_byOutputType = d;
 		}
-		foreach (var t in r.requiredTile)
-			if (t == station) return true;
-		return false;
+		return _byOutputType.TryGetValue(outType, out var hit) ? hit : _noCandidates;
 	}
 
-	public static int StationTileOf(GTRecipe gt)
+	private static bool StationMatches(Terraria.Recipe r, IReadOnlyList<string> stations)
 	{
-		int[] tiles = gt.Data.GetIntArray("stationTiles");
-		if (tiles.Length > 0) return tiles[0];
+		var required = MePattern.StationIdsOf(r);
+		if (required.Length != stations.Count) return false;
+		for (int i = 0; i < required.Length; i++)
+			if (required[i] != stations[i]) return false;
+		return true;
+	}
+
+	public static IReadOnlyList<string> StationIdsOf(GTRecipe gt)
+	{
+		var resolver = IIngredientResolver.Default;
+		var ids = new List<string>();
+
+		foreach (var key in CraftingStationRegistry.StationKeysFor(gt))
+		{
+			if (!CraftingStationRegistry.TryGetTile(key, out int t)) return System.Array.Empty<string>();
+			var id = resolver?.StableTileId(t) ?? "";
+			if (id.Length == 0) return System.Array.Empty<string>();
+			if (!ids.Contains(id)) ids.Add(id);
+		}
+		if (ids.Count > 0) { ids.Sort(System.StringComparer.Ordinal); return ids; }
+
 		int native = gt.Data.GetInt("nativeTile");
-		if (native > 0) return native;
+		if (native > 0)
+		{
+			var id = resolver?.StableTileId(native) ?? "";
+			if (id.Length > 0) return new[] { id };
+		}
+
 		string station = gt.RecipeType.RegistryName ?? "";
-		if (VanillaCraftingBridge.IsHandStation(station)) return -1;
-		return VanillaCraftingBridge.TryGetStationTile(station, out int tile) ? tile : -1;
+		if (VanillaCraftingBridge.IsHandStation(station)) return System.Array.Empty<string>();
+		if (VanillaCraftingBridge.TryGetStationTile(station, out int tile))
+		{
+			var id = resolver?.StableTileId(tile) ?? "";
+			if (id.Length > 0) return new[] { id };
+		}
+		return System.Array.Empty<string>();
 	}
 
 	private static AEItemKey? KeyOf(Ingredient ing)
@@ -97,7 +105,11 @@ public static class CraftingRecipeResolver
 
 	private static readonly Dictionary<GTRecipe, (Terraria.Recipe? rec, int index)> _resolved = new();
 
-	public static void ClearResolvedCache() => _resolved.Clear();
+	public static void ClearResolvedCache()
+	{
+		_resolved.Clear();
+		_byOutputType = null;
+	}
 
 	public static Terraria.Recipe? FindForGtRecipe(GTRecipe gt, out int index)
 	{
@@ -125,15 +137,12 @@ public static class CraftingRecipeResolver
 		}
 		if (inputs.Count == 0) return null;
 
-		int station = StationTileOf(gt);
+		var stations = StationIdsOf(gt);
 
-		for (int i = 0; i < Terraria.Recipe.numRecipes; i++)
+		foreach (var (i, r) in CandidatesFor(outType))
 		{
-			var r = Main.recipe[i];
-			if (r is null || r.createItem is null || r.createItem.IsAir) continue;
-			if (r.createItem.type != outType) continue;
 			if (r.createItem.stack != outAmt) continue;
-			if (!StationMatches(r, station)) continue;
+			if (!StationMatches(r, stations)) continue;
 			if (!InputsMatch(r, inputs)) continue;
 			index = i;
 			return r;

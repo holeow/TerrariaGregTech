@@ -225,7 +225,7 @@ public static class NativeRecipeProxy
 			if (members is null || !members.Contains(slotItemType)) continue;
 
 			var list = members.ToList();
-			grouped = new TagIngredient($"$terraria:group/{gid}", list);
+			grouped = new TagIngredient(IngredientResolverImpl.RecipeGroupTag(gid), list);
 			return true;
 		}
 		return false;

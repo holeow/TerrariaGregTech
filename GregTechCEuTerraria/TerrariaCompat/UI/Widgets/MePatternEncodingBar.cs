@@ -151,10 +151,9 @@ public sealed class MePatternEncodingBar : UIElement
 			inputs.Add((AEItemKey.OfType(req.type), req.stack));
 			tags.Add(TagForItem(gt, req.type));
 		}
-		int station = tr.requiredTile.Count > 0 ? tr.requiredTile[0] : -1;
 		var output = new[] { ((AEKey)AEItemKey.OfType(tr.createItem.type), (long)tr.createItem.stack) };
 		MachineActions.Send(MePatternEncodingAction.SetContents(
-			MePatternType.Crafting, station, inputs.ToArray(), output, tags.ToArray()), term.Machine);
+			MePatternType.Crafting, MePattern.StationIdsOf(tr), inputs.ToArray(), output, tags.ToArray()), term.Machine);
 	}
 
 	private static void FillProcessing(IMePatternEncodingHost term, GTRecipe gt)
@@ -171,7 +170,7 @@ public sealed class MePatternEncodingBar : UIElement
 		foreach (var (fi, amt) in gt.GetFluidOutputs())
 			if (ResolveFluid(fi) is { } f) outputs.Add((AEFluidKey.Of(f), amt));
 		MachineActions.Send(MePatternEncodingAction.SetContents(
-			MePatternType.Processing, -1, inputs.ToArray(), outputs.ToArray(), tags.ToArray()), term.Machine);
+			MePatternType.Processing, System.Array.Empty<string>(), inputs.ToArray(), outputs.ToArray(), tags.ToArray()), term.Machine);
 	}
 
 	private static string? TagNameOf(Ingredient ing)

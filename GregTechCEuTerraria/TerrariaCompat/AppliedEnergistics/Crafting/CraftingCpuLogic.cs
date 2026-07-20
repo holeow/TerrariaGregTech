@@ -241,10 +241,10 @@ public sealed class CraftingCpuLogic
 			?? Terraria.Localization.Language.GetTextValue(AELocale.CraftDoneItems);
 		long amount = job.FinalOutput.Amount;
 		long elapsedMs = job.TimeTracker.GetElapsedTime() / 1_000_000;
-		long units = job.TimeTracker.GetTotalStarted();
+		string units = job.TimeTracker.DescribeTotalStarted();
 
 		string msg = Terraria.Localization.Language.GetTextValue(AELocale.CraftDone,
-			who, amount.ToString("N0"), what, FormatDuration(elapsedMs), units.ToString("N0"));
+			who, amount.ToString("N0"), what, FormatDuration(elapsedMs), units);
 		var color = new Microsoft.Xna.Framework.Color(124, 255, 156);
 
 		if (Main.netMode == Terraria.ID.NetmodeID.Server)

@@ -281,7 +281,7 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 	public bool CanFulfill(MePattern details)
 	{
 		if (details.Type == MePatternType.Crafting)
-			return details.StationTile < 0 || TryFindStation(details.StationTile, out _);
+			return TryFindStations(details, out _);
 		return HasAdjacentInventory();
 	}
 
@@ -308,12 +308,8 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 
 		// TODO water / lava / honey, snow, graveyard biome, torch god
 
-		Point16 fxPos;
-		if (details.StationTile >= 0)
-		{
-			if (!TryFindStation(details.StationTile, out fxPos)) return false;
-		}
-		else
+		if (!TryFindStations(details, out Point16 fxPos)) return false;
+		if (fxPos.X < 0)
 		{
 			var (w, h) = Size;
 			fxPos = new Point16(Position.X + w / 2, Position.Y + h / 2);
@@ -321,7 +317,7 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 
 		foreach (var list in inputHolder) list.Clear();
 		_jobs.Add(new Job(details.PrimaryOutput, details.PrimaryOutputAmount,
-			CraftingPatternTimes.TicksFor(details.StationTile)) { Station = fxPos });
+			CraftingPatternTimes.TicksFor(details.ResolveStationTiles())) { Station = fxPos });
 		return true;
 	}
 
@@ -463,6 +459,17 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 		list.RemoveRange(0, _roundRobinIndex);
 	}
 
+	private bool TryFindStations(MePattern details, out Point16 pos)
+	{
+		pos = new Point16(-1, -1);
+		foreach (int tileId in details.ResolveStationTiles())
+		{
+			if (!TryFindStation(tileId, out var found)) return false;
+			if (pos.X < 0) pos = found;
+		}
+		return true;
+	}
+
 	private bool TryFindStation(int tileId, out Point16 pos)
 	{
 		var (w, h) = Size;
@@ -473,37 +480,9 @@ public sealed class PatternProviderMachine : MetaMachine, IMePatternProvider, IM
 				if (x <= 0 || y <= 0 || x >= Main.maxTilesX - 1 || y >= Main.maxTilesY - 1) continue;
 				if (!OnPushSide(x, y)) continue;
 				var t = Main.tile[x, y];
-				if (t.HasTile && TileCountsAs(t.TileType, tileId)) { pos = new Point16(x, y); return true; }
+				if (t.HasTile && RecipeNetworkCrafting.TileSatisfies(t.TileType, tileId)) { pos = new Point16(x, y); return true; }
 			}
 		pos = new Point16(-1, -1);
-		return false;
-	}
-
-	private static readonly Dictionary<int, int[]> VanillaTileCountsAs = new()
-	{
-		[96] = new[] { 215 },
-		[17] = new[] { 215 },
-		[302] = new[] { 17 },
-		[77] = new[] { 17 },
-		[133] = new[] { 77 },
-		[134] = new[] { 16 },
-		[355] = new[] { 13 },
-		[699] = new[] { 13 },
-		[304] = new[] { 86 },
-	};
-
-	private static bool TileCountsAs(int present, int required, HashSet<int>? seen = null)
-	{
-		if (present == required) return true;
-		seen ??= new HashSet<int>();
-		if (!seen.Add(present)) return false;
-		if (VanillaTileCountsAs.TryGetValue(present, out var eqs))
-			foreach (int eq in eqs)
-				if (TileCountsAs(eq, required, seen)) return true;
-		var modTile = Terraria.ModLoader.TileLoader.GetTile(present);
-		if (modTile != null)
-			foreach (int eq in modTile.AdjTiles)
-				if (TileCountsAs(eq, required, seen)) return true;
 		return false;
 	}
 

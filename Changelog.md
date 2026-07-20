@@ -1,3 +1,22 @@
+## 0.0.13
+
+Minor bugfix
+
+Important:
+- Changed most slots to have a limit of 64 items, works better for gt balance (thanks Creater~)
+- Fixed assembly line shape to allow overclock (thanks Isenki)
+- Fixed manual crafting stations autocraft patterns (thanks Bup Supreme)
+
+Qol:
+- Optimized terminal a bit, should open faster now
+- Fixed tag pinning for vanilla tags
+
+Visual:
+- Fixed favorites tags persistance
+- Fixed crafting result chat message fluid amount
+
+slots 64 overflow won't void so its okay to update
+
 ## 0.0.12
 
 Minor bugfix

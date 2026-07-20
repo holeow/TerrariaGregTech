@@ -99,10 +99,14 @@ public sealed class EncodedPatternItem : ModItem, ITextureWarmUp
 		}
 
 		if (Pattern.Type == MePatternType.Crafting)
+		{
+			var names = new List<string>();
+			foreach (int tile in Pattern.ResolveStationTiles()) names.Add(StationName(tile));
 			tooltips.Add(new TooltipLine(Mod, "me_pattern_station",
-				Pattern.StationTile >= 0
-					? $"  station: {StationName(Pattern.StationTile)}"
+				names.Count > 0
+					? $"  station: {string.Join(", ", names)}"
 					: "  station: not required"));
+		}
 	}
 
 	private static string ShortTag(string tag)

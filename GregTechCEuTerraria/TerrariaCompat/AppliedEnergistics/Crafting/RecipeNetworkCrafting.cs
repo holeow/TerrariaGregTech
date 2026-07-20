@@ -26,39 +26,59 @@ public static class RecipeNetworkCrafting
 	private static void AddStationAdj(Item item, bool[] adj)
 	{
 		if (item is not { IsAir: false } || item.createTile < TileID.Dirt) return;
-		adj[item.createTile] = true;
-		switch (item.createTile)
-		{
-			case TileID.GlassKiln:
-			case TileID.Hellforge:
-				adj[TileID.Furnaces] = true;
-				break;
-			case TileID.AdamantiteForge:
-				adj[TileID.Furnaces] = true;
-				adj[TileID.Hellforge] = true;
-				break;
-			case TileID.MythrilAnvil:
-				adj[TileID.Anvils] = true;
-				break;
-			case TileID.BewitchingTable:
-			case TileID.Tables2:
-				adj[TileID.Tables] = true;
-				goto case TileID.Tables;
-			case TileID.AlchemyTable:
-				adj[TileID.Bottles] = true;
-				adj[TileID.Tables] = true;
-				break;
-			case TileID.WorkBenches:
-			case TileID.Tables:
-				adj[TileID.Chairs] = true;
-				break;
-		}
+		CollectAdjacency(item.createTile, adj);
+	}
+
+	public static void CollectAdjacency(int tileType, bool[] adj)
+	{
+		if (tileType < 0 || tileType >= adj.Length) return;
+
+		ExpandVanilla(tileType, adj);
 
 		var player = Main.LocalPlayer;
 		var old = player.adjTile;
 		player.adjTile = adj;
-		try { TileLoader.AdjTiles(player, item.createTile); }
+		try { TileLoader.AdjTiles(player, tileType); }
 		finally { player.adjTile = old; }
+	}
+
+	private static readonly Dictionary<int, int[]> VanillaCountsAs = new()
+	{
+		[TileID.CookingPots]             = new[] { (int)TileID.Campfire },
+		[TileID.Furnaces]                = new[] { (int)TileID.Campfire },
+		[TileID.GlassKiln]               = new[] { (int)TileID.Furnaces },
+		[TileID.Hellforge]               = new[] { (int)TileID.Furnaces },
+		[TileID.AdamantiteForge]         = new[] { (int)TileID.Hellforge },
+		[TileID.MythrilAnvil]            = new[] { (int)TileID.Anvils },
+		[TileID.AlchemyTable]            = new[] { (int)TileID.Bottles, (int)TileID.Tables },
+		[TileID.LivingLoom]              = new[] { (int)TileID.Loom },
+		[TileID.BewitchingTable]         = new[] { (int)TileID.Tables },
+		[TileID.Tables2]                 = new[] { (int)TileID.Tables },
+		[TileID.WorkBenches]             = new[] { (int)TileID.Chairs },
+		[TileID.Tables]                  = new[] { (int)TileID.Chairs },
+	};
+
+	private static void ExpandVanilla(int tileType, bool[] adj)
+	{
+		if (tileType < 0 || tileType >= adj.Length || adj[tileType]) return;
+		adj[tileType] = true;
+		if (!VanillaCountsAs.TryGetValue(tileType, out var equivalents)) return;
+		foreach (int equivalent in equivalents) ExpandVanilla(equivalent, adj);
+	}
+
+	private static readonly Dictionary<int, bool[]> _adjCache = new();
+
+	public static bool TileSatisfies(int present, int required)
+	{
+		if (present == required) return true;
+		if (present < 0 || required < 0) return false;
+		if (!_adjCache.TryGetValue(present, out var adj))
+		{
+			adj = new bool[TileLoader.TileCount];
+			CollectAdjacency(present, adj);
+			_adjCache[present] = adj;
+		}
+		return required < adj.Length && adj[required];
 	}
 
 	private static HashSet<int>? _stationTiles;

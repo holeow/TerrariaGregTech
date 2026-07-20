@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using GregTechCEuTerraria.Api.Recipe.Ingredient;
 using GregTechCEuTerraria.AppliedEnergistics.Api.Stacks;
 using GregTechCEuTerraria.TerrariaCompat.Tiles.CraftingStations;
 using Terraria.ID;
@@ -10,29 +11,28 @@ namespace GregTechCEuTerraria.TerrariaCompat.AppliedEnergistics.Crafting;
 public sealed class MePattern
 {
 	public MePatternType Type { get; }
-	public int StationTile { get; }
-	public string? StationKey { get; }
+	public IReadOnlyList<string> StationIds => _stationIds;
 
+	private readonly string[] _stationIds;
 	private readonly (AEKey what, long amount)[] _inputs;
 	private readonly (AEKey what, long amount)[] _outputs;
 	private readonly string?[] _inputTags;
 
-	private MePattern(MePatternType type, int station, string? stationKey,
+	private MePattern(MePatternType type, string[] stationIds,
 		(AEKey, long)[] inputs, (AEKey, long)[] outputs, string?[] inputTags)
 	{
 		Type = type;
-		StationTile = station;
-		StationKey = stationKey;
+		_stationIds = stationIds;
 		_inputs = inputs;
 		_outputs = outputs;
 		_inputTags = inputTags;
 	}
 
-	public static MePattern Crafting(AEKey output, long amount, int stationTile,
+	public static MePattern Crafting(AEKey output, long amount, IReadOnlyList<string> stationIds,
 		IReadOnlyList<(AEKey what, long amount)> inputs, IReadOnlyList<string?>? inputTags = null)
 	{
 		var (ins, tags) = FilterInputs(inputs, inputTags);
-		return new(MePatternType.Crafting, stationTile, StationKeyForTile(stationTile),
+		return new(MePatternType.Crafting, CanonicalStations(stationIds),
 			ins, new[] { (output, amount) }, tags);
 	}
 
@@ -40,31 +40,41 @@ public sealed class MePattern
 		IReadOnlyList<(AEKey what, long amount)> outputs, IReadOnlyList<string?>? inputTags = null)
 	{
 		var (ins, tags) = FilterInputs(inputs, inputTags);
-		return new(MePatternType.Processing, -1, null, ins, FilterStacks(outputs), tags);
+		return new(MePatternType.Processing, System.Array.Empty<string>(),
+			ins, FilterStacks(outputs), tags);
 	}
 
-	internal static string? StationKeyForTile(int tileType)
+	public static string[] StationIdsOf(Terraria.Recipe recipe)
 	{
-		if (tileType < 0) return null;
-		return CraftingStationRegistry.TryGetStationKey(tileType, out var k) ? k : null;
+		var ids = new List<string>();
+		foreach (int tile in recipe.requiredTile)
+		{
+			if (tile < 0) continue;
+			var id = IIngredientResolver.Default?.StableTileId(tile) ?? "";
+			if (id.Length > 0 && !ids.Contains(id)) ids.Add(id);
+		}
+		return CanonicalStations(ids);
 	}
 
-	private static (int station, string? key) NormalizeStation(int station, string? key,
-		List<(AEKey what, long amount)> outputs, List<(AEKey what, long amount)> inputs)
+	public IReadOnlyList<int> ResolveStationTiles()
 	{
-		if (key != null)
+		var tiles = new List<int>(_stationIds.Length);
+		foreach (var id in _stationIds)
 		{
-			if (CraftingStationRegistry.TryGetTile(key, out int t)) return (t, key);
+			int t = IIngredientResolver.Default?.ResolveTileType(id) ?? -1;
+			if (t >= 0) tiles.Add(t);
 		}
-		else
-		{
-			if (station < 0) return (-1, null);
-			if (station < TileID.Count) return (station, null);
-		}
+		return tiles;
+	}
 
-		int rederived = CraftingRecipeResolver.ReDeriveStationTile(outputs, inputs);
-		if (rederived >= 0) return (rederived, StationKeyForTile(rederived));
-		return (station, key);
+	private static string[] CanonicalStations(IReadOnlyList<string> ids)
+	{
+		if (ids.Count == 0) return System.Array.Empty<string>();
+		var list = new List<string>(ids.Count);
+		foreach (var id in ids)
+			if (!string.IsNullOrEmpty(id) && !list.Contains(id)) list.Add(id);
+		list.Sort(System.StringComparer.Ordinal);
+		return list.Count == 0 ? System.Array.Empty<string>() : list.ToArray();
 	}
 
 	private static ((AEKey, long)[] inputs, string?[] tags) FilterInputs(
@@ -100,7 +110,7 @@ public sealed class MePattern
 	public override bool Equals(object? obj)
 	{
 		if (obj is not MePattern o) return false;
-		if (Type != o.Type || StationTile != o.StationTile) return false;
+		if (Type != o.Type || !TagsEqual(_stationIds, o._stationIds)) return false;
 		return StacksEqual(_inputs, o._inputs) && StacksEqual(_outputs, o._outputs)
 			&& TagsEqual(_inputTags, o._inputTags);
 	}
@@ -125,7 +135,7 @@ public sealed class MePattern
 	{
 		var hc = new System.HashCode();
 		hc.Add((byte)Type);
-		hc.Add(StationTile);
+		foreach (var id in _stationIds) hc.Add(id);
 		for (int i = 0; i < _inputs.Length; i++)
 		{
 			hc.Add(_inputs[i].what);
@@ -144,11 +154,10 @@ public sealed class MePattern
 		var t = new TagCompound
 		{
 			["type"] = (byte)Type,
-			["station"] = StationTile,
 			["in"] = WriteInputs(),
 			["out"] = WriteStacks(_outputs),
 		};
-		if (StationKey != null) t["stationkey"] = StationKey;
+		if (_stationIds.Length > 0) t["stations"] = new List<string>(_stationIds);
 		return t;
 	}
 
@@ -156,16 +165,42 @@ public sealed class MePattern
 	{
 		if (!tag.ContainsKey("type")) return null;
 		var type = (MePatternType)tag.GetByte("type");
-		int station = tag.ContainsKey("station") ? tag.GetInt("station") : -1;
-		string? stationKey = tag.ContainsKey("stationkey") ? tag.GetString("stationkey") : null;
 		var (inputs, tags) = ReadInputs(tag, "in");
 		var outputs = ReadStacks(tag, "out");
 		if (outputs.Count == 0) return null;
 
-		if (type == MePatternType.Crafting)
-			(station, stationKey) = NormalizeStation(station, stationKey, outputs, inputs);
+		var stations = type == MePatternType.Crafting
+			? ReadStations(tag)
+			: System.Array.Empty<string>();
 
-		return new MePattern(type, station, stationKey, inputs.ToArray(), outputs.ToArray(), tags.ToArray());
+		return new MePattern(type, stations, inputs.ToArray(), outputs.ToArray(), tags.ToArray());
+	}
+
+	private static string[] ReadStations(TagCompound tag)
+	{
+		if (tag.ContainsKey("stations"))
+			return CanonicalStations(new List<string>(tag.GetList<string>("stations")));
+
+		if (tag.ContainsKey("stationkey"))
+		{
+			var key = tag.GetString("stationkey");
+			if (key.Length > 0 && CraftingStationRegistry.TryGetTile(key, out int keyTile))
+			{
+				var id = IIngredientResolver.Default?.StableTileId(keyTile) ?? "";
+				if (id.Length > 0) return new[] { id };
+			}
+		}
+
+		if (tag.ContainsKey("station"))
+		{
+			int legacy = tag.GetInt("station");
+			if (legacy >= 0 && legacy < TileID.Count)
+			{
+				var id = IIngredientResolver.Default?.StableTileId(legacy) ?? "";
+				if (id.Length > 0) return new[] { id };
+			}
+		}
+		return System.Array.Empty<string>();
 	}
 
 	private List<TagCompound> WriteInputs()
