@@ -2,17 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+using Terraria.ID;
+using Terraria.Localization;
+using Terraria.ModLoader;
+
 namespace GregTechCEuTerraria.TerrariaCompat.Items
 {
-	public sealed class CreosoteCoatingItem : ModItem
+	public sealed class WoodCoatingItem : ModItem
 	{
 
-		public override string Name => "creosote_coating";
-		public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/creosote_coating";
+		public override string Name => "wood_coating";
+		public override string Texture => "GregTechCEuTerraria/Content/TerrariaCompat/wood_coating";
 
 		public override void SetStaticDefaults()
 		=> Language.GetOrRegister($"Mods.GregTechCEuTerraria.Items.{Name}.DisplayName",
-			() => "Creosote Coating");
+			() => "Wood Coating");
 
 		public override void SetDefaults()
 		{
