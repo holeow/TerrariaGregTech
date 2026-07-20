@@ -18,7 +18,7 @@ public sealed class PatternEncodingState
 	private readonly GenericStackInv _inputs = new(null, GenericStackInv.Mode.CONFIG_STACKS, InputSlots);
 	private readonly GenericStackInv _outputs = new(null, GenericStackInv.Mode.CONFIG_STACKS, OutputSlots);
 	private MePatternType _mode = MePatternType.Crafting;
-	private int _station = -1;
+	private string[] _stations = System.Array.Empty<string>();
 
 	private readonly string?[] _inputTag = new string?[InputSlots];
 
@@ -66,7 +66,7 @@ public sealed class PatternEncodingState
 	private readonly Item[] _encoded = { new() };
 
 	public MePatternType Mode => _mode;
-	public int Station => _station;
+	public IReadOnlyList<string> Stations => _stations;
 	public bool HasEncodedOutput => _encoded[0].ModItem is EncodedPatternItem;
 	public GenericStackInv Inputs => _inputs;
 	public GenericStackInv Outputs => _outputs;
@@ -82,7 +82,8 @@ public sealed class PatternEncodingState
 		{
 			var tags = new List<string?>(p.Inputs.Count);
 			for (int i = 0; i < p.Inputs.Count; i++) tags.Add(p.InputTag(i));
-			ApplySetContents(p.Type, p.Type == MePatternType.Crafting ? p.StationTile : -1,
+			ApplySetContents(p.Type,
+				p.Type == MePatternType.Crafting ? p.StationIds : System.Array.Empty<string>(),
 				p.Inputs, p.Outputs, tags);
 		}
 	}
@@ -105,7 +106,7 @@ public sealed class PatternEncodingState
 	{
 		var hc = new HashCode();
 		hc.Add((byte)_mode);
-		hc.Add(_station);
+		foreach (var s in _stations) hc.Add(s);
 		for (int i = 0; i < _inputs.Size(); i++) { var s = _inputs.GetStack(i); hc.Add(s?.What); hc.Add(s?.Amount ?? 0); }
 		for (int i = 0; i < _outputs.Size(); i++) { var s = _outputs.GetStack(i); hc.Add(s?.What); hc.Add(s?.Amount ?? 0); }
 		return hc.ToHashCode();
@@ -117,7 +118,7 @@ public sealed class PatternEncodingState
 		if (outputs.Count == 0) return false;
 		if (_mode == MePatternType.Processing)
 			return Collect(_inputs).Count > 0;
-		var pattern = MePattern.Crafting(outputs[0].what, outputs[0].amount, _station, Collect(_inputs));
+		var pattern = MePattern.Crafting(outputs[0].what, outputs[0].amount, _stations, Collect(_inputs));
 		return CraftingRecipeResolver.Find(pattern) != null;
 	}
 
@@ -155,13 +156,13 @@ public sealed class PatternEncodingState
 		_inputs.SetStack(slot, new GenericStack(s.What, Math.Max(1, amount)));
 	}
 
-	public void ApplySetContents(MePatternType mode, int station,
+	public void ApplySetContents(MePatternType mode, IReadOnlyList<string> stations,
 		IReadOnlyList<(AEKey what, long amount)> inputs,
 		IReadOnlyList<(AEKey what, long amount)> outputs,
 		IReadOnlyList<string?>? inputTags = null)
 	{
 		_mode = mode;
-		_station = station;
+		_stations = ToStationArray(stations);
 		_inputs.Clear();
 		_outputs.Clear();
 		System.Array.Clear(_inputTag);
@@ -180,7 +181,17 @@ public sealed class PatternEncodingState
 		_inputs.Clear();
 		_outputs.Clear();
 		System.Array.Clear(_inputTag);
-		_station = -1;
+		_stations = System.Array.Empty<string>();
+	}
+
+	private static string[] ToStationArray(IReadOnlyList<string> stations)
+	{
+		if (stations.Count == 0) return System.Array.Empty<string>();
+		var list = new List<string>(stations.Count);
+		foreach (var s in stations)
+			if (!string.IsNullOrEmpty(s) && !list.Contains(s)) list.Add(s);
+		list.Sort(System.StringComparer.Ordinal);
+		return list.Count == 0 ? System.Array.Empty<string>() : list.ToArray();
 	}
 
 	public bool CanCycleOutputs
@@ -257,7 +268,7 @@ public sealed class PatternEncodingState
 		if (_mode == MePatternType.Crafting)
 		{
 			if (outputs.Count == 0) return;
-			pattern = MePattern.Crafting(outputs[0].what, outputs[0].amount, _station, inputs, tags);
+			pattern = MePattern.Crafting(outputs[0].what, outputs[0].amount, _stations, inputs, tags);
 		}
 		else
 		{
@@ -311,7 +322,7 @@ public sealed class PatternEncodingState
 	public void Save(TagCompound tag)
 	{
 		tag["mode"] = (byte)_mode;
-		tag["station"] = _station;
+		if (_stations.Length > 0) tag["stations"] = new List<string>(_stations);
 		_inputs.WriteToChildTag(tag, "in");
 		_outputs.WriteToChildTag(tag, "out");
 		for (int i = 0; i < _inputTag.Length; i++)
@@ -323,7 +334,9 @@ public sealed class PatternEncodingState
 	public void Load(TagCompound tag)
 	{
 		_mode = tag.ContainsKey("mode") ? (MePatternType)tag.GetByte("mode") : MePatternType.Crafting;
-		_station = tag.ContainsKey("station") ? tag.GetInt("station") : -1;
+		_stations = tag.ContainsKey("stations")
+			? ToStationArray(new List<string>(tag.GetList<string>("stations")))
+			: System.Array.Empty<string>();
 		_inputs.ReadFromChildTag(tag, "in");
 		_outputs.ReadFromChildTag(tag, "out");
 		for (int i = 0; i < _inputTag.Length; i++)

@@ -106,10 +106,16 @@ public sealed class ElapsedTimeTracker
 	public long GetRemainingItemCount() => (long)(int.MaxValue - (double)GetProgress() * int.MaxValue);
 	public long GetStartItemCount() => int.MaxValue;
 
-	public long GetTotalStarted()
+	public string DescribeTotalStarted()
 	{
-		long total = 0;
-		foreach (var v in _started.Values) total += v;
-		return total;
+		var parts = new List<string>();
+		foreach (var keyType in AEKeyTypes.GetAll())
+		{
+			long started = _started.GetValueOrDefault(keyType);
+			if (started <= 0) continue;
+			long units = started / keyType.GetAmountPerUnit();
+			parts.Add($"{keyType.FormatAmount(units, AmountFormat.FULL)} {keyType.GetDescription()}");
+		}
+		return string.Join(", ", parts);
 	}
 }

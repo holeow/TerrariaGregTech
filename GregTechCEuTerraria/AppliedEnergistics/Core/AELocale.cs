@@ -53,7 +53,7 @@ public static class AELocale
 		Language.GetOrRegister(CraftSubmitMissing, () => "Missing {0}x {1}");
 		Language.GetOrRegister(CraftSubmitMissingGeneric, () => "Missing an ingredient");
 
-		Language.GetOrRegister(CraftDone, () => "[ME] {0} crafted {1}x {2} in {3} ({4} items processed)");
+		Language.GetOrRegister(CraftDone, () => "[ME] {0} crafted {1}x {2} in {3} ({4} processed)");
 		Language.GetOrRegister(CraftDoneSomeone, () => "Someone");
 		Language.GetOrRegister(CraftDoneItems, () => "items");
 	}

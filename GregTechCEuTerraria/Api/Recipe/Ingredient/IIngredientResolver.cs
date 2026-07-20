@@ -12,6 +12,10 @@ public interface IIngredientResolver
 
 	string StableItemId(int itemType);
 
+	int ResolveTileType(string stableId);
+
+	string StableTileId(int tileType);
+
 	IReadOnlyList<int> ResolveItemTag(string tagName);
 
 	FluidType? ResolveFluidType(string upstreamId);

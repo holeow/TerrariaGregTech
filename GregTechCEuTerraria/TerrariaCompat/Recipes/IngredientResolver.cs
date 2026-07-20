@@ -7,9 +7,6 @@ using GregTechCEuTerraria.TerrariaCompat.Items;
 
 namespace GregTechCEuTerraria.TerrariaCompat.Recipes;
 
-// IIngredientResolver - consumed by IngredientJson / GTRecipeSerializer when
-// materializing runData JSON. Delegates to existing static surfaces
-// (VanillaItemMap, MaterialItemRegistry, RegistryItemLoader, FluidRegistry)
 public sealed class IngredientResolverImpl : IIngredientResolver
 {
 	public static readonly IngredientResolverImpl Instance = new();
@@ -66,12 +63,42 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 
 	string IIngredientResolver.StableItemId(int itemType) => StableItemId(itemType);
 
+	public static string StableTileId(int tileType)
+	{
+		if (tileType < 0) return "";
+		if (Terraria.ModLoader.TileLoader.GetTile(tileType) is { } modTile)
+			return modTile.FullName;
+		return Terraria.ID.TileID.Search.TryGetName(tileType, out var name) ? "terraria:" + name : "";
+	}
+
+	public static int ResolveTileType(string stableId)
+	{
+		if (string.IsNullOrEmpty(stableId)) return -1;
+
+		if (stableId.StartsWith("terraria:", System.StringComparison.Ordinal))
+			return Terraria.ID.TileID.Search.TryGetId(stableId["terraria:".Length..], out var tid) ? tid : -1;
+
+		int slash = stableId.IndexOf('/');
+		if (slash > 0 && Terraria.ModLoader.ModContent.TryFind<Terraria.ModLoader.ModTile>(
+			    stableId[..slash], stableId[(slash + 1)..], out var mt))
+			return mt.Type;
+
+		return -1;
+	}
+
+	int IIngredientResolver.ResolveTileType(string stableId) => ResolveTileType(stableId);
+
+	string IIngredientResolver.StableTileId(int tileType) => StableTileId(tileType);
+
 	public IReadOnlyList<int> ResolveItemTag(string tagName)
 	{
 		if (string.IsNullOrEmpty(tagName)) return Array.Empty<int>();
 
 		if (Items.Tools.ToolItemLoader.CraftingTagItems.TryGetValue(tagName, out var catalystItems))
 			return catalystItems;
+
+		if (TryResolveRecipeGroupTag(tagName, out var groupItems))
+			return groupItems;
 
 		if (VanillaItemMap.TryGetFungibleGroupView(tagName, out var groupView))
 			return groupView;
@@ -101,6 +128,34 @@ public sealed class IngredientResolverImpl : IIngredientResolver
 			types.Add(matItem);
 
 		return types.Count > 0 ? types : (IReadOnlyList<int>)Array.Empty<int>();
+	}
+
+	public const string RecipeGroupTagPrefix = "$terraria:group/";
+
+	public static string RecipeGroupTag(int groupId) => RecipeGroupTagPrefix + groupId;
+
+	public static bool TryGetRecipeGroupId(string tagName, out int groupId)
+	{
+		groupId = 0;
+		if (string.IsNullOrEmpty(tagName)) return false;
+		if (!tagName.StartsWith(RecipeGroupTagPrefix, StringComparison.Ordinal)) return false;
+		return int.TryParse(tagName[RecipeGroupTagPrefix.Length..], out groupId);
+	}
+
+	public static bool TryGetRecipeGroup(string tagName, out Terraria.RecipeGroup group)
+	{
+		group = null!;
+		return TryGetRecipeGroupId(tagName, out int gid)
+			&& Terraria.RecipeGroup.recipeGroups.TryGetValue(gid, out group!);
+	}
+
+	private static bool TryResolveRecipeGroupTag(string tagName, out IReadOnlyList<int> items)
+	{
+		items = Array.Empty<int>();
+		if (!TryGetRecipeGroupId(tagName, out int gid)) return false;
+		if (!Terraria.RecipeGroup.recipeGroups.ContainsKey(gid)) return false;
+		items = VanillaItemMap.GroupItemView(gid);
+		return items.Count > 0;
 	}
 
 	public FluidType? ResolveFluidType(string upstreamId)

@@ -54,8 +54,9 @@ public static class MeCraftingService
 	public static string? UnfulfillableReason(MeNetwork net, MePattern p)
 	{
 		if (net.CanFulfill(p)) return null;
-		if (p.Type == MePatternType.Crafting && p.StationTile >= 0)
-			return $"No Pattern Provider beside a {PatternProviderMachine.StationDisplayName(p.StationTile)}";
+		if (p.Type == MePatternType.Crafting)
+			foreach (int tile in p.ResolveStationTiles())
+				return $"No Pattern Provider beside a {PatternProviderMachine.StationDisplayName(tile)}";
 		if (p.Type == MePatternType.Crafting)
 			return $"No Pattern Provider can craft {p.PrimaryOutput.GetDisplayName()}";
 		return $"No machine beside a Pattern Provider to make {p.PrimaryOutput.GetDisplayName()}";

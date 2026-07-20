@@ -17,7 +17,7 @@ public sealed class MePatternEncodingAction : IMachineAction
 
 	private Op _op;
 	private MePatternType _mode;
-	private int _station;
+	private string[] _stations = System.Array.Empty<string>();
 	private bool _output;
 	private int _slot;
 	private AEKey? _key;
@@ -32,11 +32,11 @@ public sealed class MePatternEncodingAction : IMachineAction
 		new() { _op = Op.SetMode, _mode = mode };
 	public static MePatternEncodingAction SetSlot(bool output, int slot, AEKey? key, long amount) =>
 		new() { _op = Op.SetSlot, _output = output, _slot = slot, _key = key, _amount = amount };
-	public static MePatternEncodingAction SetContents(MePatternType mode, int station,
+	public static MePatternEncodingAction SetContents(MePatternType mode, string[] stations,
 		(AEKey, long)[] inputs, (AEKey, long)[] outputs, string?[]? inputTags = null) =>
 		new()
 		{
-			_op = Op.SetContents, _mode = mode, _station = station,
+			_op = Op.SetContents, _mode = mode, _stations = stations,
 			_inputs = inputs, _outputs = outputs,
 			_inputTags = inputTags ?? System.Array.Empty<string?>(),
 		};
@@ -63,7 +63,8 @@ public sealed class MePatternEncodingAction : IMachineAction
 				break;
 			case Op.SetContents:
 				w.Write((byte)_mode);
-				w.Write(_station);
+				w.Write((byte)_stations.Length);
+				foreach (var s in _stations) w.Write(s);
 				WritePairs(w, _inputs);
 				WritePairs(w, _outputs);
 				w.Write((byte)_inputTags.Length);
@@ -99,7 +100,9 @@ public sealed class MePatternEncodingAction : IMachineAction
 				break;
 			case Op.SetContents:
 				_mode = (MePatternType)r.ReadByte();
-				_station = r.ReadInt32();
+				int nStations = r.ReadByte();
+				_stations = new string[nStations];
+				for (int i = 0; i < nStations; i++) _stations[i] = r.ReadString();
 				_inputs = ReadPairs(r);
 				_outputs = ReadPairs(r);
 				int nTags = r.ReadByte();
@@ -148,7 +151,7 @@ public sealed class MePatternEncodingAction : IMachineAction
 		{
 			case Op.SetMode:     enc.ApplySetMode(_mode); break;
 			case Op.SetSlot:     enc.ApplySetSlot(_output, _slot, _key, _amount); break;
-			case Op.SetContents: enc.ApplySetContents(_mode, _station, _inputs, _outputs, _inputTags); break;
+			case Op.SetContents: enc.ApplySetContents(_mode, _stations, _inputs, _outputs, _inputTags); break;
 			case Op.Clear:       enc.ApplyClear(); break;
 			case Op.CycleOutput: enc.ApplyCycleOutput(); break;
 			case Op.Scale:       enc.ApplyScale(_output); break;

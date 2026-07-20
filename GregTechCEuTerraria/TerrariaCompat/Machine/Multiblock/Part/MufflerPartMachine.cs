@@ -47,6 +47,11 @@ public class MufflerPartMachine : TieredPartMachine
 			? Inventory.Stacks
 			: base.GetSlotGroup(group);
 
+	public override int GetSlotLimitFor(TerrariaCompat.Machine.SlotGroup group, int index) =>
+		group == TerrariaCompat.Machine.SlotGroup.Inventory && Inventory != null
+			? Inventory.GetSlotLimit(index)
+			: base.GetSlotLimitFor(group, index);
+
 	public override void AppendTooltip(System.Collections.Generic.List<string> lines)
 	{
 		base.AppendTooltip(lines);

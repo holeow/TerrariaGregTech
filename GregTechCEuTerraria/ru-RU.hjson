@@ -133,7 +133,7 @@ Mods: {
 			Craft: {
 				// Items: items
 				// Someone: Someone
-				// Done: "[ME] {0} crafted {1}x {2} in {3} ({4} items processed)"
+				// Done: "[ME] {0} crafted {1}x {2} in {3} ({4} processed)"
 			}
 
 			CraftSubmit: {

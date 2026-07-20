@@ -338,13 +338,18 @@ public static class VanillaItemMap
 
 	private static readonly Dictionary<int, RecipeGroupItemView> _groupViews = new();
 
+	public static IReadOnlyList<int> GroupItemView(int groupId)
+	{
+		if (!_groupViews.TryGetValue(groupId, out var v))
+			_groupViews[groupId] = v = new RecipeGroupItemView(groupId);
+		return v;
+	}
+
 	public static bool TryGetFungibleGroupView(string tag, out IReadOnlyList<int> view)
 	{
 		if (TryGetGroup(tag, out int gid) && GtFungibleGroups.Contains(gid))
 		{
-			if (!_groupViews.TryGetValue(gid, out var v))
-				_groupViews[gid] = v = new RecipeGroupItemView(gid);
-			view = v;
+			view = GroupItemView(gid);
 			return true;
 		}
 		view = System.Array.Empty<int>();

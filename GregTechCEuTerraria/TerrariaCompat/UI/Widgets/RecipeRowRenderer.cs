@@ -103,18 +103,6 @@ public static class RecipeRowRenderer
 		float labelX = x + 6;
 		string ownStation = recipe.RecipeType.RegistryName ?? "";
 		int nativeTile = recipe.Data.GetInt("nativeTile");
-		int[] stationTiles = recipe.Data.GetIntArray("stationTiles");
-		if (stationTiles.Length > 0)
-		{
-			foreach (int tile in stationTiles)
-			{
-				int it = StationIcon.ItemTypeForTile(tile);
-				if (it <= 0) continue;
-				DrawItemIconFit(sb, new Rectangle((int)labelX, (int)cy + 1, StationIconSize, StationIconSize), it, StationOverlay(tile, ownStation));
-				labelX += StationIconSize + 4;
-			}
-		}
-		else
 		{
 			var stationKeys = CraftingStationRegistry.StationKeysFor(recipe);
 			int firstStationItem = 0;
@@ -847,10 +835,7 @@ public static class RecipeRowRenderer
 	public static string? FriendlyGroupName(string? tagName)
 	{
 		if (tagName is null) return null;
-		const string prefix = "$terraria:group/";
-		if (tagName.StartsWith(prefix, System.StringComparison.Ordinal)
-		    && int.TryParse(tagName.Substring(prefix.Length), out int gid)
-		    && Terraria.RecipeGroup.recipeGroups.TryGetValue(gid, out var g))
+		if (IngredientResolverImpl.TryGetRecipeGroup(tagName, out var g))
 			return g.GetText();
 		if (VanillaItemMap.TryGetFungibleGroupName(tagName, out var name))
 			return name;

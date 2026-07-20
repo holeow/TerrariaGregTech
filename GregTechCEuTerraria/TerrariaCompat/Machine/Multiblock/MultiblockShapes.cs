@@ -81,7 +81,7 @@ public static class MultiblockShapes
 	public static readonly RepeatableShape AssemblyLine = new(
 		Head: new RowPattern[]
 		{
-			"YG",
+			"YY",
 			"SD",
 			"FR",
 			"FI",

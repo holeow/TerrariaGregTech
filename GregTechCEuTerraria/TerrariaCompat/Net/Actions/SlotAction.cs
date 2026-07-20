@@ -98,16 +98,17 @@ public sealed class SlotAction : IMachineAction
 		{
 			ref Item slot = ref slots[_index];
 			int before = _cursor.stack;
+			int limit = System.Math.Min(_cursor.maxStack, entity.GetSlotLimitFor(_group, _index));
 			if (slot.IsAir)
 			{
 				var placed = _cursor.Clone();
-				placed.stack = System.Math.Min(_cursor.stack, _cursor.maxStack);
+				placed.stack = System.Math.Min(_cursor.stack, limit);
 				slot = placed;
 				_cursor.stack -= placed.stack;
 			}
-			else if (slot.type == _cursor.type && slot.stack < slot.maxStack && CanStack(slot, _cursor))
+			else if (slot.type == _cursor.type && slot.stack < limit && CanStack(slot, _cursor))
 			{
-				int moved = System.Math.Min(slot.maxStack - slot.stack, _cursor.stack);
+				int moved = System.Math.Min(limit - slot.stack, _cursor.stack);
 				slot.stack += moved;
 				_cursor.stack -= moved;
 			}
@@ -152,7 +153,7 @@ public sealed class SlotAction : IMachineAction
 		var (slots, group) = ResolveShiftInSlots(entity);
 		if (slots is not null && entity.IsItemValidForSlot(group, 0, _cursor))
 		{
-			DepositInto(slots, _cursor);
+			DepositInto(slots, _cursor, entity.GetSlotLimitFor(group, 0));
 			entity.NotifySlotGroupChanged(group);
 		}
 		WriteBackCursor(byWhoAmI, _cursor, CursorUpdatePacket.Delivery.PlayerInventory);
@@ -167,28 +168,31 @@ public sealed class SlotAction : IMachineAction
 		return (null, default);
 	}
 
-	public static int FitCapacity(Item[] slots, Item item, int from = 0, int count = -1)
+	public static int FitCapacity(Item[] slots, Item item, int from = 0, int count = -1,
+	                              int slotLimit = int.MaxValue)
 	{
 		if (item.IsAir) return 0;
+		int limit = System.Math.Min(item.maxStack, slotLimit);
 		int end = count < 0 ? slots.Length : System.Math.Min(slots.Length, from + count);
 		long cap = 0;
 		for (int i = from; i < end && cap < item.stack; i++)
 		{
 			var s = slots[i];
-			if (s.IsAir) cap += item.maxStack;
-			else if (s.type == item.type && s.stack < s.maxStack && CanStack(s, item))
-				cap += s.maxStack - s.stack;
+			if (s.IsAir) cap += limit;
+			else if (s.type == item.type && s.stack < limit && CanStack(s, item))
+				cap += limit - s.stack;
 		}
 		return (int)System.Math.Min(cap, item.stack);
 	}
 
-	public static void DepositInto(Item[] slots, Item item)
+	public static void DepositInto(Item[] slots, Item item, int slotLimit = int.MaxValue)
 	{
+		int limit = System.Math.Min(item.maxStack, slotLimit);
 		for (int i = 0; i < slots.Length && item.stack > 0; i++)
 		{
 			ref Item s = ref slots[i];
-			if (s.IsAir || s.type != item.type || s.stack >= s.maxStack || !CanStack(s, item)) continue;
-			int moved = System.Math.Min(s.maxStack - s.stack, item.stack);
+			if (s.IsAir || s.type != item.type || s.stack >= limit || !CanStack(s, item)) continue;
+			int moved = System.Math.Min(limit - s.stack, item.stack);
 			s.stack += moved;
 			item.stack -= moved;
 		}
@@ -197,7 +201,7 @@ public sealed class SlotAction : IMachineAction
 			ref Item s = ref slots[i];
 			if (!s.IsAir) continue;
 			var placed = item.Clone();
-			placed.stack = System.Math.Min(item.maxStack, item.stack);
+			placed.stack = System.Math.Min(limit, item.stack);
 			item.stack -= placed.stack;
 			s = placed;
 		}

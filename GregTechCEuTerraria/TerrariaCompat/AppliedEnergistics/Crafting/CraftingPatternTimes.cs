@@ -16,6 +16,11 @@ public static class CraftingPatternTimes
 		[TileID.AdamantiteForge] = 1 * Sec,
 	};
 
-	public static int TicksFor(int tileId) =>
-		_overrides.TryGetValue(tileId, out var t) ? t : DefaultTicks;
+	public static int TicksFor(IReadOnlyList<int> tileIds)
+	{
+		int ticks = DefaultTicks;
+		foreach (int id in tileIds)
+			if (_overrides.TryGetValue(id, out var t) && t > ticks) ticks = t;
+		return ticks;
+	}
 }

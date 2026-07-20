@@ -12,9 +12,10 @@ namespace GregTechCEuTerraria.TerrariaCompat.Tiles.CraftingStations;
 
 public static class CraftingStationRegistry
 {
-	public sealed record StationDef(string Key, string Tool, string DisplayName, string GtTag, string ForgeTag);
+	public sealed record StationDef(string Key, string Tool, string DisplayName, string GtTag, string ForgeTag,
+		string[]? AdjKeys = null, string? OverlayItemId = null);
 
-	private static readonly StationDef[] _defs =
+	private static readonly StationDef[] _toolDefs =
 	{
 		new("manual_hammer",      "hammer",      "Manual Hammer Crafting Station",      "gtceu:tools/crafting_hammers",       "forge:tools/hammers"),
 		new("manual_mallet",      "mallet",      "Manual Mallet Crafting Station",      "gtceu:tools/crafting_mallets",       "forge:tools/mallets"),
@@ -28,20 +29,22 @@ public static class CraftingStationRegistry
 		new("manual_crowbar",     "crowbar",     "Manual Crowbar Crafting Station",     "gtceu:tools/crafting_crowbars",      "forge:tools/crowbars"),
 	};
 
+	private static readonly StationDef[] _defs = BuildDefs();
+
 	public static IReadOnlyList<StationDef> Defs => _defs;
 
-	public const string UltimateKey = "ultimate_manual";
-	public const string UltimateDisplayName = "Ultimate Manual Crafting Station";
-	public const string UltimateOverlayId = "gtceu:nether_star";
-
-	private static string[] AllStationKeys()
+	private static StationDef[] BuildDefs()
 	{
-		var keys = new string[_defs.Length];
-		for (int i = 0; i < _defs.Length; i++) keys[i] = _defs[i].Key;
-		return keys;
-	}
+		var adj = new string[_toolDefs.Length];
+		for (int i = 0; i < _toolDefs.Length; i++) adj[i] = _toolDefs[i].Key;
 
-	public static int UltimateTileType => TryGetTile(UltimateKey, out int t) ? t : 0;
+		var all = new StationDef[_toolDefs.Length + 1];
+		Array.Copy(_toolDefs, all, _toolDefs.Length);
+		all[_toolDefs.Length] = new StationDef(
+			"ultimate_manual", "", "Ultimate Manual Crafting Station", "", "",
+			AdjKeys: adj, OverlayItemId: "gtceu:nether_star");
+		return all;
+	}
 
 	private static readonly Dictionary<string, string> _tagToStation = new(StringComparer.Ordinal);
 
@@ -55,8 +58,8 @@ public static class CraftingStationRegistry
 		for (int i = 0; i < _defs.Length; i++)
 		{
 			var d = _defs[i];
-			_tagToStation[d.GtTag] = d.Key;
-			_tagToStation[d.ForgeTag] = d.Key;
+			if (d.GtTag.Length > 0) _tagToStation[d.GtTag] = d.Key;
+			if (d.ForgeTag.Length > 0) _tagToStation[d.ForgeTag] = d.Key;
 			_keyOrder[d.Key] = i;
 		}
 	}
@@ -72,11 +75,9 @@ public static class CraftingStationRegistry
 		_tileCache.Clear();
 		foreach (var d in _defs)
 		{
-			mod.AddContent(new CraftingStationTile(d.Key, d.DisplayName));
-			mod.AddContent(new CraftingStationItem(d.Key, d.DisplayName, d.GtTag));
+			mod.AddContent(new CraftingStationTile(d.Key, d.DisplayName, d.AdjKeys));
+			mod.AddContent(new CraftingStationItem(d.Key, d.DisplayName, d.GtTag.Length > 0 ? d.GtTag : null));
 		}
-		mod.AddContent(new CraftingStationTile(UltimateKey, UltimateDisplayName, AllStationKeys()));
-		mod.AddContent(new CraftingStationItem(UltimateKey, UltimateDisplayName, null));
 	}
 
 	public static IReadOnlyList<string> StationKeysFor(GTRecipe recipe)
@@ -107,12 +108,12 @@ public static class CraftingStationRegistry
 
 	private static int ResolveOverlayTool(string stationKey)
 	{
-		if (stationKey == UltimateKey)
-			return IIngredientResolver.Default?.ResolveItemType(UltimateOverlayId) ?? 0;
-
 		StationDef? def = null;
 		foreach (var d in _defs) if (d.Key == stationKey) { def = d; break; }
 		if (def is null) return 0;
+
+		if (def.OverlayItemId != null)
+			return IIngredientResolver.Default?.ResolveItemType(def.OverlayItemId) ?? 0;
 
 		var toolType = GTToolType.Get(def.Tool);
 		if (toolType != null && ToolItemLoader.TryGet("gtceu:" + toolType.ResolveId("iron"), out int ironType))
@@ -130,7 +131,6 @@ public static class CraftingStationRegistry
 			_tileToKey = new Dictionary<int, string>();
 			foreach (var d in _defs)
 				if (TryGetTile(d.Key, out int t)) _tileToKey[t] = d.Key;
-			if (TryGetTile(UltimateKey, out int ut)) _tileToKey[ut] = UltimateKey;
 		}
 		return _tileToKey.TryGetValue(tileType, out stationKey!);
 	}

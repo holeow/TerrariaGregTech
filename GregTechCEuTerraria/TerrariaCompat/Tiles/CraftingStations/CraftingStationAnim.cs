@@ -52,15 +52,13 @@ public sealed class CraftingStationCraftListener : GlobalItem
 		int x0 = System.Math.Max(0, px - R), x1 = System.Math.Min(Main.maxTilesX - 1, px + R);
 		int y0 = System.Math.Max(0, py - R), y1 = System.Math.Min(Main.maxTilesY - 1, py + R);
 
-		int ultimate = CraftingStationRegistry.UltimateTileType;
-
 		bool found = false;
 		float best = float.MaxValue;
 		for (int i = x0; i <= x1; i++)
 		for (int j = y0; j <= y1; j++)
 		{
 			Tile t = Main.tile[i, j];
-			if (!t.HasTile || (t.TileType != tileType && t.TileType != ultimate)) continue;
+			if (!t.HasTile || !AppliedEnergistics.Crafting.RecipeNetworkCrafting.TileSatisfies(t.TileType, tileType)) continue;
 			int ox = i - t.TileFrameX / 18, oy = j - t.TileFrameY / 18;
 			float dx = ox + 1.5f - px, dy = oy + 1.5f - py;
 			float d = dx * dx + dy * dy;
@@ -68,6 +66,7 @@ public sealed class CraftingStationCraftListener : GlobalItem
 		}
 		return found;
 	}
+
 }
 
 public sealed class CraftingStationAnimSystem : ModSystem
